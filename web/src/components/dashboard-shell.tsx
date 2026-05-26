@@ -87,7 +87,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
     }
   }
 
-  const handleChatInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChatInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value
     setChatInputValue(val)
     
@@ -104,6 +104,24 @@ export default function DashboardShell({ children, profile, store, lowStockCount
       setAutocompleteSearch('')
     }
   }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter') {
+      if (e.shiftKey || e.altKey) {
+        return
+      }
+      e.preventDefault()
+      if (chatInputValue.trim()) {
+        const userText = chatInputValue
+        setMessages(prev => [...prev, { sender: 'user', text: userText, timestamp: new Date() }])
+        setChatInputValue('')
+        setAutocompleteOpen(false)
+        setTyping(true)
+        processCommand(userText)
+      }
+    }
+  }
+
 
   const selectSuggestion = (name: string) => {
     const textBeforeCursor = chatInputValue.slice(0, cursorPos)
@@ -1023,12 +1041,13 @@ export default function DashboardShell({ children, profile, store, lowStockCount
 
               {/* Chat Input form */}
               <form onSubmit={handleSendChatMessage} className="p-3 border-t border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-2">
-                <input
-                  type="text"
+                <textarea
                   value={chatInputValue}
                   onChange={handleChatInputChange}
+                  onKeyDown={handleKeyDown}
                   placeholder="Digite um comando... use '@' para buscar"
-                  className="flex-1 px-3 py-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs transition-all"
+                  rows={1}
+                  className="flex-1 px-3 py-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs transition-all resize-none max-h-24 overflow-y-auto"
                 />
                 <button
                   type="submit"
