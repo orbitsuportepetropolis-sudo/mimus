@@ -268,7 +268,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
             brand: 'Mimus',
             cost_price: 0,
             sale_price: 0,
-            quantity_in_stock: item.quantity,
+            quantity_in_stock: 0,
             min_stock_alert: 5
           }))
 
@@ -599,7 +599,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
               brand,
               cost_price,
               sale_price,
-              quantity_in_stock: stock,
+              quantity_in_stock: 0,
               min_stock_alert: 5
             }])
             .select()

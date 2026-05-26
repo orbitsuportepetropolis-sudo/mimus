@@ -159,7 +159,8 @@ export default function StorefrontPage() {
 
       if (prodsErr) throw prodsErr
       if (prods) {
-        setProducts(prods)
+        const inStockProds = prods.filter(p => p.quantity_in_stock > 0)
+        setProducts(inStockProds)
         
         console.log('DEBUG STOREFRONT:', {
           storeName: store?.name,
@@ -207,6 +208,10 @@ export default function StorefrontPage() {
   }
 
   function addToCart(prod: Product) {
+    if (prod.quantity_in_stock <= 0) {
+      alert('Desculpe, este produto está esgotado.')
+      return
+    }
     const existing = cart.find(item => item.id === prod.id)
     if (existing) {
       if (existing.qty >= prod.quantity_in_stock) {
@@ -988,17 +993,26 @@ export default function StorefrontPage() {
 
             {/* Drawer Footer (Buy button) */}
             <div className="p-5 border-t border-slate-100 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950">
-              <button 
-                onClick={() => {
-                  addToCart(selectedProduct)
-                  closeProductDetails()
-                  setCartOpen(true)
-                }}
-                style={{ backgroundColor: accentColor }}
-                className="w-full py-4 px-4 rounded-xl text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg hover:opacity-95 active:scale-[0.98] transition-all"
-              >
-                ADICIONAR À SACOLA — R$ {selectedProduct.sale_price.toFixed(2)}
-              </button>
+              {selectedProduct.quantity_in_stock <= 0 ? (
+                <button 
+                  disabled
+                  className="w-full py-4 px-4 rounded-xl bg-slate-200 dark:bg-zinc-800 text-slate-400 dark:text-zinc-500 font-extrabold text-xs flex items-center justify-center gap-2 cursor-not-allowed"
+                >
+                  PRODUTO ESGOTADO
+                </button>
+              ) : (
+                <button 
+                  onClick={() => {
+                    addToCart(selectedProduct)
+                    closeProductDetails()
+                    setCartOpen(true)
+                  }}
+                  style={{ backgroundColor: accentColor }}
+                  className="w-full py-4 px-4 rounded-xl text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg hover:opacity-95 active:scale-[0.98] transition-all"
+                >
+                  ADICIONAR À SACOLA — R$ {selectedProduct.sale_price.toFixed(2)}
+                </button>
+              )}
             </div>
 
           </div>

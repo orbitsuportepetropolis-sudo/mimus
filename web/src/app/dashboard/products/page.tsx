@@ -241,7 +241,7 @@ export default function ProductsPage() {
         barcode: row.barcode || null,
         cost_price: parseFloat(row.cost_price) || 0,
         sale_price: parseFloat(row.sale_price) || 0,
-        quantity_in_stock: parseInt(row.quantity_in_stock) || 0,
+        quantity_in_stock: 0,
         min_stock_alert: parseInt(row.min_stock_alert) || 5,
         expiration_date: row.expiration_date || null,
         description: row.description || null
@@ -256,14 +256,21 @@ export default function ProductsPage() {
 
       if (insertedProducts && insertedProducts.length > 0) {
         const stockMovements = insertedProducts
-          .filter(p => p.quantity_in_stock > 0)
-          .map(p => ({
-            store_id,
-            product_id: p.id,
-            quantity: p.quantity_in_stock,
-            type: 'entry',
-            reason: 'purchase'
-          }))
+          .filter(p => {
+            const originalRow = validRows.find(row => row.name === p.name)
+            return originalRow && parseInt(originalRow.quantity_in_stock) > 0
+          })
+          .map(p => {
+            const originalRow = validRows.find(row => row.name === p.name)
+            const qty = originalRow ? parseInt(originalRow.quantity_in_stock) : 0
+            return {
+              store_id,
+              product_id: p.id,
+              quantity: qty,
+              type: 'entry',
+              reason: 'purchase'
+            }
+          })
 
         if (stockMovements.length > 0) {
           const { error: smError } = await supabase
@@ -463,7 +470,7 @@ export default function ProductsPage() {
         }
       }
 
-      const productPayload = {
+      const productPayload: any = {
         store_id,
         name: formName,
         brand: formBrand || null,
@@ -472,7 +479,7 @@ export default function ProductsPage() {
         barcode: formBarcode || null,
         cost_price: parseFloat(formCostPrice) || 0,
         sale_price: parseFloat(formSalePrice) || 0,
-        quantity_in_stock: parseInt(formStock) || 0,
+        quantity_in_stock: editingProduct ? (parseInt(formStock) || 0) : 0,
         min_stock_alert: parseInt(formMinStock) || 5,
         expiration_date: formExpDate || null,
         image_url: finalImageUrl,
