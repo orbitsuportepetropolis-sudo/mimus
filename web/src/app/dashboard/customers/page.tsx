@@ -11,7 +11,9 @@ import {
   Loader2, 
   X,
   TrendingUp,
-  ShoppingBag
+  ShoppingBag,
+  Edit,
+  Trash2
 } from 'lucide-react'
 
 interface Customer {
@@ -33,6 +35,7 @@ export default function CustomersPage() {
   const [formLoading, setFormLoading] = useState(false)
 
   // Form State
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [instagram, setInstagram] = useState('')
@@ -60,6 +63,24 @@ export default function CustomersPage() {
     }
   }
 
+  function openModal(cust: Customer | null = null) {
+    setFormError(null)
+    if (cust) {
+      setEditingCustomer(cust)
+      setName(cust.name)
+      setPhone(cust.phone || '')
+      setInstagram(cust.instagram || '')
+      setBirthday(cust.birthday || '')
+    } else {
+      setEditingCustomer(null)
+      setName('')
+      setPhone('')
+      setInstagram('')
+      setBirthday('')
+    }
+    setModalOpen(true)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setFormLoading(true)
@@ -77,28 +98,62 @@ export default function CustomersPage() {
 
       if (!profile) throw new Error('Loja não encontrada')
 
-      const { error } = await supabase
-        .from('customers')
-        .insert([{
-          store_id: profile.store_id,
-          name,
-          phone: phone || null,
-          instagram: instagram || null,
-          birthday: birthday || null
-        }])
+      if (editingCustomer) {
+        // Update customer
+        const { error } = await supabase
+          .from('customers')
+          .update({
+            name,
+            phone: phone || null,
+            instagram: instagram || null,
+            birthday: birthday || null
+          })
+          .eq('id', editingCustomer.id)
+          .eq('store_id', profile.store_id)
 
-      if (error) throw error
+        if (error) throw error
+      } else {
+        // Insert customer
+        const { error } = await supabase
+          .from('customers')
+          .insert([{
+            store_id: profile.store_id,
+            name,
+            phone: phone || null,
+            instagram: instagram || null,
+            birthday: birthday || null
+          }])
+
+        if (error) throw error
+      }
 
       setModalOpen(false)
       setName('')
       setPhone('')
       setInstagram('')
       setBirthday('')
+      setEditingCustomer(null)
       await loadCustomers()
     } catch (err: any) {
-      setFormError(err.message || 'Erro ao cadastrar cliente.')
+      setFormError(err.message || 'Erro ao salvar cliente.')
     } finally {
       setFormLoading(false)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (confirm('Tem certeza que deseja excluir esta cliente?')) {
+      try {
+        const { error } = await supabase
+          .from('customers')
+          .delete()
+          .eq('id', id)
+
+        if (error) throw error
+        await loadCustomers()
+      } catch (err: any) {
+        alert('Não foi possível excluir a cliente. Certifique-se de que ela não possui vendas vinculadas.')
+      }
     }
   }
 
@@ -122,7 +177,7 @@ export default function CustomersPage() {
           </p>
         </div>
         <button
-          onClick={() => setModalOpen(true)}
+          onClick={() => openModal(null)}
           className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-500/10 transition-all self-start sm:self-auto"
         >
           <Plus className="w-4.5 h-4.5" /> Adicionar Cliente
@@ -196,6 +251,7 @@ export default function CustomersPage() {
                   <th className="px-6 py-4">Instagram</th>
                   <th className="px-6 py-4">Aniversário</th>
                   <th className="px-6 py-4">Data Cadastro</th>
+                  <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 dark:divide-zinc-800/40 text-slate-700 dark:text-zinc-300">
@@ -241,6 +297,22 @@ export default function CustomersPage() {
                     <td className="px-6 py-4 text-slate-400">
                       {new Date(c.created_at).toLocaleDateString('pt-BR')}
                     </td>
+                    <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
+                      <button
+                        onClick={() => openModal(c)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors"
+                        title="Editar"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(c.id)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors"
+                        title="Excluir"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -255,7 +327,9 @@ export default function CustomersPage() {
           <div className="bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
             
             <div className="flex items-center justify-between border-b border-slate-50 dark:border-zinc-850 pb-2.5">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-white">Cadastrar Nova Cliente</h3>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-white">
+                {editingCustomer ? 'Editar Cliente' : 'Cadastrar Nova Cliente'}
+              </h3>
               <button onClick={() => setModalOpen(false)} className="text-slate-400 hover:text-slate-650">
                 <X className="w-5 h-5" />
               </button>
@@ -324,7 +398,7 @@ export default function CustomersPage() {
                   className="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold flex items-center gap-1"
                 >
                   {formLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Cadastrar Cliente
+                  {editingCustomer ? 'Salvar Alterações' : 'Cadastrar Cliente'}
                 </button>
               </div>
 
