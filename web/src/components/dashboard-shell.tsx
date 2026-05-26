@@ -334,6 +334,234 @@ export default function DashboardShell({ children, profile, store, lowStockCount
       return
     }
 
+    const isDelete = normalizedText.includes('apagar') || 
+                     normalizedText.includes('apague') || 
+                     normalizedText.includes('deletar') || 
+                     normalizedText.includes('delete') || 
+                     normalizedText.includes('excluir') || 
+                     normalizedText.includes('exclua') || 
+                     normalizedText.includes('remover') || 
+                     normalizedText.includes('remova') || 
+                     normalizedText.includes('limpar') || 
+                     normalizedText.includes('limpe')
+
+    if (isDelete) {
+      await new Promise(resolve => setTimeout(resolve, 1200))
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Não autenticado')
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('store_id')
+          .eq('id', user.id)
+          .single()
+
+        if (!profile) throw new Error('Loja não encontrada')
+        const store_id = profile.store_id
+
+        const isTargetCustomer = normalizedText.includes('cliente') || normalizedText.includes('customer') || normalizedText.includes('fregues') || normalizedText.includes('contato')
+        const isBulk = normalizedText.includes('todo') || normalizedText.includes('toda') || normalizedText.includes('tudo') || normalizedText.includes('em massa') || normalizedText.includes('lote')
+
+        // Find exceptions
+        let exceptionText = ''
+        const exceptionKeywords = ['menos', 'exceto', 'salvo', 'fora', 'diferente de']
+        for (const kw of exceptionKeywords) {
+          const idx = normalizedText.indexOf(kw)
+          if (idx !== -1) {
+            exceptionText = normalizedText.slice(idx + kw.length)
+            break
+          }
+        }
+
+        if (isTargetCustomer) {
+          // Fetch latest customers from database
+          const { data: latestCusts, error: custsErr } = await supabase
+            .from('customers')
+            .select('id, name')
+            .eq('store_id', store_id)
+          if (custsErr) throw custsErr
+
+          const latestCustomers = latestCusts || []
+          let targetsToDelete: any[] = []
+          let excludedItems: any[] = []
+
+          if (isBulk) {
+            for (const c of latestCustomers) {
+              const normName = normalize(c.name)
+              if (exceptionText && (exceptionText.includes(normName) || normalizedText.includes(`@${normName}`))) {
+                excludedItems.push(c)
+              } else {
+                targetsToDelete.push(c)
+              }
+            }
+          } else {
+            // Single customer delete
+            for (const c of latestCustomers) {
+              const normName = normalize(c.name)
+              if (normalizedText.includes(normName) || normalizedText.includes(`@${normName}`)) {
+                targetsToDelete.push(c)
+              }
+            }
+          }
+
+          if (targetsToDelete.length === 0) {
+            addAgentMessage(`Nenhum cliente correspondente foi encontrado para exclusão.`)
+            setTyping(false)
+            return
+          }
+
+          const idsToDelete = targetsToDelete.map(t => t.id)
+          const { error: delErr } = await supabase
+            .from('customers')
+            .delete()
+            .in('id', idsToDelete)
+
+          if (delErr) throw delErr
+
+          window.dispatchEvent(new CustomEvent('dashboard-refresh'))
+
+          let responseMsg = `✅ **Exclusão de clientes concluída!**\n\n`
+          responseMsg += `👤 **Clientes excluídos (${targetsToDelete.length}):**\n`
+          targetsToDelete.forEach(t => {
+            responseMsg += `* ${t.name}\n`
+          })
+          if (excludedItems.length > 0) {
+            responseMsg += `\n🛡️ **Clientes mantidos (${excludedItems.length}):**\n`
+            excludedItems.forEach(t => {
+              responseMsg += `* ${t.name}\n`
+            })
+          }
+          addAgentMessage(responseMsg)
+
+        } else {
+          // Target is products
+          // Fetch latest products from database
+          const { data: latestProds, error: prodsErr } = await supabase
+            .from('products')
+            .select('id, name, quantity_in_stock')
+            .eq('store_id', store_id)
+          if (prodsErr) throw prodsErr
+
+          const latestProducts = latestProds || []
+          let targetsToDelete: any[] = []
+          let excludedItems: any[] = []
+
+          if (isBulk) {
+            for (const p of latestProducts) {
+              const normName = normalize(p.name)
+              if (exceptionText && (exceptionText.includes(normName) || normalizedText.includes(`@${normName}`))) {
+                excludedItems.push(p)
+              } else {
+                targetsToDelete.push(p)
+              }
+            }
+          } else {
+            // Single product delete
+            for (const p of latestProducts) {
+              const normName = normalize(p.name)
+              if (normalizedText.includes(normName) || normalizedText.includes(`@${normName}`)) {
+                targetsToDelete.push(p)
+              }
+            }
+          }
+
+          if (targetsToDelete.length === 0) {
+            addAgentMessage(`Nenhum produto correspondente foi encontrado para exclusão.`)
+            setTyping(false)
+            return
+          }
+
+          // Fetch sale items to identify products with sales (RESTRICT constraint)
+          const { data: saleItems, error: salesErr } = await supabase
+            .from('sale_items')
+            .select('product_id')
+          if (salesErr) throw salesErr
+
+          const soldProductIds = new Set(saleItems?.map(item => item.product_id) || [])
+
+          const productsRealDelete: any[] = []
+          const productsZeroStock: any[] = []
+
+          for (const p of targetsToDelete) {
+            if (soldProductIds.has(p.id)) {
+              productsZeroStock.push(p)
+            } else {
+              productsRealDelete.push(p)
+            }
+          }
+
+          // 1. Delete products that don't have sales
+          if (productsRealDelete.length > 0) {
+            const idsToDelete = productsRealDelete.map(p => p.id)
+            const { error: delErr } = await supabase
+              .from('products')
+              .delete()
+              .in('id', idsToDelete)
+            if (delErr) throw delErr
+          }
+
+          // 2. Set stock to 0 for products that have sales (and cannot be deleted)
+          if (productsZeroStock.length > 0) {
+            const zeroStockMovements: any[] = []
+            for (const p of productsZeroStock) {
+              if (p.quantity_in_stock !== 0) {
+                zeroStockMovements.push({
+                  store_id,
+                  product_id: p.id,
+                  quantity: -p.quantity_in_stock,
+                  type: 'exit',
+                  reason: 'manual_adjustment'
+                })
+              }
+            }
+
+            if (zeroStockMovements.length > 0) {
+              const { error: smErr } = await supabase
+                .from('stock_movements')
+                .insert(zeroStockMovements)
+              if (smErr) throw smErr
+            }
+          }
+
+          window.dispatchEvent(new CustomEvent('dashboard-refresh'))
+
+          let responseMsg = `✅ **Exclusão de produtos concluída!**\n\n`
+          if (productsRealDelete.length > 0) {
+            responseMsg += `🗑️ **Produtos excluídos (${productsRealDelete.length}):**\n`
+            productsRealDelete.forEach(p => {
+              responseMsg += `* ${p.name}\n`
+            })
+            responseMsg += `\n`
+          }
+          if (productsZeroStock.length > 0) {
+            responseMsg += `⚠️ **Produtos mantidos mas com estoque zerado (${productsZeroStock.length})** (não puderam ser excluídos pois possuem vendas vinculadas):\n`
+            zeroStockMovementsBlock: {
+              productsZeroStock.forEach(p => {
+                responseMsg += `* ${p.name}\n`
+              })
+            }
+            responseMsg += `\n`
+          }
+          if (excludedItems.length > 0) {
+            responseMsg += `🛡️ **Produtos mantidos com estoque original (${excludedItems.length}):**\n`
+            excludedItems.forEach(p => {
+              responseMsg += `* ${p.name} (${p.quantity_in_stock} un.)\n`
+            })
+          }
+
+          addAgentMessage(responseMsg)
+        }
+
+      } catch (err: any) {
+        console.error(err)
+        addAgentMessage(`❌ **Erro ao excluir:** ${err.message || 'Erro desconhecido.'}`)
+      } finally {
+        setTyping(false)
+      }
+      return
+    }
+
     let matchedProduct: any = null
     let matchedCustomer: any = null
     let quantity = 1
