@@ -122,12 +122,205 @@ export default function DashboardShell({ children, profile, store, lowStockCount
   const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
 
   async function processCommand(text: string) {
+    const normalizedText = normalize(text)
+
+    // 1. Check for batch multi-line product registration
+    const lines = text.split('\n')
+    const itemsToRegister: { quantity: number; name: string }[] = []
+    const itemRegex = /^\s*(\d+)\s*(?:do|da|de|dos|das)?\s+(.+)$/i
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed) continue
+      
+      const match = trimmed.match(itemRegex)
+      if (match) {
+        const quantity = parseInt(match[1], 10)
+        const productName = match[2].trim()
+        itemsToRegister.push({ quantity, name: productName })
+      }
+    }
+
+    const isBatchTrigger = itemsToRegister.length > 0 && (
+      lines.length > 1 || 
+      normalizedText.includes('lance') || 
+      normalizedText.includes('cadastr') || 
+      normalizedText.includes('inser') || 
+      normalizedText.includes('subir') ||
+      normalizedText.includes('lote')
+    )
+
+    if (isBatchTrigger) {
+      await new Promise(resolve => setTimeout(resolve, 1500))
+
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Não autenticado')
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('store_id')
+          .eq('id', user.id)
+          .single()
+
+        if (!profile) throw new Error('Loja não encontrada')
+        const store_id = profile.store_id
+
+        // Fetch store details to check subscription limits
+        const { data: storeData } = await supabase
+          .from('stores')
+          .select('plan, plan_status, trial_ends_at')
+          .eq('id', store_id)
+          .single()
+
+        // Fetch latest products from database
+        const { data: latestProds } = await supabase
+          .from('products')
+          .select('id, name, quantity_in_stock')
+          .eq('store_id', store_id)
+
+        const latestProducts = (latestProds || []) as any[]
+
+        // Consolidate duplicates from the parsed list
+        const groupedItems: { [name: string]: number } = {}
+        for (const item of itemsToRegister) {
+          const normName = normalize(item.name)
+          const matchedKey = Object.keys(groupedItems).find(k => normalize(k) === normName)
+          if (matchedKey) {
+            groupedItems[matchedKey] += item.quantity
+          } else {
+            groupedItems[item.name] = item.quantity
+          }
+        }
+
+        const consolidatedItems = Object.entries(groupedItems).map(([name, quantity]) => ({
+          name,
+          quantity
+        }))
+
+        // Partition into updates and creations
+        const itemsToUpdate: { product: any; quantity: number }[] = []
+        const itemsToCreate: { name: string; quantity: number }[] = []
+
+        for (const item of consolidatedItems) {
+          const existing = latestProducts.find(
+            p => normalize(p.name) === normalize(item.name)
+          )
+          if (existing) {
+            itemsToUpdate.push({ product: existing, quantity: item.quantity })
+          } else {
+            itemsToCreate.push(item)
+          }
+        }
+
+        // Limit validation for Free tier
+        const getTrialDaysLeft = () => {
+          if (!storeData?.trial_ends_at) return 0
+          const diff = new Date(storeData.trial_ends_at).getTime() - Date.now()
+          return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+        }
+        const isTrialActive = storeData?.plan_status === 'trial' && getTrialDaysLeft() > 0
+        const isPro = storeData?.plan === 'pro' || isTrialActive
+
+        if (!isPro && (latestProducts.length + itemsToCreate.length) > 50) {
+          throw new Error(`A importação excede o limite de 50 produtos do Plano Free. Total atual: ${latestProducts.length}. Você está tentando cadastrar ${itemsToCreate.length} novos. Faça o upgrade para o Plano Pro!`)
+        }
+
+        // 1. Bulk insert stock movements for existing products
+        const updateMovements = itemsToUpdate.map(item => ({
+          store_id,
+          product_id: item.product.id,
+          quantity: item.quantity,
+          type: 'entry',
+          reason: 'manual_adjustment'
+        }))
+
+        if (updateMovements.length > 0) {
+          const { error: updateErr } = await supabase
+            .from('stock_movements')
+            .insert(updateMovements)
+          if (updateErr) throw updateErr
+        }
+
+        // 2. Bulk insert new products
+        if (itemsToCreate.length > 0) {
+          const newProductsToInsert = itemsToCreate.map(item => ({
+            store_id,
+            name: item.name,
+            brand: 'Mimus',
+            cost_price: 0,
+            sale_price: 0,
+            quantity_in_stock: item.quantity,
+            min_stock_alert: 5
+          }))
+
+          const { data: insertedNewProds, error: createErr } = await supabase
+            .from('products')
+            .insert(newProductsToInsert)
+            .select()
+
+          if (createErr) throw createErr
+
+          if (insertedNewProds && insertedNewProds.length > 0) {
+            const createMovements = insertedNewProds.map(p => {
+              const originalItem = itemsToCreate.find(item => normalize(item.name) === normalize(p.name))
+              const qty = originalItem ? originalItem.quantity : p.quantity_in_stock
+              return {
+                store_id,
+                product_id: p.id,
+                quantity: qty,
+                type: 'entry',
+                reason: 'purchase'
+              }
+            })
+
+            if (createMovements.length > 0) {
+              const { error: smErr } = await supabase
+                .from('stock_movements')
+                .insert(createMovements)
+              if (smErr) throw smErr
+            }
+          }
+        }
+
+        // Dispatch refresh so all tables update immediately
+        window.dispatchEvent(new CustomEvent('dashboard-refresh'))
+
+        // Format success response
+        let successMessage = `✅ **Lançamento em lote concluído com sucesso!**\n\n`
+
+        if (itemsToCreate.length > 0) {
+          successMessage += `✨ **Novos produtos cadastrados (${itemsToCreate.length}):**\n`
+          itemsToCreate.forEach(item => {
+            successMessage += `* ${item.name} (${item.quantity} un.)\n`
+          })
+          successMessage += `\n`
+        }
+
+        if (itemsToUpdate.length > 0) {
+          successMessage += `📦 **Estoque atualizado (${itemsToUpdate.length}):**\n`
+          itemsToUpdate.forEach(item => {
+            const newQty = item.product.quantity_in_stock + item.quantity
+            successMessage += `* ${item.product.name}: +${item.quantity} un. (Estoque atual: ${newQty} un.)\n`
+          })
+        }
+
+        addAgentMessage(successMessage)
+
+      } catch (err: any) {
+        console.error(err)
+        addAgentMessage(`❌ **Erro ao processar lote:** ${err.message || 'Erro desconhecido.'}`)
+      } finally {
+        setTyping(false)
+      }
+      return
+    }
+
     let matchedProduct: any = null
     let matchedCustomer: any = null
     let quantity = 1
     let paymentMethod: 'pix' | 'money' | 'credit_card' | 'debit_card' = 'pix'
 
-    const normalizedText = normalize(text)
 
     const quantityMatch = text.match(/(?:quantidade|qtd|vendi|vendeu|estoque|adicione|aumente|retire|-\s*|\+\s*)?\s*(\d+)/i)
     if (quantityMatch) {
