@@ -66,12 +66,19 @@ export default function SalesPage() {
   const [custError, setCustError] = useState<string | null>(null)
 
   useEffect(() => {
-    loadPDVData()
+    loadPDVData(true)
+
+    const handleRefresh = () => {
+      loadPDVData(false)
+    }
+
+    window.addEventListener('dashboard-refresh', handleRefresh)
+    return () => window.removeEventListener('dashboard-refresh', handleRefresh)
   }, [])
 
-  async function loadPDVData() {
+  async function loadPDVData(showSpinner = false) {
     try {
-      setLoading(true)
+      if (showSpinner) setLoading(true)
       
       // Fetch products in stock
       const { data: prods } = await supabase

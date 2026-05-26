@@ -21,7 +21,9 @@ import {
   Bell,
   AlertTriangle,
   CreditCard,
-  Settings
+  Settings,
+  Send,
+  MessageSquare
 } from 'lucide-react'
 
 interface DashboardShellProps {
@@ -39,6 +41,311 @@ export default function DashboardShell({ children, profile, store, lowStockCount
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
   const [showAlerts, setShowAlerts] = useState(false)
+
+  // AI Agent states
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatInputValue, setChatInputValue] = useState('')
+  const [messages, setMessages] = useState<any[]>([
+    { 
+      sender: 'agent', 
+      text: 'Olá! Sou o assistente Mimus AI. 🌸\n\nPosso te ajudar a gerenciar sua loja rapidamente! Digite um comando ou experimente usar `@` para marcar produtos e clientes.\n\nExemplos de comandos:\n- *vendi 2 @Batom Velvet para a cliente @Maria por Pix*\n- *adicione 10 unidades de @Delineador*\n- *cadastre o produto Blush Coral por R$ 35*', 
+      timestamp: new Date() 
+    }
+  ])
+  const [typing, setTyping] = useState(false)
+  const [products, setProducts] = useState<any[]>([])
+  const [customers, setCustomers] = useState<any[]>([])
+  
+  // Autocomplete states
+  const [autocompleteOpen, setAutocompleteOpen] = useState(false)
+  const [autocompleteSearch, setAutocompleteSearch] = useState('')
+  const [cursorPos, setCursorPos] = useState(0)
+
+  useEffect(() => {
+    loadAgentData()
+    // Reload cache when a refresh occurs
+    window.addEventListener('dashboard-refresh', loadAgentData)
+    return () => window.removeEventListener('dashboard-refresh', loadAgentData)
+  }, [])
+
+  async function loadAgentData() {
+    try {
+      const { data: prods } = await supabase
+        .from('products')
+        .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock')
+        .order('name', { ascending: true })
+
+      const { data: custs } = await supabase
+        .from('customers')
+        .select('id, name')
+        .order('name', { ascending: true })
+
+      if (prods) setProducts(prods)
+      if (custs) setCustomers(custs)
+    } catch (err) {
+      console.error('Erro ao carregar dados do Agente IA:', err)
+    }
+  }
+
+  const handleChatInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    setChatInputValue(val)
+    
+    const selectionStart = e.target.selectionStart || 0
+    const textBeforeCursor = val.slice(0, selectionStart)
+    const lastAtPos = textBeforeCursor.lastIndexOf('@')
+    
+    if (lastAtPos !== -1 && !textBeforeCursor.slice(lastAtPos, selectionStart).includes(' ')) {
+      setAutocompleteOpen(true)
+      setAutocompleteSearch(textBeforeCursor.slice(lastAtPos + 1, selectionStart))
+      setCursorPos(selectionStart)
+    } else {
+      setAutocompleteOpen(false)
+      setAutocompleteSearch('')
+    }
+  }
+
+  const selectSuggestion = (name: string) => {
+    const textBeforeCursor = chatInputValue.slice(0, cursorPos)
+    const lastAtPos = textBeforeCursor.lastIndexOf('@')
+    
+    if (lastAtPos !== -1) {
+      const beforeAt = chatInputValue.slice(0, lastAtPos)
+      const afterCursor = chatInputValue.slice(cursorPos)
+      const newValue = `${beforeAt}@${name}${afterCursor}`
+      setChatInputValue(newValue)
+      setAutocompleteOpen(false)
+      setAutocompleteSearch('')
+    }
+  }
+
+  const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+
+  async function processCommand(text: string) {
+    let matchedProduct: any = null
+    let matchedCustomer: any = null
+    let quantity = 1
+    let paymentMethod: 'pix' | 'money' | 'credit_card' | 'debit_card' = 'pix'
+
+    const normalizedText = normalize(text)
+
+    const quantityMatch = text.match(/(?:quantidade|qtd|vendi|vendeu|estoque|adicione|aumente|retire|-\s*|\+\s*)?\s*(\d+)/i)
+    if (quantityMatch) {
+      quantity = parseInt(quantityMatch[1]) || 1
+    }
+
+    for (const c of customers) {
+      const normName = normalize(c.name)
+      if (normalizedText.includes(normName) || normalizedText.includes(normName.replace(/\s+/g, '-'))) {
+        matchedCustomer = c
+        break
+      }
+    }
+
+    for (const p of products) {
+      const normName = normalize(p.name)
+      const normSku = p.sku ? normalize(p.sku) : ''
+      const normBarcode = p.barcode ? normalize(p.barcode) : ''
+      
+      if (
+        normalizedText.includes(normName) || 
+        normalizedText.includes(normName.replace(/\s+/g, '-')) ||
+        (normSku && normalizedText.includes(normSku)) ||
+        (normBarcode && normalizedText.includes(normBarcode))
+      ) {
+        matchedProduct = p
+        break
+      }
+    }
+
+    if (normalizedText.includes('dinheiro') || normalizedText.includes('money')) {
+      paymentMethod = 'money'
+    } else if (normalizedText.includes('credito') || normalizedText.includes('cartao de credito')) {
+      paymentMethod = 'credit_card'
+    } else if (normalizedText.includes('debito') || normalizedText.includes('cartao de debito')) {
+      paymentMethod = 'debit_card'
+    }
+
+    const isSale = normalizedText.includes('vendi') || normalizedText.includes('venda') || normalizedText.includes('vendeu') || normalizedText.includes('saida')
+    const isStockIncrease = normalizedText.includes('adicione') || normalizedText.includes('aumente') || normalizedText.includes('entrada') || normalizedText.includes('somar') || normalizedText.includes('mais')
+    const isStockDecrease = normalizedText.includes('retire') || normalizedText.includes('remova') || normalizedText.includes('saida') || normalizedText.includes('menos') || normalizedText.includes('subtrair')
+    const isCreate = normalizedText.includes('cadastre') || normalizedText.includes('crie') || normalizedText.includes('inserir') || normalizedText.includes('novo produto')
+
+    await new Promise(resolve => setTimeout(resolve, 1200))
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Não autenticado')
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('store_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) throw new Error('Loja não encontrada')
+      const store_id = profile.store_id
+
+      if (isSale) {
+        if (!matchedProduct) {
+          addAgentMessage("Desculpe, não consegui identificar qual produto foi vendido. Marque-o usando `@`.")
+          return
+        }
+
+        let customerId = matchedCustomer?.id
+        if (!customerId) {
+          const { data: existingAvulso } = await supabase
+            .from('customers')
+            .select('id')
+            .eq('store_id', store_id)
+            .eq('name', 'Cliente Avulso')
+            .maybeSingle()
+
+          if (existingAvulso) {
+            customerId = existingAvulso.id
+          } else {
+            const { data: newAvulso } = await supabase
+              .from('customers')
+              .insert([{ store_id, name: 'Cliente Avulso' }])
+              .select('id')
+              .single()
+            customerId = newAvulso?.id
+          }
+        }
+
+        const totalValue = quantity * matchedProduct.sale_price
+
+        const { data: newSale, error: saleErr } = await supabase
+          .from('sales')
+          .insert([{
+            store_id,
+            customer_id: customerId,
+            total_value: totalValue,
+            discount: 0,
+            payment_method: paymentMethod
+          }])
+          .select('id')
+          .single()
+
+        if (saleErr) throw saleErr
+
+        const { error: itemErr } = await supabase
+          .from('sale_items')
+          .insert([{
+            sale_id: newSale.id,
+            product_id: matchedProduct.id,
+            quantity,
+            unit_price: matchedProduct.sale_price
+          }])
+
+        if (itemErr) throw itemErr
+
+        window.dispatchEvent(new CustomEvent('dashboard-refresh'))
+
+        const custName = matchedCustomer ? matchedCustomer.name : 'Cliente Avulso'
+        addAgentMessage(`✅ **Venda registrada!**\n\n* **Produto:** ${matchedProduct.name}\n* **Quantidade:** ${quantity} un.\n* **Cliente:** ${custName}\n* **Total:** R$ ${totalValue.toFixed(2)}\n* **Pagamento:** ${paymentMethod === 'pix' ? 'Pix' : paymentMethod === 'money' ? 'Dinheiro' : paymentMethod === 'credit_card' ? 'Crédito' : 'Débito'}`)
+
+      } else if (isStockIncrease || isStockDecrease) {
+        if (!matchedProduct) {
+          addAgentMessage("Desculpe, não identifiquei o produto para alteração. Use `@`.")
+          return
+        }
+
+        const quantityChange = isStockIncrease ? quantity : -quantity
+
+        const { error: smErr } = await supabase
+          .from('stock_movements')
+          .insert([{
+            store_id,
+            product_id: matchedProduct.id,
+            quantity: quantityChange,
+            type: isStockIncrease ? 'entry' : 'exit',
+            reason: 'manual_adjustment'
+          }])
+
+        if (smErr) throw smErr
+
+        window.dispatchEvent(new CustomEvent('dashboard-refresh'))
+
+        const currentQty = matchedProduct.quantity_in_stock + quantityChange
+        addAgentMessage(`📦 **Estoque atualizado!**\n\n* **Produto:** ${matchedProduct.name}\n* **Movimentação:** ${quantityChange > 0 ? '+' : ''}${quantityChange} un.\n* **Estoque Atualizado:** ${currentQty} un.`)
+
+      } else if (isCreate) {
+        let name = text.replace(/cadastre|crie|inserir|novo produto|produto/gi, '').split(/com|preco|custo|marca|estoque/)[0].replace(/@/g, '').trim()
+        
+        const priceMatch = text.match(/(?:preco|venda|valor)\s*(?:de|R\$)?\s*(\d+(?:[.,]\d+)?)/i)
+        const costMatch = text.match(/(?:custo|compra)\s*(?:de|R\$)?\s*(\d+(?:[.,]\d+)?)/i)
+        const brandMatch = text.match(/(?:marca|grife|da)\s+([a-zA-Z\s]+?)(?:\s+com|\s+preco|\s+custo|\s+estoque|$)/i)
+        const stockMatch = text.match(/(?:estoque|quantidade|qtd)\s*(?:de)?\s*(\d+)/i)
+
+        const sale_price = priceMatch ? parseFloat(priceMatch[1].replace(',', '.')) : 0.00
+        const cost_price = costMatch ? parseFloat(costMatch[1].replace(',', '.')) : 0.00
+        const brand = brandMatch ? brandMatch[1].trim() : 'Mimus'
+        const stock = stockMatch ? parseInt(stockMatch[1]) : 0
+
+        if (!name || name.length < 2) {
+          addAgentMessage("Não consegui identificar o nome do produto. Diga algo como: *'cadastre o produto Delineador com preço 45 e custo 20'*.")
+          return
+        }
+
+        const { data: newProd, error: insertErr } = await supabase
+          .from('products')
+          .insert([{
+            store_id,
+            name,
+            brand,
+            cost_price,
+            sale_price,
+            quantity_in_stock: stock,
+            min_stock_alert: 5
+          }])
+          .select()
+          .single()
+
+        if (insertErr) throw insertErr
+
+        if (newProd && stock > 0) {
+          await supabase
+            .from('stock_movements')
+            .insert([{
+              store_id,
+              product_id: newProd.id,
+              quantity: stock,
+              type: 'entry',
+              reason: 'purchase'
+            }])
+        }
+
+        window.dispatchEvent(new CustomEvent('dashboard-refresh'))
+
+        addAgentMessage(`✨ **Produto cadastrado com sucesso!**\n\n* **Nome:** ${name}\n* **Marca:** ${brand}\n* **Venda:** R$ ${sale_price.toFixed(2)}\n* **Estoque:** ${stock} un.`)
+
+      } else {
+        addAgentMessage(`Olá! Sou o assistente Mimus AI. 🌸\n\nComandos aceitos:\n\n* 🛍️ **Vendas:** *"vendi 2 @Batom para @Maria"*.\n* 📦 **Estoque:** *"adicione 10 @Delineador"* ou *"retire 2 @Base"*.\n* ✨ **Cadastrar:** *"cadastre produto Rímel com preço 29.90 e custo 15"*.\n\nUse **\`@\`** para marcar itens sem erro de digitação!`)
+      }
+    } catch (err: any) {
+      console.error(err)
+      addAgentMessage(`❌ **Erro ao processar:** ${err.message || 'Erro desconhecido.'}`)
+    } finally {
+      setTyping(false)
+    }
+  }
+
+  function addAgentMessage(text: string) {
+    setMessages(prev => [...prev, { sender: 'agent', text, timestamp: new Date() }])
+  }
+
+  const handleSendChatMessage = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!chatInputValue.trim()) return
+
+    const userText = chatInputValue
+    setMessages(prev => [...prev, { sender: 'user', text: userText, timestamp: new Date() }])
+    setChatInputValue('')
+    setAutocompleteOpen(false)
+    setTyping(true)
+    processCommand(userText)
+  }
 
   // Sync dark mode state with document.documentElement class
   useEffect(() => {
@@ -335,6 +642,137 @@ export default function DashboardShell({ children, profile, store, lowStockCount
         <main className="flex-1 p-4 md:p-8">
           {children}
         </main>
+
+        {/* Chat Widget IA Agente Mimus */}
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+          
+          {/* Panel Chat */}
+          {chatOpen && (
+            <div className="w-[360px] sm:w-[380px] h-[500px] bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl flex flex-col mb-4 overflow-hidden animate-in slide-in-from-bottom duration-250 relative">
+              
+              {/* Chat Header */}
+              <div className="p-4 bg-gradient-to-r from-rose-600 to-pink-500 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-white animate-pulse" />
+                  <div>
+                    <h4 className="text-xs font-bold leading-tight">Mimus AI</h4>
+                    <span className="text-[9px] text-rose-100 flex items-center gap-1 font-semibold">
+                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" /> Online • Assistente Virtual
+                    </span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setChatOpen(false)}
+                  className="p-1 rounded-lg hover:bg-white/10 text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Message List */}
+              <div className="flex-1 p-4 overflow-y-auto space-y-3.5 bg-slate-50/50 dark:bg-zinc-950/20 text-xs">
+                {messages.map((msg, index) => (
+                  <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] p-3 rounded-2xl leading-relaxed whitespace-pre-line shadow-sm border ${
+                      msg.sender === 'user'
+                        ? 'bg-rose-600 text-white border-rose-500 rounded-tr-none'
+                        : 'bg-white dark:bg-zinc-900 text-slate-800 dark:text-zinc-200 border-slate-100 dark:border-zinc-800/80 rounded-tl-none'
+                    }`}>
+                      {msg.text}
+                    </div>
+                  </div>
+                ))}
+                
+                {typing && (
+                  <div className="flex justify-start">
+                    <div className="bg-white dark:bg-zinc-900 text-slate-400 dark:text-zinc-550 p-3 rounded-2xl rounded-tl-none border border-slate-100 dark:border-zinc-800/80 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-slate-400 dark:bg-zinc-650 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 bg-slate-400 dark:bg-zinc-650 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 bg-slate-400 dark:bg-zinc-650 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Autocomplete Mention Overlay Popup */}
+              {autocompleteOpen && (
+                <div className="absolute bottom-[60px] left-4 right-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl max-h-[160px] overflow-y-auto z-50 divide-y divide-slate-100 dark:divide-zinc-800/60 text-xs">
+                  <div className="p-1.5 bg-slate-50 dark:bg-zinc-950 text-[10px] text-slate-400 dark:text-zinc-500 font-bold uppercase tracking-wider">Produtos e Clientes matching "@"</div>
+                  
+                  {/* Filter products */}
+                  {products
+                    .filter(p => !autocompleteSearch || normalize(p.name).includes(normalize(autocompleteSearch)) || (p.sku && normalize(p.sku).includes(normalize(autocompleteSearch))))
+                    .map(p => (
+                      <button
+                        key={`p-${p.id}`}
+                        type="button"
+                        onClick={() => selectSuggestion(p.name)}
+                        className="w-full text-left px-3 py-2 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-slate-700 dark:text-zinc-200 flex items-center justify-between"
+                      >
+                        <span className="font-semibold truncate">🛍️ {p.name}</span>
+                        <span className="text-[10px] text-slate-400 dark:text-zinc-500 ml-2 flex-shrink-0">Estoque: {p.quantity_in_stock} un. • R$ {p.sale_price.toFixed(2)}</span>
+                      </button>
+                    ))}
+
+                  {/* Filter customers */}
+                  {customers
+                    .filter(c => !autocompleteSearch || normalize(c.name).includes(normalize(autocompleteSearch)))
+                    .map(c => (
+                      <button
+                        key={`c-${c.id}`}
+                        type="button"
+                        onClick={() => selectSuggestion(c.name)}
+                        className="w-full text-left px-3 py-2 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-slate-700 dark:text-zinc-200 flex items-center"
+                      >
+                        <span className="font-semibold truncate">👤 {c.name}</span>
+                      </button>
+                    ))}
+                  
+                  {products.filter(p => !autocompleteSearch || normalize(p.name).includes(normalize(autocompleteSearch))).length === 0 && 
+                   customers.filter(c => !autocompleteSearch || normalize(c.name).includes(normalize(autocompleteSearch))).length === 0 && (
+                    <p className="p-3 text-center text-slate-450 dark:text-zinc-550 text-[11px]">Nenhum correspondente encontrado.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Chat Input form */}
+              <form onSubmit={handleSendChatMessage} className="p-3 border-t border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={chatInputValue}
+                  onChange={handleChatInputChange}
+                  placeholder="Digite um comando... use '@' para buscar"
+                  className="flex-1 px-3 py-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs transition-all"
+                />
+                <button
+                  type="submit"
+                  disabled={!chatInputValue.trim()}
+                  className="p-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white flex items-center justify-center transition-all shadow-md shadow-rose-500/10 active:scale-[0.98]"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </form>
+
+            </div>
+          )}
+
+          {/* Chat Floating Button */}
+          <button
+            onClick={() => setChatOpen(!chatOpen)}
+            className="w-14 h-14 bg-gradient-to-r from-rose-600 to-pink-500 text-white rounded-full flex items-center justify-center shadow-xl shadow-rose-500/20 hover:shadow-rose-500/35 hover:scale-105 active:scale-95 transition-all duration-200 border-2 border-white dark:border-zinc-800 group relative"
+            title="Assistente de IA"
+          >
+            {chatOpen ? <X className="w-6 h-6 animate-in spin-in-90 duration-200" /> : <MessageSquare className="w-6 h-6 animate-in zoom-in duration-200" />}
+            
+            {/* Ping indicator */}
+            {!chatOpen && (
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-zinc-900 rounded-full flex items-center justify-center">
+                <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
+              </span>
+            )}
+          </button>
+
+        </div>
       </div>
 
     </div>

@@ -54,135 +54,150 @@ export default function DashboardPage() {
   const [expiringProducts, setExpiringProducts] = useState<any[]>([])
   const [chartData, setChartData] = useState<any[]>([])
 
-  useEffect(() => {
-    async function loadDashboardData() {
-      try {
-        setLoading(true)
+  async function loadDashboardData(showSpinner = false) {
+    try {
+      if (showSpinner) setLoading(true)
 
-        // 1. Get today's sales and monthly revenue
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        
-        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+      // 1. Get today's sales and monthly revenue
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
 
-        const { data: salesData } = await supabase
-          .from('sales')
-          .select('id, total_value, created_at, customers(name)')
-          .order('created_at', { ascending: false })
+      const { data: salesData } = await supabase
+        .from('sales')
+        .select('id, total_value, created_at, customers(name)')
+        .order('created_at', { ascending: false })
 
-        // Process sales
-        let todayCount = 0
-        let monthlySum = 0
-        const processedRecentSales: any[] = []
+      // Process sales
+      let todayCount = 0
+      let monthlySum = 0
+      const processedRecentSales: any[] = []
 
-        if (salesData) {
-          salesData.forEach((sale: any) => {
-            const saleDate = new Date(sale.created_at)
-            if (saleDate >= today) {
-              todayCount++
-            }
-            if (saleDate >= firstDayOfMonth) {
-              monthlySum += Number(sale.total_value)
-            }
-            if (processedRecentSales.length < 5) {
-              processedRecentSales.push({
-                id: sale.id,
-                customer: sale.customers?.name || 'Cliente Avulso',
-                value: Number(sale.total_value),
-                date: saleDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-              })
-            }
-          })
-        }
-
-        setRecentSales(processedRecentSales)
-
-        // 2. Fetch products and count alerts
-        const { data: productsData } = await supabase
-          .from('products')
-          .select('id, name, brand, sale_price, quantity_in_stock, min_stock_alert, expiration_date')
-
-        let lowStockCount = 0
-        let expiringCount = 0
-        const lowStockList: ProductItem[] = []
-        const expiringList: any[] = []
-        const thirtyDaysFromNow = new Date()
-        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
-
-        if (productsData) {
-          productsData.forEach((p: any) => {
-            if (p.quantity_in_stock <= p.min_stock_alert) {
-              lowStockCount++
-              if (lowStockList.length < 4) {
-                lowStockList.push(p)
-              }
-            }
-            if (p.expiration_date) {
-              const expDate = new Date(p.expiration_date)
-              if (expDate <= thirtyDaysFromNow && expDate >= new Date()) {
-                expiringCount++
-                if (expiringList.length < 4) {
-                  expiringList.push({
-                    ...p,
-                    formattedDate: expDate.toLocaleDateString('pt-BR')
-                  })
-                }
-              }
-            }
-          })
-        }
-
-        setLowStockProducts(lowStockList)
-        setExpiringProducts(expiringList)
-
-        setStats({
-          todaySalesCount: todayCount,
-          monthlyRevenue: monthlySum,
-          lowStockCount,
-          expiringCount
-        })
-
-        // 3. Generate Chart Data (last 7 days)
-        const weekdayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
-        const last7Days = Array.from({ length: 7 }).map((_, i) => {
-          const d = new Date()
-          d.setDate(d.getDate() - (6 - i))
-          return {
-            dateStr: d.toDateString(),
-            label: weekdayNames[d.getDay()],
-            value: 0
+      if (salesData) {
+        salesData.forEach((sale: any) => {
+          const saleDate = new Date(sale.created_at)
+          if (saleDate >= today) {
+            todayCount++
+          }
+          if (saleDate >= firstDayOfMonth) {
+            monthlySum += Number(sale.total_value)
+          }
+          if (processedRecentSales.length < 5) {
+            processedRecentSales.push({
+              id: sale.id,
+              customer: sale.customers?.name || 'Cliente Avulso',
+              value: Number(sale.total_value),
+              date: saleDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+            })
           }
         })
+      }
 
-        if (salesData) {
-          salesData.forEach((sale: any) => {
-            const saleDateStr = new Date(sale.created_at).toDateString()
-            const match = last7Days.find(item => item.dateStr === saleDateStr)
-            if (match) {
-              match.value += Number(sale.total_value)
+      setRecentSales(processedRecentSales)
+
+      // 2. Fetch products and count alerts
+      const { data: productsData } = await supabase
+        .from('products')
+        .select('id, name, brand, sale_price, quantity_in_stock, min_stock_alert, expiration_date')
+
+      let lowStock = 0
+      let expiring = 0
+      const processedLowStock: ProductItem[] = []
+      const processedExpiring: any[] = []
+
+      const thirtyDaysFromNow = new Date()
+      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
+
+      if (productsData) {
+        productsData.forEach((prod: any) => {
+          // Low stock alert
+          if (prod.quantity_in_stock <= prod.min_stock_alert) {
+            lowStock++
+            if (processedLowStock.length < 5) {
+              processedLowStock.push({
+                id: prod.id,
+                name: prod.name,
+                brand: prod.brand || 'Mimus',
+                sale_price: Number(prod.sale_price),
+                quantity_in_stock: prod.quantity_in_stock
+              })
             }
-          })
-        }
+          }
 
-        // Standard mock data if everything is 0 to make it look stunning for demonstration
-        const totalSalesSum = last7Days.reduce((acc, curr) => acc + curr.value, 0)
-        if (totalSalesSum === 0) {
-          setChartData([
-            { label: 'Seg', value: 1200 },
-            { label: 'Ter', value: 1900 },
-            { label: 'Qua', value: 1500 },
-            { label: 'Qui', value: 2400 },
-            { label: 'Sex', value: 3100 },
-            { label: 'Sáb', value: 4200 },
-            { label: 'Dom', value: 2800 },
-          ])
-          // Set beautiful fallback stats for demo if database is empty
-          setStats({
-            todaySalesCount: 12,
-            monthlyRevenue: 15430.50,
-            lowStockCount: 3,
-            expiringCount: 2
-          })
+          // Expiration alert
+          if (prod.expiration_date) {
+            const expDate = new Date(prod.expiration_date)
+            if (expDate <= thirtyDaysFromNow && expDate >= new Date()) {
+              expiring++
+              if (processedExpiring.length < 5) {
+                processedExpiring.push({
+                  id: prod.id,
+                  name: prod.name,
+                  brand: prod.brand || 'Mimus',
+                  formattedDate: expDate.toLocaleDateString('pt-BR')
+                })
+              }
+            }
+          }
+        })
+      }
+
+      setLowStockProducts(processedLowStock)
+      setExpiringProducts(processedExpiring)
+
+      setStats({
+        todaySalesCount: todayCount,
+        monthlyRevenue: monthlySum,
+        lowStockCount: lowStock,
+        expiringCount: expiring
+      })
+
+      // 3. Process chart data (last 7 days of sales)
+      const last7Days = Array.from({ length: 7 }).map((_, i) => {
+        const d = new Date()
+        d.setDate(d.getDate() - (6 - i))
+        d.setHours(0,0,0,0)
+        return {
+          date: d,
+          label: d.toLocaleDateString('pt-BR', { weekday: 'short' }),
+          value: 0
+        }
+      })
+
+      if (salesData) {
+        salesData.forEach((sale: any) => {
+          const saleDate = new Date(sale.created_at)
+          const matchingDay = last7Days.find(day => 
+            saleDate.getDate() === day.date.getDate() &&
+            saleDate.getMonth() === day.date.getMonth() &&
+            saleDate.getFullYear() === day.date.getFullYear()
+          )
+          if (matchingDay) {
+            matchingDay.value += Number(sale.total_value)
+          }
+        })
+      }
+
+      // Check if empty for demo
+      const totalSalesSum = last7Days.reduce((acc, curr) => acc + curr.value, 0)
+      if (totalSalesSum === 0) {
+        setChartData([
+          { label: 'Seg', value: 1200 },
+          { label: 'Ter', value: 1900 },
+          { label: 'Qua', value: 1500 },
+          { label: 'Qui', value: 2400 },
+          { label: 'Sex', value: 3100 },
+          { label: 'Sáb', value: 4200 },
+          { label: 'Dom', value: 2800 },
+        ])
+        // Set beautiful fallback stats for demo if database is empty
+        setStats({
+          todaySalesCount: 12,
+          monthlyRevenue: 15430.50,
+          lowStockCount: 3,
+          expiringCount: 2
+        })
           setRecentSales([
             { id: '1', customer: 'Mariana Silva', value: 189.90, date: '14:32' },
             { id: '2', customer: 'Leticia Costa', value: 92.50, date: '13:15' },
@@ -209,7 +224,15 @@ export default function DashboardPage() {
       }
     }
 
-    loadDashboardData()
+  useEffect(() => {
+    loadDashboardData(true)
+    
+    const handleRefresh = () => {
+      loadDashboardData(false)
+    }
+    
+    window.addEventListener('dashboard-refresh', handleRefresh)
+    return () => window.removeEventListener('dashboard-refresh', handleRefresh)
   }, [])
 
   if (loading) {

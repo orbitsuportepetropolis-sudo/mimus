@@ -39,6 +39,17 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+
+  // Batch import states
+  const [batchModalOpen, setBatchModalOpen] = useState(false)
+  const [batchTab, setBatchTab] = useState<'manual' | 'csv'>('manual')
+  const [batchRows, setBatchRows] = useState<any[]>([
+    { name: '', brand: '', category: '', sku: '', barcode: '', cost_price: '0.00', sale_price: '0.00', quantity_in_stock: '0', min_stock_alert: '5', expiration_date: '', description: '' },
+    { name: '', brand: '', category: '', sku: '', barcode: '', cost_price: '0.00', sale_price: '0.00', quantity_in_stock: '0', min_stock_alert: '5', expiration_date: '', description: '' },
+    { name: '', brand: '', category: '', sku: '', barcode: '', cost_price: '0.00', sale_price: '0.00', quantity_in_stock: '0', min_stock_alert: '5', expiration_date: '', description: '' }
+  ])
+  const [batchLoading, setBatchLoading] = useState(false)
+  const [batchError, setBatchError] = useState<string | null>(null)
   
   // Search & Filter state
   const [search, setSearch] = useState('')
@@ -67,8 +78,212 @@ export default function ProductsPage() {
   const [categories, setCategories] = useState<string[]>([])
   const [brands, setBrands] = useState<string[]>([])
 
+  // Add a blank row to batch list
+  function addBatchRow() {
+    setBatchRows([
+      ...batchRows,
+      { name: '', brand: '', category: '', sku: '', barcode: '', cost_price: '0.00', sale_price: '0.00', quantity_in_stock: '0', min_stock_alert: '5', expiration_date: '', description: '' }
+    ])
+  }
+
+  // Remove a row from batch list
+  function removeBatchRow(index: number) {
+    setBatchRows(batchRows.filter((_, i) => i !== index))
+  }
+
+  // Handle cell changes in batch editing
+  function handleBatchCellChange(index: number, field: string, value: string) {
+    const updated = [...batchRows]
+    updated[index][field] = value
+    setBatchRows(updated)
+  }
+
+  // Parse and handle CSV uploads
+  function handleCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    setBatchError(null)
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0]
+      const reader = new FileReader()
+      
+      reader.onload = (event) => {
+        const text = event.target?.result as string
+        if (text) {
+          try {
+            const parsed = parseCSV(text)
+            if (parsed.length === 0) {
+              setBatchError('Nenhuma linha válida identificada no CSV. Verifique os cabeçalhos das colunas.')
+            } else {
+              setBatchRows(parsed)
+            }
+          } catch (err) {
+            setBatchError('Erro ao processar o arquivo CSV. Verifique a formatação do arquivo.')
+          }
+        }
+      }
+      reader.readAsText(file, 'UTF-8')
+    }
+  }
+
+  // Simple CSV parser
+  function parseCSV(text: string) {
+    const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0)
+    if (lines.length < 2) return []
+    
+    const headerLine = lines[0]
+    const delimiter = headerLine.includes(';') ? ';' : ','
+    const headers = headerLine.split(delimiter).map(h => h.trim().toLowerCase().replace(/"/g, ''))
+    const rows: any[] = []
+    
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i]
+      let values: string[] = []
+      let currentVal = ''
+      let insideQuotes = false
+      
+      for (let charIndex = 0; charIndex < line.length; charIndex++) {
+        const char = line[charIndex]
+        if (char === '"') {
+          insideQuotes = !insideQuotes
+        } else if (char === delimiter && !insideQuotes) {
+          values.push(currentVal.trim())
+          currentVal = ''
+        } else {
+          currentVal += char
+        }
+      }
+      values.push(currentVal.trim())
+      
+      const row = {
+        name: '', brand: '', category: '', sku: '', barcode: '',
+        cost_price: '0.00', sale_price: '0.00', quantity_in_stock: '0',
+        min_stock_alert: '5', expiration_date: '', description: ''
+      }
+      
+      headers.forEach((header, index) => {
+        const value = values[index] || ''
+        const cleanedVal = value.replace(/"/g, '')
+        
+        if (header.includes('nome') || header.includes('name') || header.includes('produto')) {
+          row.name = cleanedVal
+        } else if (header.includes('marca') || header.includes('brand')) {
+          row.brand = cleanedVal
+        } else if (header.includes('categoria') || header.includes('category')) {
+          row.category = cleanedVal
+        } else if (header.includes('sku')) {
+          row.sku = cleanedVal
+        } else if (header.includes('barra') || header.includes('barcode') || header.includes('ean')) {
+          row.barcode = cleanedVal
+        } else if (header.includes('custo') || header.includes('cost')) {
+          row.cost_price = cleanedVal
+        } else if (header.includes('venda') || header.includes('price') || header.includes('valor')) {
+          row.sale_price = cleanedVal
+        } else if (header.includes('estoque') || header.includes('quantity') || header.includes('qtd')) {
+          row.quantity_in_stock = cleanedVal
+        } else if (header.includes('minimo') || header.includes('alerta') || header.includes('min')) {
+          row.min_stock_alert = cleanedVal
+        } else if (header.includes('validade') || header.includes('expiration') || header.includes('vence')) {
+          row.expiration_date = cleanedVal
+        } else if (header.includes('descricao') || header.includes('description')) {
+          row.description = cleanedVal
+        }
+      })
+      
+      if (row.name) {
+        rows.push(row)
+      }
+    }
+    return rows
+  }
+
+  // Handle batch saving to Supabase
+  async function handleBatchSave() {
+    setBatchLoading(true)
+    setBatchError(null)
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Não autenticado')
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('store_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) throw new Error('Loja não encontrada')
+      const store_id = profile.store_id
+
+      const validRows = batchRows.filter(row => row.name && row.name.trim().length > 0)
+      if (validRows.length === 0) {
+        throw new Error('Preencha o Nome de pelo menos um produto.')
+      }
+
+      if (storePlan === 'free' && products.length + validRows.length > 50) {
+        throw new Error(`A importação excede o limite de 50 produtos do Plano Free. Total atual: ${products.length}. Você está tentando importar ${validRows.length}. Faça o upgrade para o Plano Pro!`)
+      }
+
+      const productsToInsert = validRows.map(row => ({
+        store_id,
+        name: row.name,
+        brand: row.brand || null,
+        category: row.category || null,
+        sku: row.sku || null,
+        barcode: row.barcode || null,
+        cost_price: parseFloat(row.cost_price) || 0,
+        sale_price: parseFloat(row.sale_price) || 0,
+        quantity_in_stock: parseInt(row.quantity_in_stock) || 0,
+        min_stock_alert: parseInt(row.min_stock_alert) || 5,
+        expiration_date: row.expiration_date || null,
+        description: row.description || null
+      }))
+
+      const { data: insertedProducts, error: insertError } = await supabase
+        .from('products')
+        .insert(productsToInsert)
+        .select()
+
+      if (insertError) throw insertError
+
+      if (insertedProducts && insertedProducts.length > 0) {
+        const stockMovements = insertedProducts
+          .filter(p => p.quantity_in_stock > 0)
+          .map(p => ({
+            store_id,
+            product_id: p.id,
+            quantity: p.quantity_in_stock,
+            type: 'entry',
+            reason: 'purchase'
+          }))
+
+        if (stockMovements.length > 0) {
+          const { error: smError } = await supabase
+            .from('stock_movements')
+            .insert(stockMovements)
+
+          if (smError) console.error('Erro ao cadastrar movimentações de estoque:', smError)
+        }
+      }
+
+      await loadProducts()
+      setBatchModalOpen(false)
+      setBatchRows([
+        { name: '', brand: '', category: '', sku: '', barcode: '', cost_price: '0.00', sale_price: '0.00', quantity_in_stock: '0', min_stock_alert: '5', expiration_date: '', description: '' },
+        { name: '', brand: '', category: '', sku: '', barcode: '', cost_price: '0.00', sale_price: '0.00', quantity_in_stock: '0', min_stock_alert: '5', expiration_date: '', description: '' },
+        { name: '', brand: '', category: '', sku: '', barcode: '', cost_price: '0.00', sale_price: '0.00', quantity_in_stock: '0', min_stock_alert: '5', expiration_date: '', description: '' }
+      ])
+    } catch (err: any) {
+      setBatchError(err.message || 'Erro ao importar produtos. Verifique se os dados estão corretos.')
+    } finally {
+      setBatchLoading(false)
+    }
+  }
+
   useEffect(() => {
     loadProducts()
+
+    // Listen to global dashboard updates (e.g. from AI Agent)
+    window.addEventListener('dashboard-refresh', loadProducts)
+    return () => window.removeEventListener('dashboard-refresh', loadProducts)
   }, [])
 
   async function loadProducts() {
@@ -341,12 +556,20 @@ export default function ProductsPage() {
           </div>
           <p className="text-sm text-slate-500 dark:text-zinc-400">Adicione, edite e controle o estoque dos seus produtos de beleza.</p>
         </div>
-        <button
-          onClick={() => openModal()}
-          className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-500/10 active:scale-[0.98] transition-all duration-150 self-start sm:self-auto"
-        >
-          <Plus className="w-4.5 h-4.5" /> Adicionar Produto
-        </button>
+        <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+          <button
+            onClick={() => setBatchModalOpen(true)}
+            className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white hover:bg-slate-50 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 font-medium text-sm flex items-center justify-center gap-2 shadow-sm transition-all duration-150"
+          >
+            <Upload className="w-4 h-4" /> Importar em Lote (NF / CSV)
+          </button>
+          <button
+            onClick={() => openModal()}
+            className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-500/10 active:scale-[0.98] transition-all duration-150"
+          >
+            <Plus className="w-4.5 h-4.5" /> Adicionar Produto
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -703,6 +926,279 @@ export default function ProductsPage() {
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Batch Import Modal */}
+      {batchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl w-full max-w-5xl shadow-2xl max-h-[90vh] overflow-y-auto p-6 space-y-4">
+            
+            <div className="flex items-center justify-between border-b border-slate-50 dark:border-zinc-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-800 dark:text-white">Importação de Produtos em Lote</h3>
+                <p className="text-[10px] text-slate-400 dark:text-zinc-500 font-normal">Adicione múltiplos produtos ao mesmo tempo via tabela ou planilha CSV.</p>
+              </div>
+              <button 
+                onClick={() => {
+                  setBatchModalOpen(false)
+                  setBatchError(null)
+                }}
+                className="p-1 rounded-lg text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {batchError && (
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs font-semibold rounded-xl border border-rose-100 dark:border-rose-900/30">
+                {batchError}
+              </div>
+            )}
+
+            {/* Tabs */}
+            <div className="flex border-b border-slate-100 dark:border-zinc-800 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setBatchTab('manual')
+                  setBatchError(null)
+                }}
+                className={`py-2 px-4 text-xs font-bold border-b-2 transition-all ${
+                  batchTab === 'manual'
+                    ? 'border-rose-500 text-rose-600 dark:text-rose-400'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-zinc-400'
+                }`}
+              >
+                Digitação de Lote / NF
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBatchTab('csv')
+                  setBatchError(null)
+                }}
+                className={`py-2 px-4 text-xs font-bold border-b-2 transition-all ${
+                  batchTab === 'csv'
+                    ? 'border-rose-500 text-rose-600 dark:text-rose-400'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-zinc-400'
+                }`}
+              >
+                Importar Planilha CSV
+              </button>
+            </div>
+
+            {batchTab === 'csv' && (
+              <div className="space-y-4">
+                <div className="p-4 bg-slate-50 dark:bg-zinc-950 rounded-xl border border-slate-200/50 dark:border-zinc-800 text-xs text-slate-600 dark:text-zinc-400 space-y-2 leading-relaxed">
+                  <p className="font-bold text-slate-800 dark:text-zinc-200">Como deve ser seu arquivo CSV:</p>
+                  <p>O arquivo deve possuir cabeçalhos. São aceitos os seguintes nomes de colunas (em português ou inglês):</p>
+                  <ul className="list-disc pl-4 space-y-1 font-mono text-[10px]">
+                    <li><strong>Nome / Produto / Name:</strong> Nome do produto (obrigatório)</li>
+                    <li><strong>Marca / Brand:</strong> Marca do fabricante</li>
+                    <li><strong>Categoria / Category:</strong> Categoria do item</li>
+                    <li><strong>SKU:</strong> Código de estoque interno</li>
+                    <li><strong>Código de Barras / Barcode / EAN:</strong> Código EAN do produto</li>
+                    <li><strong>Preço de Custo / Cost Price:</strong> Valor decimal de custo</li>
+                    <li><strong>Preço de Venda / Price:</strong> Valor decimal de venda</li>
+                    <li><strong>Quantidade / Qtd / Quantity:</strong> Estoque inicial</li>
+                    <li><strong>Mínimo / Alerta / Min:</strong> Quantidade mínima para alertas</li>
+                    <li><strong>Validade / Expiration:</strong> Data no formato AAAA-MM-DD</li>
+                    <li><strong>Descrição / Description:</strong> Detalhes e descrição do produto</li>
+                  </ul>
+                </div>
+
+                <div className="flex items-center justify-center w-full">
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-350 dark:border-zinc-800 border-dashed rounded-xl cursor-pointer bg-slate-50/50 hover:bg-slate-50 dark:bg-zinc-950/20 dark:hover:bg-zinc-950/40 transition-colors">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Upload className="w-8 h-8 text-slate-400 mb-2" />
+                      <p className="mb-1 text-xs text-slate-550 dark:text-zinc-450 font-semibold">Clique para selecionar ou arraste o arquivo CSV</p>
+                      <p className="text-[10px] text-slate-450">Formatos aceitos: .csv (separado por vírgula ou ponto-e-vírgula)</p>
+                    </div>
+                    <input 
+                      type="file" 
+                      accept=".csv" 
+                      className="hidden" 
+                      onChange={handleCsvUpload} 
+                    />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Batch Table Grid */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-slate-400 dark:text-zinc-550 font-bold uppercase tracking-wider">Produtos a Importar ({batchRows.length})</span>
+                {batchTab === 'manual' && (
+                  <button
+                    type="button"
+                    onClick={addBatchRow}
+                    className="px-3 py-1.5 rounded-lg border border-rose-100 hover:bg-rose-50 dark:border-rose-950/40 dark:hover:bg-rose-950/20 text-rose-600 dark:text-rose-450 font-bold text-[10px] transition-colors"
+                  >
+                    + Adicionar Linha
+                  </button>
+                )}
+              </div>
+
+              <div className="overflow-x-auto border border-slate-200 dark:border-zinc-800 rounded-xl">
+                <table className="w-full border-collapse text-left text-[11px] min-w-[1400px]">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/30 font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">
+                      <th className="px-3 py-2.5 w-[220px]">Nome *</th>
+                      <th className="px-3 py-2.5 w-[130px]">Marca</th>
+                      <th className="px-3 py-2.5 w-[130px]">Categoria</th>
+                      <th className="px-3 py-2.5 w-[110px]">SKU</th>
+                      <th className="px-3 py-2.5 w-[130px]">Cód. Barras</th>
+                      <th className="px-3 py-2.5 w-[90px]">Custo (R$) *</th>
+                      <th className="px-3 py-2.5 w-[90px]">Venda (R$) *</th>
+                      <th className="px-3 py-2.5 w-[80px]">Qtd *</th>
+                      <th className="px-3 py-2.5 w-[80px]">Alerta Mín. *</th>
+                      <th className="px-3 py-2.5 w-[130px]">Validade</th>
+                      <th className="px-3 py-2.5 w-[200px]">Descrição</th>
+                      <th className="px-3 py-2.5 text-center w-[50px]">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/40 bg-white dark:bg-zinc-900/50">
+                    {batchRows.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/20 dark:hover:bg-zinc-950/5">
+                        <td className="p-1">
+                          <input 
+                            type="text" 
+                            value={row.name} 
+                            onChange={(e) => handleBatchCellChange(idx, 'name', e.target.value)} 
+                            placeholder="Nome do produto"
+                            className="w-full px-2 py-1 rounded border border-transparent hover:border-slate-200 dark:hover:border-zinc-700 bg-transparent focus:bg-white dark:focus:bg-zinc-950 focus:border-rose-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="text" 
+                            value={row.brand} 
+                            onChange={(e) => handleBatchCellChange(idx, 'brand', e.target.value)} 
+                            placeholder="Marca"
+                            className="w-full px-2 py-1 rounded border border-transparent hover:border-slate-200 dark:hover:border-zinc-700 bg-transparent focus:bg-white dark:focus:bg-zinc-950 focus:border-rose-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="text" 
+                            value={row.category} 
+                            onChange={(e) => handleBatchCellChange(idx, 'category', e.target.value)} 
+                            placeholder="Categoria"
+                            className="w-full px-2 py-1 rounded border border-transparent hover:border-slate-200 dark:hover:border-zinc-700 bg-transparent focus:bg-white dark:focus:bg-zinc-950 focus:border-rose-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="text" 
+                            value={row.sku} 
+                            onChange={(e) => handleBatchCellChange(idx, 'sku', e.target.value)} 
+                            placeholder="SKU"
+                            className="w-full px-2 py-1 rounded border border-transparent hover:border-slate-200 dark:hover:border-zinc-700 bg-transparent focus:bg-white dark:focus:bg-zinc-950 focus:border-rose-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="text" 
+                            value={row.barcode} 
+                            onChange={(e) => handleBatchCellChange(idx, 'barcode', e.target.value)} 
+                            placeholder="Cód. Barras"
+                            className="w-full px-2 py-1 rounded border border-transparent hover:border-slate-200 dark:hover:border-zinc-700 bg-transparent focus:bg-white dark:focus:bg-zinc-950 focus:border-rose-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="number" 
+                            step="0.01" 
+                            value={row.cost_price} 
+                            onChange={(e) => handleBatchCellChange(idx, 'cost_price', e.target.value)} 
+                            className="w-full px-2 py-1 rounded border border-transparent hover:border-slate-200 dark:hover:border-zinc-700 bg-transparent focus:bg-white dark:focus:bg-zinc-950 focus:border-rose-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="number" 
+                            step="0.01" 
+                            value={row.sale_price} 
+                            onChange={(e) => handleBatchCellChange(idx, 'sale_price', e.target.value)} 
+                            className="w-full px-2 py-1 rounded border border-transparent hover:border-slate-200 dark:hover:border-zinc-700 bg-transparent focus:bg-white dark:focus:bg-zinc-950 focus:border-rose-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="number" 
+                            value={row.quantity_in_stock} 
+                            onChange={(e) => handleBatchCellChange(idx, 'quantity_in_stock', e.target.value)} 
+                            className="w-full px-2 py-1 rounded border border-transparent hover:border-slate-200 dark:hover:border-zinc-700 bg-transparent focus:bg-white dark:focus:bg-zinc-950 focus:border-rose-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="number" 
+                            value={row.min_stock_alert} 
+                            onChange={(e) => handleBatchCellChange(idx, 'min_stock_alert', e.target.value)} 
+                            className="w-full px-2 py-1 rounded border border-transparent hover:border-slate-200 dark:hover:border-zinc-700 bg-transparent focus:bg-white dark:focus:bg-zinc-950 focus:border-rose-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="date" 
+                            value={row.expiration_date} 
+                            onChange={(e) => handleBatchCellChange(idx, 'expiration_date', e.target.value)} 
+                            className="w-full px-2 py-1 rounded border border-transparent hover:border-slate-200 dark:hover:border-zinc-700 bg-transparent focus:bg-white dark:focus:bg-zinc-950 focus:border-rose-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="text" 
+                            value={row.description} 
+                            onChange={(e) => handleBatchCellChange(idx, 'description', e.target.value)} 
+                            placeholder="Descrição"
+                            className="w-full px-2 py-1 rounded border border-transparent hover:border-slate-200 dark:hover:border-zinc-700 bg-transparent focus:bg-white dark:focus:bg-zinc-950 focus:border-rose-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="p-1 text-center">
+                          <button
+                            type="button"
+                            onClick={() => removeBatchRow(idx)}
+                            className="p-1 text-slate-400 hover:text-rose-550 rounded"
+                            title="Remover linha"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Footer buttons */}
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-50 dark:border-zinc-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setBatchModalOpen(false)
+                  setBatchError(null)
+                }}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-950 font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleBatchSave}
+                disabled={batchLoading || batchRows.length === 0}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold flex items-center gap-1.5"
+              >
+                {batchLoading && <Loader2 className="w-4.5 h-4.5 animate-spin" />}
+                Confirmar Importação
+              </button>
+            </div>
+
           </div>
         </div>
       )}

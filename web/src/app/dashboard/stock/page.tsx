@@ -46,12 +46,19 @@ export default function StockPage() {
   const [formError, setFormError] = useState<string | null>(null)
 
   useEffect(() => {
-    loadStockData()
+    loadStockData(true)
+
+    const handleRefresh = () => {
+      loadStockData(false)
+    }
+
+    window.addEventListener('dashboard-refresh', handleRefresh)
+    return () => window.removeEventListener('dashboard-refresh', handleRefresh)
   }, [])
 
-  async function loadStockData() {
+  async function loadStockData(showSpinner = false) {
     try {
-      setLoading(true)
+      if (showSpinner) setLoading(true)
 
       // Fetch products for the dropdown
       const { data: prods } = await supabase
