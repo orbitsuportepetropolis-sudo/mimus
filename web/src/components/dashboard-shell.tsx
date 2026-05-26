@@ -166,10 +166,17 @@ export default function DashboardShell({ children, profile, store, lowStockCount
       paymentMethod = 'debit_card'
     }
 
-    const isSale = normalizedText.includes('vendi') || normalizedText.includes('venda') || normalizedText.includes('vendeu') || normalizedText.includes('saida')
-    const isStockIncrease = normalizedText.includes('adicione') || normalizedText.includes('aumente') || normalizedText.includes('entrada') || normalizedText.includes('somar') || normalizedText.includes('mais')
-    const isStockDecrease = normalizedText.includes('retire') || normalizedText.includes('remova') || normalizedText.includes('saida') || normalizedText.includes('menos') || normalizedText.includes('subtrair')
-    const isCreate = normalizedText.includes('cadastre') || normalizedText.includes('crie') || normalizedText.includes('inserir') || normalizedText.includes('novo produto')
+    const isSale = normalizedText.includes('vendi') || normalizedText.includes('venda') || normalizedText.includes('vendeu') || normalizedText.includes('saida') || normalizedText.includes('saída') || normalizedText.includes('vender')
+    const isStockIncrease = normalizedText.includes('adicione') || normalizedText.includes('aumente') || normalizedText.includes('entrada') || normalizedText.includes('somar') || normalizedText.includes('mais') || normalizedText.includes('adicionar')
+    const isStockDecrease = normalizedText.includes('retire') || normalizedText.includes('remova') || normalizedText.includes('saida') || normalizedText.includes('saída') || normalizedText.includes('menos') || normalizedText.includes('subtrair') || normalizedText.includes('retirar')
+    const isCreate = normalizedText.includes('cadastr') || 
+                     normalizedText.includes('cri') || 
+                     normalizedText.includes('inser') || 
+                     normalizedText.includes('registr') || 
+                     normalizedText.includes('novo produto') || 
+                     normalizedText.includes('novo cliente') || 
+                     normalizedText.includes('nova cliente') ||
+                     (normalizedText.includes('adicion') && normalizedText.includes('cliente'))
 
     await new Promise(resolve => setTimeout(resolve, 1200))
 
@@ -271,54 +278,140 @@ export default function DashboardShell({ children, profile, store, lowStockCount
         addAgentMessage(`📦 **Estoque atualizado!**\n\n* **Produto:** ${matchedProduct.name}\n* **Movimentação:** ${quantityChange > 0 ? '+' : ''}${quantityChange} un.\n* **Estoque Atualizado:** ${currentQty} un.`)
 
       } else if (isCreate) {
-        let name = text.replace(/cadastre|crie|inserir|novo produto|produto/gi, '').split(/com|preco|custo|marca|estoque/)[0].replace(/@/g, '').trim()
-        
-        const priceMatch = text.match(/(?:preco|venda|valor)\s*(?:de|R\$)?\s*(\d+(?:[.,]\d+)?)/i)
+        const phoneMatch = text.match(/(?:telefone|phone|celular|whats|whatsapp)\s*(?:de)?\s*([\d\s\-()]+)/i)
+        const instagramMatch = text.match(/(?:instagram|ig|insta)\s*(?:de)?\s*([@\w._]+)/i)
+        const birthdayMatch = text.match(/(?:nascimento|aniversario|aniversário|nasc)\s*(?:de)?\s*([\d/]+)/i)
+
+        const priceMatch = text.match(/(?:preco|preço|venda|valor)\s*(?:de|R\$)?\s*(\d+(?:[.,]\d+)?)/i)
         const costMatch = text.match(/(?:custo|compra)\s*(?:de|R\$)?\s*(\d+(?:[.,]\d+)?)/i)
         const brandMatch = text.match(/(?:marca|grife|da)\s+([a-zA-Z\s]+?)(?:\s+com|\s+preco|\s+custo|\s+estoque|$)/i)
         const stockMatch = text.match(/(?:estoque|quantidade|qtd)\s*(?:de)?\s*(\d+)/i)
 
-        const sale_price = priceMatch ? parseFloat(priceMatch[1].replace(',', '.')) : 0.00
-        const cost_price = costMatch ? parseFloat(costMatch[1].replace(',', '.')) : 0.00
-        const brand = brandMatch ? brandMatch[1].trim() : 'Mimus'
-        const stock = stockMatch ? parseInt(stockMatch[1]) : 0
+        const productKeywords = ['produto', 'item', 'mercadoria', 'preco', 'preço', 'custo', 'estoque', 'qtd', 'quantidade', 'marca', 'brand', 'sku', 'barra', 'batom', 'blush', 'rimel', 'rímel', 'base', 'delineador', 'sombra', 'gloss', 'esmalte', 'po ', 'pó ', 'corretivo', 'iluminador', 'pincel', 'paleta', 'mascara', 'máscara', 'sabonete', 'creme', 'perfume', 'hidratante', 'oleo', 'óleo', 'serum', 'sérum', 'tonico', 'tônico', 'protetor', 'sol', 'labial']
+        const customerKeywords = ['cliente', 'customer', 'comprador', 'compradora', 'fregues', 'freguesa', 'usuario', 'usuaria', 'usuário', 'usuária', 'pessoa', 'contato', 'contatos', 'whats', 'whatsapp', 'telefone', 'celular', 'phone', 'instagram', 'ig', 'insta', 'nascimento', 'aniversario', 'aniversário', 'nasc']
 
-        if (!name || name.length < 2) {
-          addAgentMessage("Não consegui identificar o nome do produto. Diga algo como: *'cadastre o produto Delineador com preço 45 e custo 20'*.")
-          return
+        const hasProductClues = !!(priceMatch || costMatch || brandMatch || stockMatch || productKeywords.some(kw => normalizedText.includes(kw)))
+        const hasCustomerClues = !!(phoneMatch || instagramMatch || birthdayMatch || customerKeywords.some(kw => normalizedText.includes(kw)))
+
+        // Determine if it is a customer or a product
+        let isCustomer = false
+        if (hasCustomerClues && !hasProductClues) {
+          isCustomer = true
+        } else if (hasProductClues && !hasCustomerClues) {
+          isCustomer = false
+        } else if (hasCustomerClues && hasProductClues) {
+          if (normalizedText.includes('cliente') || normalizedText.includes('customer')) {
+            isCustomer = true
+          } else {
+            isCustomer = false
+          }
+        } else {
+          // Default to customer when no clues are present, as registering just a name is typical for a customer
+          isCustomer = true
         }
 
-        const { data: newProd, error: insertErr } = await supabase
-          .from('products')
-          .insert([{
-            store_id,
-            name,
-            brand,
-            cost_price,
-            sale_price,
-            quantity_in_stock: stock,
-            min_stock_alert: 5
-          }])
-          .select()
-          .single()
+        const cleanRegex = /\b(cadastrar|cadastre|cadastra|cadastro|criar|crie|cria|inserir|insira|insere|registrar|registre|registra|registro|adicionar|adicione|adiciona|cliente|customer|comprador|compradora|fregues|freguesa|produto|item|um|uma|o|a|os|as|novo|nova)\b/gi
 
-        if (insertErr) throw insertErr
+        if (isCustomer) {
+          const namePart = text.split(/(?:com|telefone|phone|celular|whats|whatsapp|instagram|ig|insta|nascimento|aniversario|aniversário|nasc)\b/i)[0]
+          let name = namePart
+            .replace(cleanRegex, '')
+            .replace(/@/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
 
-        if (newProd && stock > 0) {
-          await supabase
-            .from('stock_movements')
+          const phone = phoneMatch ? phoneMatch[1].trim() : null
+          const instagram = instagramMatch ? instagramMatch[1].replace('@', '').trim() : null
+          
+          let birthday = null
+          if (birthdayMatch) {
+            const parts = birthdayMatch[1].trim().split('/')
+            if (parts.length === 3) {
+              birthday = `${parts[2]}-${parts[1]}-${parts[0]}`
+            } else if (parts.length === 2) {
+              birthday = `2000-${parts[1]}-${parts[0]}`
+            } else {
+              birthday = birthdayMatch[1].trim()
+            }
+          }
+
+          if (!name || name.length < 2) {
+            addAgentMessage("Não identifiquei o nome da cliente. Diga algo como: *'cadastre a cliente Luciana com telefone 99999-9999'*.")
+            return
+          }
+
+          const { data: newCust, error: insertErr } = await supabase
+            .from('customers')
             .insert([{
               store_id,
-              product_id: newProd.id,
-              quantity: stock,
-              type: 'entry',
-              reason: 'purchase'
+              name,
+              phone,
+              instagram,
+              birthday
             }])
+            .select()
+            .single()
+
+          if (insertErr) throw insertErr
+
+          window.dispatchEvent(new CustomEvent('dashboard-refresh'))
+
+          let details = `👤 **Cliente cadastrada com sucesso!**\n\n* **Nome:** ${name}`
+          if (phone) details += `\n* **Telefone:** ${phone}`
+          if (instagram) details += `\n* **Instagram:** @${instagram}`
+          if (birthday) details += `\n* **Aniversário:** ${new Date(birthday).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
+
+          addAgentMessage(details)
+        } else {
+          const namePart = text.split(/(?:com|preco|preço|custo|marca|grife|da|estoque|quantidade|qtd)\b/i)[0]
+          let name = namePart
+            .replace(cleanRegex, '')
+            .replace(/@/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+
+          const sale_price = priceMatch ? parseFloat(priceMatch[1].replace(',', '.')) : 0.00
+          const cost_price = costMatch ? parseFloat(costMatch[1].replace(',', '.')) : 0.00
+          const brand = brandMatch ? brandMatch[1].trim() : 'Mimus'
+          const stock = stockMatch ? parseInt(stockMatch[1]) : 0
+
+          if (!name || name.length < 2) {
+            addAgentMessage("Não consegui identificar o nome do produto. Diga algo como: *'cadastre o produto Delineador com preço 45 e custo 20'*.")
+            return
+          }
+
+          const { data: newProd, error: insertErr } = await supabase
+            .from('products')
+            .insert([{
+              store_id,
+              name,
+              brand,
+              cost_price,
+              sale_price,
+              quantity_in_stock: stock,
+              min_stock_alert: 5
+            }])
+            .select()
+            .single()
+
+          if (insertErr) throw insertErr
+
+          if (newProd && stock > 0) {
+            await supabase
+              .from('stock_movements')
+              .insert([{
+                store_id,
+                product_id: newProd.id,
+                quantity: stock,
+                type: 'entry',
+                reason: 'purchase'
+              }])
+          }
+
+          window.dispatchEvent(new CustomEvent('dashboard-refresh'))
+
+          addAgentMessage(`✨ **Produto cadastrado com sucesso!**\n\n* **Nome:** ${name}\n* **Marca:** ${brand}\n* **Venda:** R$ ${sale_price.toFixed(2)}\n* **Estoque:** ${stock} un.`)
         }
-
-        window.dispatchEvent(new CustomEvent('dashboard-refresh'))
-
-        addAgentMessage(`✨ **Produto cadastrado com sucesso!**\n\n* **Nome:** ${name}\n* **Marca:** ${brand}\n* **Venda:** R$ ${sale_price.toFixed(2)}\n* **Estoque:** ${stock} un.`)
 
       } else {
         addAgentMessage(`Olá! Sou o assistente Mimus AI. 🌸\n\nComandos aceitos:\n\n* 🛍️ **Vendas:** *"vendi 2 @Batom para @Maria"*.\n* 📦 **Estoque:** *"adicione 10 @Delineador"* ou *"retire 2 @Base"*.\n* ✨ **Cadastrar:** *"cadastre produto Rímel com preço 29.90 e custo 15"*.\n\nUse **\`@\`** para marcar itens sem erro de digitação!`)
