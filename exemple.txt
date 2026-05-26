@@ -1,0 +1,35 @@
+Atue como um Arquiteto de Software e Desenvolvedor Senior especialista em React Native, TypeScript e Supabase. Estou expandindo o escopo do meu app "mimus".
+
+O app atualmente é um gerenciador de catálogo/estoque e PDV local. O objetivo agora é transformá-lo em uma plataforma onde a lojista constrói e personaliza sua própria LOJA VIRTUAL COMPLETA. Ela deve ter autonomia para criar campanhas e mudar a identidade visual da loja dela (Cores, Fontes e Logo), além do catálogo.
+
+Gere a reestruturação do projeto em TypeScript e SQL considerando as seguintes especificações:
+
+1. MODELAGEM DO BANCO DE DADOS (SQL para o Supabase):
+Preciso criar ou atualizar a tabela 'store_preferences' (vinculada ao user_id da lojista) para salvar o DNA visual da loja. Gere o script SQL com os campos:
+- logo_url (text) -> URL da logo armazenada no Supabase Storage.
+- primary_color (varchar) -> Cor principal em Hexadecimal (ex: para botões, destaques).
+- secondary_color (varchar) -> Cor secundária em Hexadecimal.
+- background_color (varchar) -> Cor de fundo do e-commerce.
+- font_family (varchar) -> Nome da fonte selecionada (ex: 'Inter', 'Montserrat', 'Playfair Display').
+- whatsapp_number (varchar) -> Para onde o carrinho finalizado será enviado.
+- free_shipping_threshold (numeric) -> Valor mínimo para frete grátis.
+- gift_threshold (numeric) -> Valor mínimo para a barra de progresso de brindes.
+
+Crie também a tabela 'store_campaigns' (id, user_id, image_url, title, redirect_type, redirect_id, active, position_order) para os banners rotativos da Home.
+
+2. TELA DE PERSONALIZAÇÃO VISUAL (Nova Screen no React Native):
+Gere o código de uma nova tela chamada 'StoreCustomizationScreen.tsx' usando TypeScript. Essa tela deve conter:
+- SELEÇÃO DE LOGO: Componente que usa 'expo-image-picker' para fazer upload da imagem para o bucket 'logos' do Supabase Storage e salvar o link no banco. Mostra um preview da logo atual ou um placeholder se estiver vazio.
+- PALETA DE CORES: Inputs ou seletores visuais onde a lojista escolhe a Cor Primária e Secundária da loja dela (pode usar um seletor simples de cores predefinidas em formato de círculos ou um Color Picker).
+- SELEÇÃO DE FONTES: Um componente Dropdown/Picker para escolher o estilo tipográfico da loja (Elegante, Moderna, Clean).
+- Botão "Salvar Identidade da Loja" que executa o .upsert() no Supabase.
+
+3. TELA DE GERENCIAMENTO DE CAMPANHAS E BANNERS:
+Insira dentro dessa mesma tela ou em um componente separado a gestão de 'store_campaigns':
+- Uma lista de banners já cadastrados (com imagem em miniatura e um botão de excluir/desativar).
+- Botão "Adicionar Novo Banner da Home", abrindo um formulário/modal para enviar a foto do banner, definir um título de campanha e associar a um produto existente (puxando os produtos do estoque atual).
+
+4. ADAPTAÇÃO DA TELA DE ESTOQUE (StockScreen):
+Explique brevemente ou mostre como adaptar o formulário de produtos existente para que, além do preço padrão, a lojista possa preencher um 'promotional_price' e marcar um switch 'is_featured' (para jogar o produto na vitrine de "Mais Vendidos" do site).
+
+Gere o código limpo, modular, fortemente tipado e com foco total em usabilidade (UX) para que a dona da loja ache o processo de criar a identidade visual dela extremamente simples e intuitivo.
