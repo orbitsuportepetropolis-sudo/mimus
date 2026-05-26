@@ -12,7 +12,9 @@ import {
   Layout, 
   Eye, 
   ShoppingBag,
-  ArrowRight
+  ArrowRight,
+  Globe,
+  Store
 } from 'lucide-react'
 
 const GOOGLE_FONTS = [
@@ -42,6 +44,7 @@ export default function SettingsPage() {
   const [accentColor, setAccentColor] = useState('#1bbc9b')
   const [fontFamily, setFontFamily] = useState('Inter')
   const [marqueeText, setMarqueeText] = useState('')
+  const [customDomain, setCustomDomain] = useState('')
 
 interface BannerConfig {
   title: string
@@ -113,6 +116,7 @@ interface BannerConfig {
           setAccentColor(store.accent_color || '#1bbc9b')
           setFontFamily(store.font_family || 'Inter')
           setMarqueeText(store.marquee_text || '')
+          setCustomDomain(store.custom_domain || '')
 
           // Load banners
           let loadedBanners: any[] = []
@@ -316,7 +320,8 @@ interface BannerConfig {
           campaign_banner_url: firstBanner ? firstBanner.banner_url : null,
           // New banners array
           banners: finalBannersToSave,
-          marquee_text: marqueeText || null
+          marquee_text: marqueeText || null,
+          custom_domain: customDomain ? customDomain.trim().toLowerCase() : null
         })
         .eq('id', storeId)
 
@@ -597,6 +602,36 @@ interface BannerConfig {
                       </button>
                     )}
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Custom Domain */}
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm space-y-4">
+            <h2 className="text-sm font-bold text-slate-700 dark:text-zinc-200 border-b border-slate-50 dark:border-zinc-800/60 pb-2 flex items-center gap-2">
+              <Globe className="w-4 h-4 text-rose-500" /> Domínio Personalizado
+            </h2>
+            
+            <div className="space-y-3 text-xs font-semibold">
+              <div>
+                <label className="block text-slate-400 dark:text-zinc-500 mb-1">Seu Domínio Personalizado</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Ex: www.minhaloja.com.br"
+                    value={customDomain}
+                    onChange={(e) => setCustomDomain(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 font-mono text-[11px]"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 dark:text-zinc-550 mt-1.5 font-normal">
+                  Configure seu próprio domínio para a vitrine. Para ativar, crie um apontamento DNS no seu provedor:
+                </p>
+                <div className="bg-slate-50 dark:bg-zinc-950 p-3 rounded-lg border border-slate-100 dark:border-zinc-850 mt-2 font-mono text-[10px] space-y-1.5 font-medium text-slate-650 dark:text-zinc-350 leading-relaxed">
+                  <div><strong>Tipo:</strong> CNAME</div>
+                  <div><strong>Nome/Host:</strong> www (ou o subdomínio desejado)</div>
+                  <div><strong>Destino/Valor:</strong> mimusapp.vercel.app</div>
                 </div>
               </div>
             </div>

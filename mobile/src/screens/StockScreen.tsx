@@ -143,12 +143,25 @@ export default function StockScreen() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('store_id, stores(plan)')
+        .select('store_id, stores(plan, plan_status, trial_ends_at)')
         .eq('id', user.id)
         .single()
 
       if (profile) {
-        setStorePlan((profile.stores as any)?.plan || 'free')
+        const store = (profile.stores as any)
+        const plan = store?.plan || 'free'
+        const status = store?.plan_status || 'trial'
+        const trialEnds = store?.trial_ends_at
+
+        const getTrialDaysLeft = () => {
+          if (!trialEnds) return 0
+          const diff = new Date(trialEnds).getTime() - Date.now()
+          return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+        }
+        const isTrialActive = status === 'trial' && getTrialDaysLeft() > 0
+        const isPro = plan === 'pro' || isTrialActive
+
+        setStorePlan(isPro ? 'pro' : 'free')
         
         const { data, error } = await supabase
           .from('products')

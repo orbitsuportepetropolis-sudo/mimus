@@ -36,6 +36,8 @@ export default function ProductsPage() {
   const supabase = createClient()
   const [products, setProducts] = useState<Product[]>([])
   const [storePlan, setStorePlan] = useState<'free' | 'pro'>('free')
+  const [planStatus, setPlanStatus] = useState<string>('trial')
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
@@ -218,7 +220,15 @@ export default function ProductsPage() {
         throw new Error('Preencha o Nome de pelo menos um produto.')
       }
 
-      if (storePlan === 'free' && products.length + validRows.length > 50) {
+      const getTrialDaysLeft = () => {
+        if (!trialEndsAt) return 0
+        const diff = new Date(trialEndsAt).getTime() - Date.now()
+        return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+      }
+      const isTrialActive = planStatus === 'trial' && getTrialDaysLeft() > 0
+      const isPro = storePlan === 'pro' || isTrialActive
+
+      if (!isPro && products.length + validRows.length > 50) {
         throw new Error(`A importação excede o limite de 50 produtos do Plano Free. Total atual: ${products.length}. Você está tentando importar ${validRows.length}. Faça o upgrade para o Plano Pro!`)
       }
 
@@ -311,12 +321,15 @@ export default function ProductsPage() {
       if (user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('store_id, stores(plan)')
+          .select('store_id, stores(plan, plan_status, trial_ends_at)')
           .eq('id', user.id)
           .single()
 
         if (profile && profile.stores) {
-          setStorePlan((profile.stores as any).plan || 'free')
+          const st = profile.stores as any
+          setStorePlan(st.plan || 'free')
+          setPlanStatus(st.plan_status || 'trial')
+          setTrialEndsAt(st.trial_ends_at)
         }
       }
     } catch (err) {
@@ -333,7 +346,15 @@ export default function ProductsPage() {
     setImagePreview(null)
 
     // Enforce 50 products limit for Free Plan users when registering a NEW product
-    if (!prod && storePlan === 'free' && products.length >= 50) {
+    const getTrialDaysLeft = () => {
+      if (!trialEndsAt) return 0
+      const diff = new Date(trialEndsAt).getTime() - Date.now()
+      return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+    }
+    const isTrialActive = planStatus === 'trial' && getTrialDaysLeft() > 0
+    const isPro = storePlan === 'pro' || isTrialActive
+
+    if (!prod && !isPro && products.length >= 50) {
       alert('Limite de 50 produtos atingido no Plano Free. Faça o upgrade para o Plano Pro por apenas R$39/mês para liberar cadastros ilimitados!')
       return
     }

@@ -371,3 +371,17 @@ CREATE POLICY "Permitir atualização de fotos para usuários autenticados" ON s
 
 CREATE POLICY "Permitir deleção de fotos para usuários autenticados" ON storage.objects
     FOR DELETE TO authenticated USING (bucket_id = 'product-photos');
+
+-- =========================================================================
+-- MELHORIAS DE ASSINATURA (ASAAS/GOOGLE PLAY) E DOMÍNIOS PERSONALIZADOS
+-- =========================================================================
+
+-- Adição de colunas na tabela stores
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS custom_domain text UNIQUE;
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS trial_ends_at timestamp with time zone DEFAULT (now() + interval '7 days');
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS promotional_ends_at timestamp with time zone;
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS plan_status text DEFAULT 'trial';
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS asaas_customer_id text;
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS asaas_subscription_id text;
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS subscription_ends_at timestamp with time zone;
+
