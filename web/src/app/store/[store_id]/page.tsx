@@ -67,6 +67,7 @@ export default function StorefrontPage() {
   // Products list
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
@@ -115,14 +116,51 @@ export default function StorefrontPage() {
     try {
       setLoading(true)
 
-      // Fetch Store details (selecting both banners array and legacy fields)
-      const { data: store, error: storeErr } = await supabase
+      // Fetch Store details with fallback options for legacy database tables
+      let store: any = null
+      
+      const firstQuery = await supabase
         .from('stores')
         .select('name, logo_url, primary_color, accent_color, font_family, campaign_title, campaign_subtitle, campaign_cta, campaign_tag, campaign_banner_url, marquee_text, banners, company_name, cnpj')
         .eq('id', storeId)
-        .single()
+        .maybeSingle()
 
-      if (storeErr) throw storeErr
+      if (firstQuery.error) {
+        console.warn('Erro ao consultar novas colunas, tentando consulta legado...', firstQuery.error)
+        
+        // Fallback 1: Sem as colunas novas 'company_name' e 'cnpj'
+        const fallbackQuery = await supabase
+          .from('stores')
+          .select('name, logo_url, primary_color, accent_color, font_family, campaign_title, campaign_subtitle, campaign_cta, campaign_tag, campaign_banner_url, marquee_text, banners')
+          .eq('id', storeId)
+          .maybeSingle()
+
+        if (fallbackQuery.error) {
+          console.warn('Erro ao consultar banners, tentando sem banners...', fallbackQuery.error)
+          
+          // Fallback 2: Sem banners e sem colunas novas
+          const fallbackLegacyQuery = await supabase
+            .from('stores')
+            .select('name, logo_url, primary_color, accent_color, font_family, campaign_title, campaign_subtitle, campaign_cta, campaign_tag, campaign_banner_url, marquee_text')
+            .eq('id', storeId)
+            .maybeSingle()
+
+          if (fallbackLegacyQuery.error) {
+            throw fallbackLegacyQuery.error
+          }
+          store = fallbackLegacyQuery.data
+        } else {
+          store = fallbackQuery.data
+        }
+      } else {
+        store = firstQuery.data
+      }
+
+      if (!store) {
+        setErrorMsg('Esta loja não foi encontrada ou o link está incorreto.')
+        setLoading(false)
+        return
+      }
       if (store) {
         setStoreName(store.name)
         setLogoUrl(store.logo_url)
@@ -206,8 +244,9 @@ export default function StorefrontPage() {
       if (integration) {
         setWhatsappNumber(integration.credentials?.whatsapp || '')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao carregar vitrine:', err)
+      setErrorMsg(err.message || 'Erro ao carregar os dados do banco.')
     } finally {
       setLoading(false)
     }
@@ -339,6 +378,18 @@ export default function StorefrontPage() {
       <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-zinc-950">
         <Loader2 className="w-10 h-10 animate-spin text-rose-500" />
         <p className="mt-4 text-xs font-semibold text-slate-500 dark:text-zinc-400">Preparando vitrine virtual...</p>
+      </div>
+    )
+  }
+
+  if (errorMsg) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-zinc-950 p-6 text-center">
+        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Loja não encontrada</h2>
+        <p className="text-sm text-slate-400 mt-2">{errorMsg}</p>
+        <p className="text-xs text-rose-500/80 mt-6 max-w-md bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/10 rounded-lg p-3">
+          Se você for o proprietário desta loja, por favor certifique-se de que todas as tabelas e colunas adicionais foram criadas no painel do Supabase executando o arquivo de migração SQL.
+        </p>
       </div>
     )
   }
