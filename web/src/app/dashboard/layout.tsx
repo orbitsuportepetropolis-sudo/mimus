@@ -41,6 +41,7 @@ export default async function DashboardLayout({
   const { count: lowStockCount } = await supabase
     .from('products')
     .select('*', { count: 'exact', head: true })
+    .eq('store_id', profile.store_id)
     .lte('quantity_in_stock', 5) // count standard lower bound or min_stock_alert
 
   return (

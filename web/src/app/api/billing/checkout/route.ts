@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Parâmetros obrigatórios ausentes.' }, { status: 400 })
     }
 
-    const price = usePromo ? 39.00 : 49.00
+    const price = 49.00
 
     // MOCK MODE: If no Mercado Pago Access Token is configured (or set to default placeholder), run simulated checkout
     const isMock = !MERCADO_PAGO_ACCESS_TOKEN || MERCADO_PAGO_ACCESS_TOKEN === 'mock' || MERCADO_PAGO_ACCESS_TOKEN.startsWith('seu_')

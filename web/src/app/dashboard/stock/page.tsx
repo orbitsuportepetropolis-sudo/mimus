@@ -60,21 +60,44 @@ export default function StockPage() {
     try {
       if (showSpinner) setLoading(true)
 
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('store_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) return
+      const storeId = profile.store_id
+
       // Fetch products for the dropdown
       const { data: prods } = await supabase
         .from('products')
         .select('id, name, quantity_in_stock')
+        .eq('store_id', storeId)
         .order('name', { ascending: true })
 
       // Fetch stock movements history
       const { data: moves } = await supabase
         .from('stock_movements')
         .select('id, quantity, type, reason, created_at, products(name)')
+        .eq('store_id', storeId)
         .order('created_at', { ascending: false })
         .limit(50)
 
-      if (prods) setProducts(prods)
-      if (moves) setMovements(moves)
+      if (prods) {
+        setProducts(prods)
+      } else {
+        setProducts([])
+      }
+
+      if (moves) {
+        setMovements(moves)
+      } else {
+        setMovements([])
+      }
     } catch (err) {
       console.error(err)
     } finally {

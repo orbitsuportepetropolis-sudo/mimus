@@ -306,9 +306,29 @@ export default function ProductsPage() {
   async function loadProducts() {
     try {
       setLoading(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('store_id, stores(plan, plan_status, trial_ends_at)')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) return
+      const storeId = profile.store_id
+
+      if (profile.stores) {
+        const st = profile.stores as any
+        setStorePlan(st.plan || 'free')
+        setPlanStatus(st.plan_status || 'trial')
+        setTrialEndsAt(st.trial_ends_at)
+      }
+
       const { data, error } = await supabase
         .from('products')
         .select('*')
+        .eq('store_id', storeId)
         .order('name', { ascending: true })
 
       if (error) throw error
@@ -321,23 +341,10 @@ export default function ProductsPage() {
         const bnds = Array.from(new Set(data.map(p => p.brand).filter(Boolean))) as string[]
         setCategories(cats)
         setBrands(bnds)
-      }
-
-      // Fetch current store plan
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('store_id, stores(plan, plan_status, trial_ends_at)')
-          .eq('id', user.id)
-          .single()
-
-        if (profile && profile.stores) {
-          const st = profile.stores as any
-          setStorePlan(st.plan || 'free')
-          setPlanStatus(st.plan_status || 'trial')
-          setTrialEndsAt(st.trial_ends_at)
-        }
+      } else {
+        setProducts([])
+        setCategories([])
+        setBrands([])
       }
     } catch (err) {
       console.error('Erro ao buscar produtos:', err)
@@ -529,10 +536,23 @@ export default function ProductsPage() {
   async function handleDelete(id: string) {
     if (confirm('Tem certeza que deseja excluir este produto?')) {
       try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Não autenticado')
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('store_id')
+          .eq('id', user.id)
+          .single()
+
+        if (!profile) throw new Error('Loja não encontrada')
+        const store_id = profile.store_id
+
         const { error } = await supabase
           .from('products')
           .delete()
           .eq('id', id)
+          .eq('store_id', store_id)
 
         if (error) throw error
         await loadProducts()

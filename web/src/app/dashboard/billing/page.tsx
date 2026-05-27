@@ -46,7 +46,7 @@ export default function BillingPage() {
 
   // Form Fields
   const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CREDIT_CARD'>('PIX')
-  const [usePromo, setUsePromo] = useState(true)
+  const [usePromo, setUsePromo] = useState(false)
   const [cpfCnpj, setCpfCnpj] = useState('')
   const [phone, setPhone] = useState('')
   
@@ -64,6 +64,39 @@ export default function BillingPage() {
   useEffect(() => {
     loadBillingData()
   }, [])
+
+  // Poll payment status automatically in the background
+  useEffect(() => {
+    let interval: any
+    if (checkoutOpen && checkoutStep === 'payment_details' && storeId) {
+      interval = setInterval(async () => {
+        try {
+          const { data: store } = await supabase
+            .from('stores')
+            .select('plan, plan_status')
+            .eq('id', storeId)
+            .single()
+
+          if (store && store.plan_status === 'active') {
+            clearInterval(interval)
+            setCheckoutStep('success')
+            setCurrentPlan('pro')
+            setPlanStatus('active')
+            setTimeout(() => {
+              setCheckoutOpen(false)
+              setCheckoutStep('form')
+              window.location.reload()
+            }, 3000)
+          }
+        } catch (e) {
+          console.error('Error polling payment status:', e)
+        }
+      }, 4000)
+    }
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [checkoutOpen, checkoutStep, storeId])
 
   async function loadBillingData() {
     try {
@@ -101,6 +134,7 @@ export default function BillingPage() {
         const { count } = await supabase
           .from('products')
           .select('*', { count: 'exact', head: true })
+          .eq('store_id', profile.store_id)
 
         setProductCount(count || 0)
       }
@@ -195,24 +229,39 @@ export default function BillingPage() {
     }
   }
 
-  // Simulates confirming a PIX transaction client-side for testing
-  async function handleConfirmPixPayment() {
+  // Verifies the payment status in Supabase database (after MP Webhook confirmation)
+  async function handleVerifyPayment() {
     setCheckoutLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setCheckoutStep('success')
-    setCurrentPlan('pro')
-    setPlanStatus('active')
-    setCheckoutLoading(false)
-    setTimeout(() => {
-      setCheckoutOpen(false)
-      setCheckoutStep('form')
-      window.location.reload()
-    }, 3000)
+    try {
+      const { data: store } = await supabase
+        .from('stores')
+        .select('plan, plan_status')
+        .eq('id', storeId)
+        .single()
+
+      if (store && store.plan_status === 'active') {
+        setCheckoutStep('success')
+        setCurrentPlan('pro')
+        setPlanStatus('active')
+        setCheckoutLoading(false)
+        setTimeout(() => {
+          setCheckoutOpen(false)
+          setCheckoutStep('form')
+          window.location.reload()
+        }, 3000)
+      } else {
+        alert('Pagamento ainda não compensado. Se você já pagou, aguarde alguns segundos e clique novamente.')
+      }
+    } catch (err: any) {
+      alert('Erro ao verificar pagamento: ' + err.message)
+    } finally {
+      setCheckoutLoading(false)
+    }
   }
 
   const productsPercentage = Math.min(100, (productCount / 50) * 100)
   const isTrialActive = planStatus === 'trial' && getTrialDaysLeft() > 0
-  const price = usePromo ? 39.00 : 49.00
+  const price = 49.00
 
   if (loading) {
     return (
@@ -324,10 +373,10 @@ export default function BillingPage() {
             <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">Para lojas físicas e online escalarem sem restrições ou limites.</p>
             <div className="space-y-1">
               <div className="flex items-baseline">
-                <span className="text-3xl font-extrabold text-slate-800 dark:text-white">R$ 39,00</span>
-                <span className="text-xs text-slate-400 ml-1">/mês (Promocional)</span>
+                <span className="text-3xl font-extrabold text-slate-800 dark:text-white">R$ 49,00</span>
+                <span className="text-xs text-slate-400 ml-1">/mês</span>
               </div>
-              <p className="text-[10px] text-slate-400">Regular: R$ 49,00/mês (após 6 meses)</p>
+              <p className="text-[10px] text-slate-400">Acesso completo e ilimitado a todos os recursos da plataforma.</p>
             </div>
             <div className="h-px bg-slate-50 dark:bg-zinc-800 my-4" />
             <ul className="space-y-2.5 text-xs text-slate-600 dark:text-zinc-300">
@@ -388,44 +437,10 @@ export default function BillingPage() {
             {checkoutStep === 'form' && (
               <form onSubmit={handleCheckout} className="space-y-4 text-xs font-semibold">
                 
-                {/* Plan Price Selection */}
-                <div className="space-y-2">
-                  <label className="block text-slate-400 dark:text-zinc-500">Escolha o seu plano:</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setUsePromo(true)}
-                      className={`p-3 rounded-xl border text-left flex flex-col justify-between h-20 transition-all ${
-                        usePromo 
-                          ? 'border-rose-500 bg-rose-50/10 ring-2 ring-rose-500/10' 
-                          : 'border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-950'
-                      }`}
-                    >
-                      <span className="font-black text-[11px] text-slate-800 dark:text-white flex items-center gap-1">
-                        Promo Inicial <Sparkles className="w-3 h-3 text-amber-500" />
-                      </span>
-                      <div>
-                        <span className="font-extrabold text-rose-600">R$ 39,00</span>
-                        <span className="text-[9px] text-slate-400 font-normal"> /mês (6 meses)</span>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setUsePromo(false)}
-                      className={`p-3 rounded-xl border text-left flex flex-col justify-between h-20 transition-all ${
-                        !usePromo 
-                          ? 'border-rose-500 bg-rose-50/10 ring-2 ring-rose-500/10' 
-                          : 'border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-950'
-                      }`}
-                    >
-                      <span className="font-black text-[11px] text-slate-800 dark:text-white">Plano Mensal Regular</span>
-                      <div>
-                        <span className="font-extrabold text-slate-850 dark:text-zinc-300">R$ 49,00</span>
-                        <span className="text-[9px] text-slate-400 font-normal"> /mês</span>
-                      </div>
-                    </button>
-                  </div>
+                {/* Plan Info */}
+                <div className="bg-slate-50 dark:bg-zinc-950 p-3.5 rounded-xl border border-slate-100 dark:border-zinc-850/60 flex justify-between items-center h-12">
+                  <span className="font-extrabold text-slate-800 dark:text-white text-xs">Plano Mimus Pro</span>
+                  <span className="font-black text-rose-600 text-sm">R$ 49,00/mês</span>
                 </div>
 
                 {/* Payment Method Selector */}
@@ -585,16 +600,16 @@ export default function BillingPage() {
 
                 <div className="border-t border-slate-100 dark:border-zinc-800/80 pt-4 flex flex-col gap-2">
                   <button
-                    onClick={handleConfirmPixPayment}
+                    onClick={handleVerifyPayment}
                     disabled={checkoutLoading}
-                    className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white font-bold flex items-center justify-center gap-2"
+                    className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-rose-500/10 transition-all"
                   >
                     {checkoutLoading ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" /> Verificando...
                       </>
                     ) : (
-                      'Simular Confirmação de Pagamento'
+                      'Verificar Pagamento'
                     )}
                   </button>
 

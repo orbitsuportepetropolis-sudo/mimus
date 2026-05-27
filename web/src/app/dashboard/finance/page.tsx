@@ -66,9 +66,22 @@ export default function FinancePage() {
     try {
       setLoading(true)
 
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('store_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) return
+      const storeId = profile.store_id
+
       const { data, error } = await supabase
         .from('financial_transactions')
         .select('*')
+        .eq('store_id', storeId)
         .order('date', { ascending: false })
         .order('created_at', { ascending: false })
 
@@ -183,10 +196,23 @@ export default function FinancePage() {
   async function handleDeleteTransaction(id: string) {
     if (confirm('Deseja excluir este lançamento financeiro?')) {
       try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Não autenticado')
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('store_id')
+          .eq('id', user.id)
+          .single()
+
+        if (!profile) throw new Error('Loja não encontrada')
+        const store_id = profile.store_id
+
         const { error } = await supabase
           .from('financial_transactions')
           .delete()
           .eq('id', id)
+          .eq('store_id', store_id)
 
         if (error) throw error
         await loadFinancialData()

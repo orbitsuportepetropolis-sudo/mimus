@@ -58,6 +58,18 @@ export default function DashboardPage() {
     try {
       if (showSpinner) setLoading(true)
 
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('store_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) return
+      const storeId = profile.store_id
+
       // 1. Get today's sales and monthly revenue
       const today = new Date()
       today.setHours(0, 0, 0, 0)
@@ -67,6 +79,7 @@ export default function DashboardPage() {
       const { data: salesData } = await supabase
         .from('sales')
         .select('id, total_value, created_at, customers(name)')
+        .eq('store_id', storeId)
         .order('created_at', { ascending: false })
 
       // Process sales
@@ -100,6 +113,7 @@ export default function DashboardPage() {
       const { data: productsData } = await supabase
         .from('products')
         .select('id, name, brand, sale_price, quantity_in_stock, min_stock_alert, expiration_date')
+        .eq('store_id', storeId)
 
       let lowStock = 0
       let expiring = 0

@@ -53,32 +53,38 @@ export default function IntegrationsPage() {
           .single()
         
         if (profile) {
-          setStoreId(profile.store_id)
+          const storeIdVal = profile.store_id
+          setStoreId(storeIdVal)
           
           // Fetch storefront credentials
           const { data: storefront } = await supabase
             .from('integrations')
             .select('*')
-            .eq('store_id', profile.store_id)
+            .eq('store_id', storeIdVal)
             .eq('provider', 'storefront')
             .single()
 
           if (storefront) {
             setWhatsapp(storefront.credentials?.whatsapp || '')
           }
+
+          const { data } = await supabase
+            .from('integrations')
+            .select('*')
+            .eq('store_id', storeIdVal)
+            .eq('provider', 'loja_integrada')
+            .single()
+
+          if (data) {
+            setApiKey(data.credentials?.api_key || '')
+            setAppToken(data.credentials?.app_token || '')
+            setActive(data.active || false)
+          } else {
+            setApiKey('')
+            setAppToken('')
+            setActive(false)
+          }
         }
-      }
-
-      const { data } = await supabase
-        .from('integrations')
-        .select('*')
-        .eq('provider', 'loja_integrada')
-        .single()
-
-      if (data) {
-        setApiKey(data.credentials?.api_key || '')
-        setAppToken(data.credentials?.app_token || '')
-        setActive(data.active || false)
       }
     } catch (err) {
       // If none found, keep fields empty
@@ -257,6 +263,7 @@ export default function IntegrationsPage() {
         const { data: product } = await supabase
           .from('products')
           .select('id, sale_price')
+          .eq('store_id', profile.store_id)
           .limit(1)
 
         if (product && product[0]) {

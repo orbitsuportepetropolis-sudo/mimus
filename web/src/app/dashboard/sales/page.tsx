@@ -79,11 +79,24 @@ export default function SalesPage() {
   async function loadPDVData(showSpinner = false) {
     try {
       if (showSpinner) setLoading(true)
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('store_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) return
+      const storeId = profile.store_id
       
       // Fetch products in stock
       const { data: prods } = await supabase
         .from('products')
         .select('id, name, brand, sale_price, quantity_in_stock, image_url')
+        .eq('store_id', storeId)
         .gt('quantity_in_stock', 0)
         .order('name', { ascending: true })
 
@@ -91,10 +104,20 @@ export default function SalesPage() {
       const { data: custs } = await supabase
         .from('customers')
         .select('id, name, phone')
+        .eq('store_id', storeId)
         .order('name', { ascending: true })
 
-      if (prods) setProducts(prods)
-      if (custs) setCustomers(custs)
+      if (prods) {
+        setProducts(prods)
+      } else {
+        setProducts([])
+      }
+
+      if (custs) {
+        setCustomers(custs)
+      } else {
+        setCustomers([])
+      }
     } catch (err) {
       console.error(err)
     } finally {

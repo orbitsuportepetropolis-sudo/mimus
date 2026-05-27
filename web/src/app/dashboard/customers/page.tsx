@@ -49,13 +49,30 @@ export default function CustomersPage() {
   async function loadCustomers() {
     try {
       setLoading(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('store_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) return
+      const storeId = profile.store_id
+
       const { data, error } = await supabase
         .from('customers')
         .select('*')
+        .eq('store_id', storeId)
         .order('name', { ascending: true })
 
       if (error) throw error
-      if (data) setCustomers(data)
+      if (data) {
+        setCustomers(data)
+      } else {
+        setCustomers([])
+      }
     } catch (err) {
       console.error(err)
     } finally {
@@ -144,10 +161,23 @@ export default function CustomersPage() {
   async function handleDelete(id: string) {
     if (confirm('Tem certeza que deseja excluir esta cliente?')) {
       try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Não autenticado')
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('store_id')
+          .eq('id', user.id)
+          .single()
+
+        if (!profile) throw new Error('Loja não encontrada')
+        const store_id = profile.store_id
+
         const { error } = await supabase
           .from('customers')
           .delete()
           .eq('id', id)
+          .eq('store_id', store_id)
 
         if (error) throw error
         await loadCustomers()

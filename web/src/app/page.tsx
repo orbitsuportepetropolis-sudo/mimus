@@ -590,7 +590,7 @@ export default function LandingPage() {
                 <h3 className="text-xl font-bold text-slate-900 dark:text-white">Plano Pro</h3>
                 <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">Aceleração total para sua loja</p>
                 <div className="my-6">
-                  <span className="text-4xl font-extrabold text-slate-900 dark:text-white">R$ 59,90</span>
+                  <span className="text-4xl font-extrabold text-slate-900 dark:text-white">R$ 49,00</span>
                   <span className="text-sm text-slate-400 dark:text-zinc-500">/ mês</span>
                 </div>
                 <div className="border-t border-slate-100 dark:border-zinc-800 pt-6 space-y-4">
