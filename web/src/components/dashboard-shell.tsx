@@ -39,6 +39,9 @@ interface DashboardShellProps {
   lowStockCount: number
 }
 
+const normalize = (str: string) => 
+  str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : ""
+
 export default function DashboardShell({ children, profile, store, lowStockCount }: DashboardShellProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -91,14 +94,28 @@ export default function DashboardShell({ children, profile, store, lowStockCount
 
   async function loadAgentData() {
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('store_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) return
+      const storeId = profile.store_id
+
       const { data: prods } = await supabase
         .from('products')
         .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock')
+        .eq('store_id', storeId)
         .order('name', { ascending: true })
 
       const { data: custs } = await supabase
         .from('customers')
         .select('id, name')
+        .eq('store_id', storeId)
         .order('name', { ascending: true })
 
       if (prods) setProducts(prods)
@@ -151,495 +168,13 @@ export default function DashboardShell({ children, profile, store, lowStockCount
     if (lastAtPos !== -1) {
       const beforeAt = chatInputValue.slice(0, lastAtPos)
       const afterCursor = chatInputValue.slice(cursorPos)
-      const newValue = `${beforeAt}@${name}${afterCursor}`
+      const newValue = `${beforeAt}@${name} ${afterCursor}`
       setChatInputValue(newValue)
       setAutocompleteOpen(false)
-      setAutocompleteSearch('')
     }
   }
 
-  const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
-
   async function processCommand(text: string) {
-    const normalizedText = normalize(text)
-
-    const isDelete = normalizedText.includes('apagar') || 
-                     normalizedText.includes('apague') || 
-                     normalizedText.includes('deletar') || 
-                     normalizedText.includes('delete') || 
-                     normalizedText.includes('excluir') || 
-                     normalizedText.includes('exclua') || 
-                     normalizedText.includes('remover') || 
-                     normalizedText.includes('remova') || 
-                     normalizedText.includes('limpar') || 
-                     normalizedText.includes('limpe')
-
-    // 1. Check for batch multi-line product registration
-    const lines = text.split('\n')
-    const itemsToRegister: { quantity: number; name: string }[] = []
-    const itemRegex = /^\s*(\d+)\s*(?:do|da|de|dos|das)?\s+(.+)$/i
-
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed) continue
-      
-      const match = trimmed.match(itemRegex)
-      if (match) {
-        const quantity = parseInt(match[1], 10)
-        const productName = match[2].trim()
-        itemsToRegister.push({ quantity, name: productName })
-      }
-    }
-
-    const isBatchTrigger = itemsToRegister.length > 0 && !isDelete && (
-      lines.length > 1 || 
-      normalizedText.includes('lance') || 
-      normalizedText.includes('cadastr') || 
-      normalizedText.includes('inser') || 
-      normalizedText.includes('subir') ||
-      normalizedText.includes('lote')
-    )
-
-    if (isBatchTrigger) {
-      await new Promise(resolve => setTimeout(resolve, 1500))
-
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Não autenticado')
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('store_id')
-          .eq('id', user.id)
-          .single()
-
-        if (!profile) throw new Error('Loja não encontrada')
-        const store_id = profile.store_id
-
-        // Fetch store details to check subscription limits
-        const { data: storeData } = await supabase
-          .from('stores')
-          .select('plan, plan_status, trial_ends_at')
-          .eq('id', store_id)
-          .single()
-
-        // Fetch latest products from database
-        const { data: latestProds } = await supabase
-          .from('products')
-          .select('id, name, quantity_in_stock')
-          .eq('store_id', store_id)
-
-        const latestProducts = (latestProds || []) as any[]
-
-        // Consolidate duplicates from the parsed list
-        const groupedItems: { [name: string]: number } = {}
-        for (const item of itemsToRegister) {
-          const normName = normalize(item.name)
-          const matchedKey = Object.keys(groupedItems).find(k => normalize(k) === normName)
-          if (matchedKey) {
-            groupedItems[matchedKey] += item.quantity
-          } else {
-            groupedItems[item.name] = item.quantity
-          }
-        }
-
-        const consolidatedItems = Object.entries(groupedItems).map(([name, quantity]) => ({
-          name,
-          quantity
-        }))
-
-        // Partition into updates and creations
-        const itemsToUpdate: { product: any; quantity: number }[] = []
-        const itemsToCreate: { name: string; quantity: number }[] = []
-
-        for (const item of consolidatedItems) {
-          const existing = latestProducts.find(
-            p => normalize(p.name) === normalize(item.name)
-          )
-          if (existing) {
-            itemsToUpdate.push({ product: existing, quantity: item.quantity })
-          } else {
-            itemsToCreate.push(item)
-          }
-        }
-
-        // Limit validation for Free tier
-        const getTrialDaysLeft = () => {
-          if (!storeData?.trial_ends_at) return 0
-          const diff = new Date(storeData.trial_ends_at).getTime() - Date.now()
-          return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
-        }
-        const isTrialActive = storeData?.plan_status === 'trial' && getTrialDaysLeft() > 0
-        const isPro = storeData?.plan === 'pro' || isTrialActive
-
-        if (!isPro && (latestProducts.length + itemsToCreate.length) > 50) {
-          throw new Error(`A importação excede o limite de 50 produtos do Plano Free. Total atual: ${latestProducts.length}. Você está tentando cadastrar ${itemsToCreate.length} novos. Faça o upgrade para o Plano Pro!`)
-        }
-
-        // 1. Bulk insert stock movements for existing products
-        const updateMovements = itemsToUpdate.map(item => ({
-          store_id,
-          product_id: item.product.id,
-          quantity: item.quantity,
-          type: 'entry',
-          reason: 'manual_adjustment'
-        }))
-
-        if (updateMovements.length > 0) {
-          const { error: updateErr } = await supabase
-            .from('stock_movements')
-            .insert(updateMovements)
-          if (updateErr) throw updateErr
-        }
-
-        // 2. Bulk insert new products
-        if (itemsToCreate.length > 0) {
-          const newProductsToInsert = itemsToCreate.map(item => ({
-            store_id,
-            name: item.name,
-            brand: 'Mimus',
-            cost_price: 0,
-            sale_price: 0,
-            quantity_in_stock: 0,
-            min_stock_alert: 5
-          }))
-
-          const { data: insertedNewProds, error: createErr } = await supabase
-            .from('products')
-            .insert(newProductsToInsert)
-            .select()
-
-          if (createErr) throw createErr
-
-          if (insertedNewProds && insertedNewProds.length > 0) {
-            const createMovements = insertedNewProds.map(p => {
-              const originalItem = itemsToCreate.find(item => normalize(item.name) === normalize(p.name))
-              const qty = originalItem ? originalItem.quantity : p.quantity_in_stock
-              return {
-                store_id,
-                product_id: p.id,
-                quantity: qty,
-                type: 'entry',
-                reason: 'purchase'
-              }
-            })
-
-            if (createMovements.length > 0) {
-              const { error: smErr } = await supabase
-                .from('stock_movements')
-                .insert(createMovements)
-              if (smErr) throw smErr
-            }
-          }
-        }
-
-        // Dispatch refresh so all tables update immediately
-        window.dispatchEvent(new CustomEvent('dashboard-refresh'))
-
-        // Format success response
-        let successMessage = `✅ **Lançamento em lote concluído com sucesso!**\n\n`
-
-        if (itemsToCreate.length > 0) {
-          successMessage += `✨ **Novos produtos cadastrados (${itemsToCreate.length}):**\n`
-          itemsToCreate.forEach(item => {
-            successMessage += `* ${item.name} (${item.quantity} un.)\n`
-          })
-          successMessage += `\n`
-        }
-
-        if (itemsToUpdate.length > 0) {
-          successMessage += `📦 **Estoque atualizado (${itemsToUpdate.length}):**\n`
-          itemsToUpdate.forEach(item => {
-            const newQty = item.product.quantity_in_stock + item.quantity
-            successMessage += `* ${item.product.name}: +${item.quantity} un. (Estoque atual: ${newQty} un.)\n`
-          })
-        }
-
-        addAgentMessage(successMessage)
-
-      } catch (err: any) {
-        console.error(err)
-        addAgentMessage(`❌ **Erro ao processar lote:** ${err.message || 'Erro desconhecido.'}`)
-      } finally {
-        setTyping(false)
-      }
-      return
-    }
-
-    if (isDelete) {
-      await new Promise(resolve => setTimeout(resolve, 1200))
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Não autenticado')
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('store_id')
-          .eq('id', user.id)
-          .single()
-
-        if (!profile) throw new Error('Loja não encontrada')
-        const store_id = profile.store_id
-
-        const isTargetCustomer = normalizedText.includes('cliente') || normalizedText.includes('customer') || normalizedText.includes('fregues') || normalizedText.includes('contato')
-        const isBulk = normalizedText.includes('todo') || normalizedText.includes('toda') || normalizedText.includes('tudo') || normalizedText.includes('em massa') || normalizedText.includes('lote')
-
-        // Find exceptions
-        let exceptionText = ''
-        const exceptionKeywords = ['menos', 'exceto', 'salvo', 'fora', 'diferente de']
-        for (const kw of exceptionKeywords) {
-          const idx = normalizedText.indexOf(kw)
-          if (idx !== -1) {
-            exceptionText = normalizedText.slice(idx + kw.length)
-            break
-          }
-        }
-
-        if (isTargetCustomer) {
-          // Fetch latest customers from database
-          const { data: latestCusts, error: custsErr } = await supabase
-            .from('customers')
-            .select('id, name')
-            .eq('store_id', store_id)
-          if (custsErr) throw custsErr
-
-          const latestCustomers = latestCusts || []
-          let targetsToDelete: any[] = []
-          let excludedItems: any[] = []
-
-          if (isBulk) {
-            for (const c of latestCustomers) {
-              const normName = normalize(c.name)
-              if (exceptionText && (exceptionText.includes(normName) || normalizedText.includes(`@${normName}`))) {
-                excludedItems.push(c)
-              } else {
-                targetsToDelete.push(c)
-              }
-            }
-          } else {
-            // Single customer delete
-            for (const c of latestCustomers) {
-              const normName = normalize(c.name)
-              if (normalizedText.includes(normName) || normalizedText.includes(`@${normName}`)) {
-                targetsToDelete.push(c)
-              }
-            }
-          }
-
-          if (targetsToDelete.length === 0) {
-            addAgentMessage(`Nenhum cliente correspondente foi encontrado para exclusão.`)
-            setTyping(false)
-            return
-          }
-
-          const idsToDelete = targetsToDelete.map(t => t.id)
-          const { error: delErr } = await supabase
-            .from('customers')
-            .delete()
-            .in('id', idsToDelete)
-
-          if (delErr) throw delErr
-
-          window.dispatchEvent(new CustomEvent('dashboard-refresh'))
-
-          let responseMsg = `✅ **Exclusão de clientes concluída!**\n\n`
-          responseMsg += `👤 **Clientes excluídos (${targetsToDelete.length}):**\n`
-          targetsToDelete.forEach(t => {
-            responseMsg += `* ${t.name}\n`
-          })
-          if (excludedItems.length > 0) {
-            responseMsg += `\n🛡️ **Clientes mantidos (${excludedItems.length}):**\n`
-            excludedItems.forEach(t => {
-              responseMsg += `* ${t.name}\n`
-            })
-          }
-          addAgentMessage(responseMsg)
-
-        } else {
-          // Target is products
-          // Fetch latest products from database
-          const { data: latestProds, error: prodsErr } = await supabase
-            .from('products')
-            .select('id, name, quantity_in_stock')
-            .eq('store_id', store_id)
-          if (prodsErr) throw prodsErr
-
-          const latestProducts = latestProds || []
-          let targetsToDelete: any[] = []
-          let excludedItems: any[] = []
-
-          if (isBulk) {
-            for (const p of latestProducts) {
-              const normName = normalize(p.name)
-              if (exceptionText && (exceptionText.includes(normName) || normalizedText.includes(`@${normName}`))) {
-                excludedItems.push(p)
-              } else {
-                targetsToDelete.push(p)
-              }
-            }
-          } else {
-            // Single product delete
-            for (const p of latestProducts) {
-              const normName = normalize(p.name)
-              if (normalizedText.includes(normName) || normalizedText.includes(`@${normName}`)) {
-                targetsToDelete.push(p)
-              }
-            }
-          }
-
-          if (targetsToDelete.length === 0) {
-            addAgentMessage(`Nenhum produto correspondente foi encontrado para exclusão.`)
-            setTyping(false)
-            return
-          }
-
-          // Fetch sale items to identify products with sales (RESTRICT constraint)
-          const { data: saleItems, error: salesErr } = await supabase
-            .from('sale_items')
-            .select('product_id')
-          if (salesErr) throw salesErr
-
-          const soldProductIds = new Set(saleItems?.map(item => item.product_id) || [])
-
-          const productsRealDelete: any[] = []
-          const productsZeroStock: any[] = []
-
-          for (const p of targetsToDelete) {
-            if (soldProductIds.has(p.id)) {
-              productsZeroStock.push(p)
-            } else {
-              productsRealDelete.push(p)
-            }
-          }
-
-          // 1. Delete products that don't have sales
-          if (productsRealDelete.length > 0) {
-            const idsToDelete = productsRealDelete.map(p => p.id)
-            const { error: delErr } = await supabase
-              .from('products')
-              .delete()
-              .in('id', idsToDelete)
-            if (delErr) throw delErr
-          }
-
-          // 2. Set stock to 0 for products that have sales (and cannot be deleted)
-          if (productsZeroStock.length > 0) {
-            const zeroStockMovements: any[] = []
-            for (const p of productsZeroStock) {
-              if (p.quantity_in_stock !== 0) {
-                zeroStockMovements.push({
-                  store_id,
-                  product_id: p.id,
-                  quantity: -p.quantity_in_stock,
-                  type: 'exit',
-                  reason: 'manual_adjustment'
-                })
-              }
-            }
-
-            if (zeroStockMovements.length > 0) {
-              const { error: smErr } = await supabase
-                .from('stock_movements')
-                .insert(zeroStockMovements)
-              if (smErr) throw smErr
-            }
-          }
-
-          window.dispatchEvent(new CustomEvent('dashboard-refresh'))
-
-          let responseMsg = `✅ **Exclusão de produtos concluída!**\n\n`
-          if (productsRealDelete.length > 0) {
-            responseMsg += `🗑️ **Produtos excluídos (${productsRealDelete.length}):**\n`
-            productsRealDelete.forEach(p => {
-              responseMsg += `* ${p.name}\n`
-            })
-            responseMsg += `\n`
-          }
-          if (productsZeroStock.length > 0) {
-            responseMsg += `⚠️ **Produtos mantidos mas com estoque zerado (${productsZeroStock.length})** (não puderam ser excluídos pois possuem vendas vinculadas):\n`
-            zeroStockMovementsBlock: {
-              productsZeroStock.forEach(p => {
-                responseMsg += `* ${p.name}\n`
-              })
-            }
-            responseMsg += `\n`
-          }
-          if (excludedItems.length > 0) {
-            responseMsg += `🛡️ **Produtos mantidos com estoque original (${excludedItems.length}):**\n`
-            excludedItems.forEach(p => {
-              responseMsg += `* ${p.name} (${p.quantity_in_stock} un.)\n`
-            })
-          }
-
-          addAgentMessage(responseMsg)
-        }
-
-      } catch (err: any) {
-        console.error(err)
-        addAgentMessage(`❌ **Erro ao excluir:** ${err.message || 'Erro desconhecido.'}`)
-      } finally {
-        setTyping(false)
-      }
-      return
-    }
-
-    let matchedProduct: any = null
-    let matchedCustomer: any = null
-    let quantity = 1
-    let paymentMethod: 'pix' | 'money' | 'credit_card' | 'debit_card' = 'pix'
-
-
-    const quantityMatch = text.match(/(?:quantidade|qtd|vendi|vendeu|estoque|adicione|aumente|retire|-\s*|\+\s*)?\s*(\d+)/i)
-    if (quantityMatch) {
-      quantity = parseInt(quantityMatch[1]) || 1
-    }
-
-    for (const c of customers) {
-      const normName = normalize(c.name)
-      if (normalizedText.includes(normName) || normalizedText.includes(normName.replace(/\s+/g, '-'))) {
-        matchedCustomer = c
-        break
-      }
-    }
-
-    for (const p of products) {
-      const normName = normalize(p.name)
-      const normSku = p.sku ? normalize(p.sku) : ''
-      const normBarcode = p.barcode ? normalize(p.barcode) : ''
-      
-      if (
-        normalizedText.includes(normName) || 
-        normalizedText.includes(normName.replace(/\s+/g, '-')) ||
-        (normSku && normalizedText.includes(normSku)) ||
-        (normBarcode && normalizedText.includes(normBarcode))
-      ) {
-        matchedProduct = p
-        break
-      }
-    }
-
-    if (normalizedText.includes('dinheiro') || normalizedText.includes('money')) {
-      paymentMethod = 'money'
-    } else if (normalizedText.includes('credito') || normalizedText.includes('cartao de credito')) {
-      paymentMethod = 'credit_card'
-    } else if (normalizedText.includes('debito') || normalizedText.includes('cartao de debito')) {
-      paymentMethod = 'debit_card'
-    }
-
-    const isSale = normalizedText.includes('vendi') || normalizedText.includes('venda') || normalizedText.includes('vendeu') || normalizedText.includes('saida') || normalizedText.includes('saída') || normalizedText.includes('vender')
-    const isStockIncrease = normalizedText.includes('adicione') || normalizedText.includes('aumente') || normalizedText.includes('entrada') || normalizedText.includes('somar') || normalizedText.includes('mais') || normalizedText.includes('adicionar')
-    const isStockDecrease = normalizedText.includes('retire') || normalizedText.includes('remova') || normalizedText.includes('saida') || normalizedText.includes('saída') || normalizedText.includes('menos') || normalizedText.includes('subtrair') || normalizedText.includes('retirar')
-    const isCreate = normalizedText.includes('cadastr') || 
-                     normalizedText.includes('cri') || 
-                     normalizedText.includes('inser') || 
-                     normalizedText.includes('registr') || 
-                     normalizedText.includes('novo produto') || 
-                     normalizedText.includes('novo cliente') || 
-                     normalizedText.includes('nova cliente') ||
-                     (normalizedText.includes('adicion') && normalizedText.includes('cliente'))
-
-    await new Promise(resolve => setTimeout(resolve, 1200))
-
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Não autenticado')
@@ -653,201 +188,94 @@ export default function DashboardShell({ children, profile, store, lowStockCount
       if (!profile) throw new Error('Loja não encontrada')
       const store_id = profile.store_id
 
-      if (isSale) {
-        if (!matchedProduct) {
-          addAgentMessage("Desculpe, não consegui identificar qual produto foi vendido. Marque-o usando `@`.")
-          return
-        }
+      // Fetch latest products and customers in real-time to have most updated lists
+      const { data: prods } = await supabase
+        .from('products')
+        .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock')
+        .eq('store_id', store_id)
+        .order('name', { ascending: true })
 
-        let customerId = matchedCustomer?.id
-        if (!customerId) {
-          const { data: existingAvulso } = await supabase
-            .from('customers')
-            .select('id')
-            .eq('store_id', store_id)
-            .eq('name', 'Cliente Avulso')
-            .maybeSingle()
+      const { data: custs } = await supabase
+        .from('customers')
+        .select('id, name')
+        .eq('store_id', store_id)
+        .order('name', { ascending: true })
 
-          if (existingAvulso) {
-            customerId = existingAvulso.id
-          } else {
-            const { data: newAvulso } = await supabase
-              .from('customers')
-              .insert([{ store_id, name: 'Cliente Avulso' }])
-              .select('id')
-              .single()
-            customerId = newAvulso?.id
+      const currentProducts = prods || []
+      const currentCustomers = custs || []
+
+      const promptText = `
+Você é a Mimus AI, a assistente virtual inteligente da loja de cosméticos.
+Sua tarefa é analisar a mensagem do usuário e decidir se ela representa comandos do banco de dados para executar na loja, ou apenas uma conversa/pergunta geral.
+
+---
+DADOS ATUAIS DA LOJA (para você correlacionar nomes a IDs):
+
+PRODUTOS CADASTRADOS (ID, Nome, SKU, Código de Barras, Preço de Venda, Estoque Atual):
+${JSON.stringify(currentProducts.map(p => ({ id: p.id, name: p.name, sku: p.sku || '', barcode: p.barcode || '', price: p.sale_price, stock: p.quantity_in_stock })))}
+
+CLIENTES CADASTRADOS (ID, Nome):
+${JSON.stringify(currentCustomers.map(c => ({ id: c.id, name: c.name })))}
+---
+
+Comandos possíveis que você pode extrair no array 'actions':
+1. Cadastrar novo produto: tipo 'create_product'. Informe name, brand, costPrice, salePrice, quantity (inicial).
+2. Cadastrar novo cliente: tipo 'create_customer'. Informe name, phone, instagram, birthday (formato YYYY-MM-DD).
+3. Movimentar estoque: tipo 'stock_movement'. Informe productId, quantity (positivo), movementType ('entry' ou 'exit'), reason ('manual_adjustment', 'loss', ou 'purchase').
+4. Registrar venda: tipo 'create_sale'. Informe items (lista de { productId, quantity, unitPrice }), customerId (opcional), paymentMethod ('pix', 'money', 'credit_card', ou 'debit_card').
+5. Excluir produto: tipo 'delete_product'. Informe productId.
+6. Excluir cliente: tipo 'delete_customer'. Informe customerId.
+
+Regras importantes de mapeamento:
+- Se o usuário falar de um produto ou cliente que já existe, mesmo com pequenas diferenças na grafia, encontre a correspondência exata no cadastro fornecido e use o ID correto.
+- Se o usuário pedir para excluir uma lista de produtos, gere uma ação 'delete_product' para cada um dos produtos correspondentes.
+- Se for uma mensagem informativa, pergunta geral, ou você precisar de mais informações, responda amigavelmente no campo 'reply' e não adicione ações.
+- Se você gerar ações, explique amigavelmente no campo 'reply' o que está fazendo, por exemplo: "Entendido! Estou registrando a venda de..." ou "Excluindo os produtos selecionados...".
+
+Você DEVE responder ESTRITAMENTE em formato JSON com o seguinte formato de resposta:
+{
+  "reply": "Sua resposta textual amigável aqui explicando a ação ou respondendo a dúvida.",
+  "actions": [
+    // lista de ações a executar
+  ]
+}
+`
+
+      const apiKey = "AIzaSyDxB4zyLAjssiNPAExf-T2fUxbg05_QjLQ"
+      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: `${promptText}\n\nMENSAGEM DO USUÁRIO:\n"${text}"` }] }],
+          generationConfig: {
+            responseMimeType: "application/json"
           }
-        }
+        })
+      })
 
-        const totalValue = quantity * matchedProduct.sale_price
+      if (!geminiResponse.ok) {
+        throw new Error("Erro na comunicação com a API do Google Gemini")
+      }
 
-        const { data: newSale, error: saleErr } = await supabase
-          .from('sales')
-          .insert([{
-            store_id,
-            customer_id: customerId,
-            total_value: totalValue,
-            discount: 0,
-            payment_method: paymentMethod
-          }])
-          .select('id')
-          .single()
+      const resData = await geminiResponse.json()
+      const rawText = resData.candidates?.[0]?.content?.parts?.[0]?.text
+      if (!rawText) throw new Error("Resposta inválida da API do Gemini.")
 
-        if (saleErr) throw saleErr
+      const parsed = JSON.parse(rawText)
+      const reply = parsed.reply || ""
+      const actions = parsed.actions || []
 
-        const { error: itemErr } = await supabase
-          .from('sale_items')
-          .insert([{
-            sale_id: newSale.id,
-            product_id: matchedProduct.id,
-            quantity,
-            unit_price: matchedProduct.sale_price
-          }])
-
-        if (itemErr) throw itemErr
-
-        window.dispatchEvent(new CustomEvent('dashboard-refresh'))
-
-        const custName = matchedCustomer ? matchedCustomer.name : 'Cliente Avulso'
-        addAgentMessage(`✅ **Venda registrada!**\n\n* **Produto:** ${matchedProduct.name}\n* **Quantidade:** ${quantity} un.\n* **Cliente:** ${custName}\n* **Total:** R$ ${totalValue.toFixed(2)}\n* **Pagamento:** ${paymentMethod === 'pix' ? 'Pix' : paymentMethod === 'money' ? 'Dinheiro' : paymentMethod === 'credit_card' ? 'Crédito' : 'Débito'}`)
-
-      } else if (isStockIncrease || isStockDecrease) {
-        if (!matchedProduct) {
-          addAgentMessage("Desculpe, não identifiquei o produto para alteração. Use `@`.")
-          return
-        }
-
-        const quantityChange = isStockIncrease ? quantity : -quantity
-
-        const { error: smErr } = await supabase
-          .from('stock_movements')
-          .insert([{
-            store_id,
-            product_id: matchedProduct.id,
-            quantity: quantityChange,
-            type: isStockIncrease ? 'entry' : 'exit',
-            reason: 'manual_adjustment'
-          }])
-
-        if (smErr) throw smErr
-
-        window.dispatchEvent(new CustomEvent('dashboard-refresh'))
-
-        const currentQty = matchedProduct.quantity_in_stock + quantityChange
-        addAgentMessage(`📦 **Estoque atualizado!**\n\n* **Produto:** ${matchedProduct.name}\n* **Movimentação:** ${quantityChange > 0 ? '+' : ''}${quantityChange} un.\n* **Estoque Atualizado:** ${currentQty} un.`)
-
-      } else if (isCreate) {
-        const phoneMatch = text.match(/(?:telefone|phone|celular|whats|whatsapp)\s*(?:de)?\s*([\d\s\-()]+)/i)
-        const instagramMatch = text.match(/(?:instagram|ig|insta)\s*(?:de)?\s*([@\w._]+)/i)
-        const birthdayMatch = text.match(/(?:nascimento|aniversario|aniversário|nasc)\s*(?:de)?\s*([\d/]+)/i)
-
-        const priceMatch = text.match(/(?:preco|preço|venda|valor)\s*(?:de|R\$)?\s*(\d+(?:[.,]\d+)?)/i)
-        const costMatch = text.match(/(?:custo|compra)\s*(?:de|R\$)?\s*(\d+(?:[.,]\d+)?)/i)
-        const brandMatch = text.match(/(?:marca|grife|da)\s+([a-zA-Z\s]+?)(?:\s+com|\s+preco|\s+custo|\s+estoque|$)/i)
-        const stockMatch = text.match(/(?:estoque|quantidade|qtd)\s*(?:de)?\s*(\d+)/i)
-
-        const productKeywords = ['produto', 'item', 'mercadoria', 'preco', 'preço', 'custo', 'estoque', 'qtd', 'quantidade', 'marca', 'brand', 'sku', 'barra', 'batom', 'blush', 'rimel', 'rímel', 'base', 'delineador', 'sombra', 'gloss', 'esmalte', 'po ', 'pó ', 'corretivo', 'iluminador', 'pincel', 'paleta', 'mascara', 'máscara', 'sabonete', 'creme', 'perfume', 'hidratante', 'oleo', 'óleo', 'serum', 'sérum', 'tonico', 'tônico', 'protetor', 'sol', 'labial']
-        const customerKeywords = ['cliente', 'customer', 'comprador', 'compradora', 'fregues', 'freguesa', 'usuario', 'usuaria', 'usuário', 'usuária', 'pessoa', 'contato', 'contatos', 'whats', 'whatsapp', 'telefone', 'celular', 'phone', 'instagram', 'ig', 'insta', 'nascimento', 'aniversario', 'aniversário', 'nasc']
-
-        const hasProductClues = !!(priceMatch || costMatch || brandMatch || stockMatch || productKeywords.some(kw => normalizedText.includes(kw)))
-        const hasCustomerClues = !!(phoneMatch || instagramMatch || birthdayMatch || customerKeywords.some(kw => normalizedText.includes(kw)))
-
-        // Determine if it is a customer or a product
-        let isCustomer = false
-        if (hasCustomerClues && !hasProductClues) {
-          isCustomer = true
-        } else if (hasProductClues && !hasCustomerClues) {
-          isCustomer = false
-        } else if (hasCustomerClues && hasProductClues) {
-          if (normalizedText.includes('cliente') || normalizedText.includes('customer')) {
-            isCustomer = true
-          } else {
-            isCustomer = false
-          }
-        } else {
-          // Default to customer when no clues are present, as registering just a name is typical for a customer
-          isCustomer = true
-        }
-
-        const cleanRegex = /\b(cadastrar|cadastre|cadastra|cadastro|criar|crie|cria|inserir|insira|insere|registrar|registre|registra|registro|adicionar|adicione|adiciona|cliente|customer|comprador|compradora|fregues|freguesa|produto|item|um|uma|o|a|os|as|novo|nova)\b/gi
-
-        if (isCustomer) {
-          const namePart = text.split(/(?:com|telefone|phone|celular|whats|whatsapp|instagram|ig|insta|nascimento|aniversario|aniversário|nasc)\b/i)[0]
-          let name = namePart
-            .replace(cleanRegex, '')
-            .replace(/@/g, '')
-            .replace(/\s+/g, ' ')
-            .trim()
-
-          const phone = phoneMatch ? phoneMatch[1].trim() : null
-          const instagram = instagramMatch ? instagramMatch[1].replace('@', '').trim() : null
-          
-          let birthday = null
-          if (birthdayMatch) {
-            const parts = birthdayMatch[1].trim().split('/')
-            if (parts.length === 3) {
-              birthday = `${parts[2]}-${parts[1]}-${parts[0]}`
-            } else if (parts.length === 2) {
-              birthday = `2000-${parts[1]}-${parts[0]}`
-            } else {
-              birthday = birthdayMatch[1].trim()
-            }
-          }
-
-          if (!name || name.length < 2) {
-            addAgentMessage("Não identifiquei o nome da cliente. Diga algo como: *'cadastre a cliente Luciana com telefone 99999-9999'*.")
-            return
-          }
-
-          const { data: newCust, error: insertErr } = await supabase
-            .from('customers')
-            .insert([{
-              store_id,
-              name,
-              phone,
-              instagram,
-              birthday
-            }])
-            .select()
-            .single()
-
-          if (insertErr) throw insertErr
-
-          window.dispatchEvent(new CustomEvent('dashboard-refresh'))
-
-          let details = `👤 **Cliente cadastrada com sucesso!**\n\n* **Nome:** ${name}`
-          if (phone) details += `\n* **Telefone:** ${phone}`
-          if (instagram) details += `\n* **Instagram:** @${instagram}`
-          if (birthday) details += `\n* **Aniversário:** ${new Date(birthday).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
-
-          addAgentMessage(details)
-        } else {
-          const namePart = text.split(/(?:com|preco|preço|custo|marca|grife|da|estoque|quantidade|qtd)\b/i)[0]
-          let name = namePart
-            .replace(cleanRegex, '')
-            .replace(/@/g, '')
-            .replace(/\s+/g, ' ')
-            .trim()
-
-          const sale_price = priceMatch ? parseFloat(priceMatch[1].replace(',', '.')) : 0.00
-          const cost_price = costMatch ? parseFloat(costMatch[1].replace(',', '.')) : 0.00
-          const brand = brandMatch ? brandMatch[1].trim() : 'Mimus'
-          const stock = stockMatch ? parseInt(stockMatch[1]) : 0
-
-          if (!name || name.length < 2) {
-            addAgentMessage("Não consegui identificar o nome do produto. Diga algo como: *'cadastre o produto Delineador com preço 45 e custo 20'*.")
-            return
-          }
-
+      // Execute actions
+      for (const action of actions) {
+        if (action.type === 'create_product') {
           const { data: newProd, error: insertErr } = await supabase
             .from('products')
             .insert([{
               store_id,
-              name,
-              brand,
-              cost_price,
-              sale_price,
+              name: action.name,
+              brand: action.brand || 'Mimus',
+              cost_price: action.costPrice || 0,
+              sale_price: action.salePrice || 0,
               quantity_in_stock: 0,
               min_stock_alert: 5
             }])
@@ -856,26 +284,143 @@ export default function DashboardShell({ children, profile, store, lowStockCount
 
           if (insertErr) throw insertErr
 
-          if (newProd && stock > 0) {
-            await supabase
-              .from('stock_movements')
-              .insert([{
-                store_id,
-                product_id: newProd.id,
-                quantity: stock,
-                type: 'entry',
-                reason: 'purchase'
-              }])
+          if (newProd && action.quantity && action.quantity > 0) {
+            await supabase.from('stock_movements').insert([{
+              store_id,
+              product_id: newProd.id,
+              quantity: action.quantity,
+              type: 'entry',
+              reason: 'purchase'
+            }])
+          }
+        } else if (action.type === 'create_customer') {
+          const { error: insertErr } = await supabase
+            .from('customers')
+            .insert([{
+              store_id,
+              name: action.name,
+              phone: action.phone || null,
+              instagram: action.instagram || null,
+              birthday: action.birthday || null
+            }])
+
+          if (insertErr) throw insertErr
+        } else if (action.type === 'stock_movement') {
+          const { error: smErr } = await supabase
+            .from('stock_movements')
+            .insert([{
+              store_id,
+              product_id: action.productId,
+              quantity: action.movementType === 'entry' ? action.quantity : -action.quantity,
+              type: action.movementType,
+              reason: action.reason || 'manual_adjustment'
+            }])
+
+          if (smErr) throw smErr
+        } else if (action.type === 'create_sale') {
+          let customerId = action.customerId
+          if (!customerId) {
+            const { data: existingAvulso } = await supabase
+              .from('customers')
+              .select('id')
+              .eq('store_id', store_id)
+              .eq('name', 'Cliente Avulso')
+              .maybeSingle()
+
+            if (existingAvulso) {
+              customerId = existingAvulso.id
+            } else {
+              const { data: newAvulso } = await supabase
+                .from('customers')
+                .insert([{ store_id, name: 'Cliente Avulso' }])
+                .select('id')
+                .single()
+              customerId = newAvulso?.id
+            }
           }
 
-          window.dispatchEvent(new CustomEvent('dashboard-refresh'))
+          const totalValue = action.items.reduce((sum: number, item: any) => sum + (item.quantity * item.unitPrice), 0)
 
-          addAgentMessage(`✨ **Produto cadastrado com sucesso!**\n\n* **Nome:** ${name}\n* **Marca:** ${brand}\n* **Venda:** R$ ${sale_price.toFixed(2)}\n* **Estoque:** ${stock} un.`)
+          const { data: newSale, error: saleErr } = await supabase
+            .from('sales')
+            .insert([{
+              store_id,
+              customer_id: customerId,
+              total_value: totalValue,
+              discount: 0,
+              payment_method: action.paymentMethod || 'pix'
+            }])
+            .select('id')
+            .single()
+
+          if (saleErr) throw saleErr
+
+          const saleItemsPayload = action.items.map((item: any) => ({
+            sale_id: newSale.id,
+            product_id: item.productId,
+            quantity: item.quantity,
+            unit_price: item.unitPrice
+          }))
+
+          const { error: itemsErr } = await supabase
+            .from('sale_items')
+            .insert(saleItemsPayload)
+
+          if (itemsErr) throw itemsErr
+        } else if (action.type === 'delete_product') {
+          const { data: saleItems, error: salesErr } = await supabase
+            .from('sale_items')
+            .select('product_id')
+            .eq('product_id', action.productId)
+
+          if (salesErr) throw salesErr
+
+          if (saleItems && saleItems.length > 0) {
+            const { data: pData } = await supabase
+              .from('products')
+              .select('quantity_in_stock')
+              .eq('id', action.productId)
+              .single()
+
+            if (pData && pData.quantity_in_stock > 0) {
+              await supabase.from('stock_movements').insert([{
+                store_id,
+                product_id: action.productId,
+                quantity: -pData.quantity_in_stock,
+                type: 'exit',
+                reason: 'manual_adjustment'
+              }])
+            }
+          } else {
+            const { error: delErr } = await supabase
+              .from('products')
+              .delete()
+              .eq('id', action.productId)
+              .eq('store_id', store_id)
+
+            if (delErr) throw delErr
+          }
+        } else if (action.type === 'delete_customer') {
+          const { error: delErr } = await supabase
+            .from('customers')
+            .delete()
+            .eq('id', action.customerId)
+            .eq('store_id', store_id)
+
+          if (delErr) throw delErr
         }
-
-      } else {
-        addAgentMessage(`Olá! Sou o assistente Mimus AI. 🌸\n\nComandos aceitos:\n\n* 🛍️ **Vendas:** *"vendi 2 @Batom para @Maria"*.\n* 📦 **Estoque:** *"adicione 10 @Delineador"* ou *"retire 2 @Base"*.\n* ✨ **Cadastrar:** *"cadastre produto Rímel com preço 29.90 e custo 15"*.\n\nUse **\`@\`** para marcar itens sem erro de digitação!`)
       }
+
+      if (actions.length > 0) {
+        window.dispatchEvent(new CustomEvent('dashboard-refresh'))
+      }
+
+      if (reply) {
+        addAgentMessage(reply)
+      } else {
+        addAgentMessage("✅ Comando processado com sucesso!")
+      }
+
     } catch (err: any) {
       console.error(err)
       addAgentMessage(`❌ **Erro ao processar:** ${err.message || 'Erro desconhecido.'}`)
