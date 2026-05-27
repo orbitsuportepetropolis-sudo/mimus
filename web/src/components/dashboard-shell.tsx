@@ -242,7 +242,7 @@ Você DEVE responder ESTRITAMENTE em formato JSON com o seguinte formato de resp
 `
 
       const apiKey = "AIzaSyDxB4zyLAjssiNPAExf-T2fUxbg05_QjLQ"
-      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
