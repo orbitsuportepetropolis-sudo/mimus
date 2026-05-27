@@ -163,6 +163,17 @@ export default function DashboardShell({ children, profile, store, lowStockCount
   async function processCommand(text: string) {
     const normalizedText = normalize(text)
 
+    const isDelete = normalizedText.includes('apagar') || 
+                     normalizedText.includes('apague') || 
+                     normalizedText.includes('deletar') || 
+                     normalizedText.includes('delete') || 
+                     normalizedText.includes('excluir') || 
+                     normalizedText.includes('exclua') || 
+                     normalizedText.includes('remover') || 
+                     normalizedText.includes('remova') || 
+                     normalizedText.includes('limpar') || 
+                     normalizedText.includes('limpe')
+
     // 1. Check for batch multi-line product registration
     const lines = text.split('\n')
     const itemsToRegister: { quantity: number; name: string }[] = []
@@ -180,7 +191,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
       }
     }
 
-    const isBatchTrigger = itemsToRegister.length > 0 && (
+    const isBatchTrigger = itemsToRegister.length > 0 && !isDelete && (
       lines.length > 1 || 
       normalizedText.includes('lance') || 
       normalizedText.includes('cadastr') || 
@@ -354,17 +365,6 @@ export default function DashboardShell({ children, profile, store, lowStockCount
       }
       return
     }
-
-    const isDelete = normalizedText.includes('apagar') || 
-                     normalizedText.includes('apague') || 
-                     normalizedText.includes('deletar') || 
-                     normalizedText.includes('delete') || 
-                     normalizedText.includes('excluir') || 
-                     normalizedText.includes('exclua') || 
-                     normalizedText.includes('remover') || 
-                     normalizedText.includes('remova') || 
-                     normalizedText.includes('limpar') || 
-                     normalizedText.includes('limpe')
 
     if (isDelete) {
       await new Promise(resolve => setTimeout(resolve, 1200))
