@@ -117,28 +117,11 @@ export default function FinancePage() {
           }
         })
 
-        // Standard mock charts if database is new/empty
-        const hasTransactions = last5Days.some(d => d.entradas > 0 || d.saidas > 0)
-        if (!hasTransactions) {
-          setChartData([
-            { label: '01/05', entradas: 400, saidas: 240 },
-            { label: '05/05', entradas: 800, saidas: 320 },
-            { label: '10/05', entradas: 1200, saidas: 450 },
-            { label: '15/05', entradas: 980, saidas: 280 },
-            { label: '20/05', entradas: 1540, saidas: 510 },
-          ])
-          setTotals({
-            revenue: 4920.00,
-            expense: 1800.00,
-            balance: 3120.00
-          })
-        } else {
-          setChartData(last5Days.map(item => ({
-            label: item.label,
-            entradas: item.entradas,
-            saidas: item.saidas
-          })))
-        }
+        setChartData(last5Days.map(item => ({
+          label: item.label,
+          entradas: item.entradas,
+          saidas: item.saidas
+        })))
       }
     } catch (err) {
       console.error(err)

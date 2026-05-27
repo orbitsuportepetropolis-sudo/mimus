@@ -179,43 +179,7 @@ export default function DashboardPage() {
         })
       }
 
-      // Check if empty for demo
-      const totalSalesSum = last7Days.reduce((acc, curr) => acc + curr.value, 0)
-      if (totalSalesSum === 0) {
-        setChartData([
-          { label: 'Seg', value: 1200 },
-          { label: 'Ter', value: 1900 },
-          { label: 'Qua', value: 1500 },
-          { label: 'Qui', value: 2400 },
-          { label: 'Sex', value: 3100 },
-          { label: 'Sáb', value: 4200 },
-          { label: 'Dom', value: 2800 },
-        ])
-        // Set beautiful fallback stats for demo if database is empty
-        setStats({
-          todaySalesCount: 12,
-          monthlyRevenue: 15430.50,
-          lowStockCount: 3,
-          expiringCount: 2
-        })
-          setRecentSales([
-            { id: '1', customer: 'Mariana Silva', value: 189.90, date: '14:32' },
-            { id: '2', customer: 'Leticia Costa', value: 92.50, date: '13:15' },
-            { id: '3', customer: 'Fernanda Rocha', value: 310.00, date: '11:05' },
-            { id: '4', customer: 'Juliana Dias', value: 45.00, date: '09:40' },
-          ])
-          setLowStockProducts([
-            { id: '1', name: 'Batom Matte Velvet Rose', brand: 'Bruna Tavares', sale_price: 39.90, quantity_in_stock: 2 },
-            { id: '2', name: 'Corretivo Hyaluronic Peach', brand: 'Mimis Beauty', sale_price: 45.00, quantity_in_stock: 1 },
-            { id: '3', name: 'Sérum Renovador Skin Care', brand: 'Sallve', sale_price: 69.90, quantity_in_stock: 0 },
-          ])
-          setExpiringProducts([
-            { id: '1', name: 'Delineador Holográfico Glow', brand: 'Mimis Beauty', formattedDate: '28/05/2026' },
-            { id: '2', name: 'Base Fluida Satin 03', brand: 'Boca Rosa', formattedDate: '12/06/2026' },
-          ])
-        } else {
-          setChartData(last7Days.map(item => ({ label: item.label, value: item.value })))
-        }
+      setChartData(last7Days.map(item => ({ label: item.label, value: item.value })))
 
       } catch (err) {
         console.error(err)
@@ -373,21 +337,25 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          <div className="flex-1 space-y-4">
-            {recentSales.map((sale) => (
-              <div key={sale.id} className="flex items-center justify-between pb-3 border-b border-slate-50 dark:border-zinc-800/40 last:border-0 last:pb-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold text-xs">
-                    {sale.customer.slice(0,2).toUpperCase()}
+          <div className="flex-1 space-y-4 flex flex-col justify-center">
+            {recentSales.length === 0 ? (
+              <p className="text-slate-400 text-xs text-center py-8">Nenhuma venda realizada hoje.</p>
+            ) : (
+              recentSales.map((sale) => (
+                <div key={sale.id} className="flex items-center justify-between pb-3 border-b border-slate-50 dark:border-zinc-800/40 last:border-0 last:pb-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold text-xs">
+                      {sale.customer.slice(0,2).toUpperCase()}
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-700 dark:text-zinc-300">{sale.customer}</h4>
+                      <span className="text-[10px] text-slate-400 dark:text-zinc-500">{sale.date}</span>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-700 dark:text-zinc-300">{sale.customer}</h4>
-                    <span className="text-[10px] text-slate-400 dark:text-zinc-500">{sale.date}</span>
-                  </div>
+                  <span className="text-xs font-bold text-slate-800 dark:text-white">R$ {sale.value.toFixed(2)}</span>
                 </div>
-                <span className="text-xs font-bold text-slate-800 dark:text-white">R$ {sale.value.toFixed(2)}</span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -406,22 +374,26 @@ export default function DashboardPage() {
               Ver Estoque <ChevronRight className="w-3 h-3" />
             </Link>
           </div>
-          <div className="space-y-3 flex-1">
-            {lowStockProducts.map((prod) => (
-              <div key={prod.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50/50 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-800/60">
-                <div>
-                  <h4 className="text-xs font-bold text-slate-700 dark:text-zinc-300">{prod.name}</h4>
-                  <span className="text-[10px] text-slate-400 dark:text-zinc-500">{prod.brand}</span>
+          <div className="space-y-3 flex-1 flex flex-col justify-center">
+            {lowStockProducts.length === 0 ? (
+              <p className="text-slate-400 text-xs text-center py-8">Nenhum produto com estoque crítico.</p>
+            ) : (
+              lowStockProducts.map((prod) => (
+                <div key={prod.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50/50 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-800/60">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-700 dark:text-zinc-300">{prod.name}</h4>
+                    <span className="text-[10px] text-slate-400 dark:text-zinc-500">{prod.brand}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                      prod.quantity_in_stock === 0 ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/50' : 'bg-amber-50 text-amber-600 dark:bg-amber-950/50'
+                    }`}>
+                      {prod.quantity_in_stock} un. restante
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                    prod.quantity_in_stock === 0 ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/50' : 'bg-amber-50 text-amber-600 dark:bg-amber-950/50'
-                  }`}>
-                    {prod.quantity_in_stock} un. restante
-                  </span>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -435,20 +407,24 @@ export default function DashboardPage() {
               Ver Catálogo <ChevronRight className="w-3 h-3" />
             </Link>
           </div>
-          <div className="space-y-3 flex-1">
-            {expiringProducts.map((prod) => (
-              <div key={prod.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50/50 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-800/60">
-                <div>
-                  <h4 className="text-xs font-bold text-slate-700 dark:text-zinc-300">{prod.name}</h4>
-                  <span className="text-[10px] text-slate-400 dark:text-zinc-500">{prod.brand}</span>
+          <div className="space-y-3 flex-1 flex flex-col justify-center">
+            {expiringProducts.length === 0 ? (
+              <p className="text-slate-400 text-xs text-center py-8">Nenhum produto próximo do vencimento.</p>
+            ) : (
+              expiringProducts.map((prod) => (
+                <div key={prod.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50/50 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-800/60">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-700 dark:text-zinc-300">{prod.name}</h4>
+                    <span className="text-[10px] text-slate-400 dark:text-zinc-500">{prod.brand}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-bold text-pink-600 bg-pink-50 dark:bg-pink-950/50 px-2 py-0.5 rounded-full">
+                      Vence {prod.formattedDate}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-xs font-bold text-pink-600 bg-pink-50 dark:bg-pink-950/50 px-2 py-0.5 rounded-full">
-                    Vence {prod.formattedDate}
-                  </span>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 

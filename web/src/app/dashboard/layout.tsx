@@ -33,7 +33,7 @@ export default async function DashboardLayout({
   // Fetch store details
   const { data: store } = await supabase
     .from('stores')
-    .select('name, plan')
+    .select('name, plan, plan_status, trial_ends_at')
     .eq('id', profile.store_id)
     .single()
 

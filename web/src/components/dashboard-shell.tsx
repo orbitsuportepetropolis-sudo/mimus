@@ -23,13 +23,19 @@ import {
   CreditCard,
   Settings,
   Send,
-  MessageSquare
+  MessageSquare,
+  Loader2
 } from 'lucide-react'
 
 interface DashboardShellProps {
   children: React.ReactNode
   profile: { name: string; role: string } | null
-  store: { name: string; plan?: string } | null
+  store: { 
+    name: string; 
+    plan?: string; 
+    plan_status?: string; 
+    trial_ends_at?: string | null 
+  } | null
   lowStockCount: number
 }
 
@@ -67,6 +73,21 @@ export default function DashboardShell({ children, profile, store, lowStockCount
     window.addEventListener('dashboard-refresh', loadAgentData)
     return () => window.removeEventListener('dashboard-refresh', loadAgentData)
   }, [])
+
+  const plan = store?.plan || 'free'
+  const status = store?.plan_status || 'trial'
+  const trialEnds = store?.trial_ends_at ? new Date(store.trial_ends_at).getTime() : 0
+  const isTrialValid = status === 'trial' && trialEnds > Date.now()
+  const isProValid = plan === 'pro' && (status === 'active' || status === 'pending')
+  const hasAccess = isTrialValid || isProValid
+  const showBlocker = !hasAccess && pathname !== '/dashboard/billing'
+
+  useEffect(() => {
+    if (!store) return
+    if (!hasAccess && pathname !== '/dashboard/billing') {
+      router.push('/dashboard/billing')
+    }
+  }, [store, pathname, router, hasAccess])
 
   async function loadAgentData() {
     try {
@@ -1172,7 +1193,14 @@ export default function DashboardShell({ children, profile, store, lowStockCount
 
         {/* Content Body */}
         <main className="flex-1 p-4 md:p-8">
-          {children}
+          {showBlocker ? (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+              <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
+              <p className="text-sm text-slate-500">Redirecionando para a página de faturamento...</p>
+            </div>
+          ) : (
+            children
+          )}
         </main>
 
         {/* Chat Widget IA Agente Mimus */}
