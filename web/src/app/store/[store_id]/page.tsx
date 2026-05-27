@@ -29,6 +29,8 @@ interface Product {
   quantity_in_stock: number
   image_url: string | null
   description: string | null
+  promotional_price: number | null
+  has_free_shipping: boolean
 }
 
 interface CartItem extends Product {
@@ -50,6 +52,8 @@ export default function StorefrontPage() {
 
   // Branding & Configuration States
   const [storeName, setStoreName] = useState('')
+  const [companyName, setCompanyName] = useState('')
+  const [cnpj, setCnpj] = useState('')
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [primaryColor, setPrimaryColor] = useState('#b5127b')
   const [accentColor, setAccentColor] = useState('#1bbc9b')
@@ -114,7 +118,7 @@ export default function StorefrontPage() {
       // Fetch Store details (selecting both banners array and legacy fields)
       const { data: store, error: storeErr } = await supabase
         .from('stores')
-        .select('name, logo_url, primary_color, accent_color, font_family, campaign_title, campaign_subtitle, campaign_cta, campaign_tag, campaign_banner_url, marquee_text, banners')
+        .select('name, logo_url, primary_color, accent_color, font_family, campaign_title, campaign_subtitle, campaign_cta, campaign_tag, campaign_banner_url, marquee_text, banners, company_name, cnpj')
         .eq('id', storeId)
         .single()
 
@@ -126,6 +130,8 @@ export default function StorefrontPage() {
         setAccentColor(store.accent_color || '#1bbc9b')
         setFontFamily(store.font_family || 'Inter')
         setMarqueeText(store.marquee_text || null)
+        setCompanyName(store.company_name || '')
+        setCnpj(store.cnpj || '')
 
         // Parse banners array with fallback to legacy fields
         let loadedBanners: Banner[] = []
@@ -212,6 +218,9 @@ export default function StorefrontPage() {
       alert('Desculpe, este produto está esgotado.')
       return
     }
+    const finalPrice = (prod.promotional_price && prod.promotional_price > 0) ? prod.promotional_price : prod.sale_price
+    const prodWithPrice = { ...prod, sale_price: finalPrice }
+    
     const existing = cart.find(item => item.id === prod.id)
     if (existing) {
       if (existing.qty >= prod.quantity_in_stock) {
@@ -220,7 +229,7 @@ export default function StorefrontPage() {
       }
       setCart(cart.map(item => item.id === prod.id ? { ...item, qty: item.qty + 1 } : item))
     } else {
-      setCart([...cart, { ...prod, qty: 1 }])
+      setCart([...cart, { ...prodWithPrice, qty: 1 }])
     }
   }
 
@@ -510,16 +519,24 @@ export default function StorefrontPage() {
             
             <div className="flex items-center gap-4 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-none">
               {campaignProducts.map(prod => {
-                const originalPrice = prod.sale_price * 1.3 // 30% discount simulation
                 return (
-                  <div 
+                   <div 
                     key={prod.id} 
                     onClick={() => openProductDetails(prod)}
                     className="w-48 bg-white dark:bg-zinc-900 rounded-[24px] border border-slate-100 dark:border-zinc-800/80 shadow-sm overflow-hidden flex flex-col flex-shrink-0 relative group hover:shadow-md transition-shadow duration-300 cursor-pointer"
                   >
                     {/* Badge */}
-                    <div className="absolute top-3 left-3 z-10 bg-[var(--primary-color)] text-white text-[9px] font-extrabold px-2.5 py-0.5 rounded-full shadow-sm">
-                      30% OFF
+                    <div className="absolute top-3 left-3 z-10 flex flex-col gap-1">
+                      {prod.promotional_price && prod.promotional_price > 0 && (
+                        <div className="bg-[var(--primary-color)] text-white text-[9px] font-extrabold px-2.5 py-0.5 rounded-full shadow-sm">
+                          {Math.round((1 - prod.promotional_price / prod.sale_price) * 100)}% OFF
+                        </div>
+                      )}
+                      {prod.has_free_shipping && (
+                        <div className="bg-emerald-600 text-white text-[9px] font-extrabold px-2.5 py-0.5 rounded-full shadow-sm">
+                          FRETE GRÁTIS
+                        </div>
+                      )}
                     </div>
 
                     <div className="aspect-square bg-slate-50 dark:bg-zinc-950 relative flex items-center justify-center text-slate-300 border-b border-slate-50 dark:border-zinc-950 overflow-hidden">
@@ -548,12 +565,20 @@ export default function StorefrontPage() {
 
                       <div className="space-y-3 pt-2">
                         <div className="flex flex-col">
-                          <span className="text-[10px] text-slate-400 line-through">
-                            R$ {originalPrice.toFixed(2)}
-                          </span>
-                          <span className="text-sm font-black text-slate-900 dark:text-white">
-                            R$ {prod.sale_price.toFixed(2)}
-                          </span>
+                          {prod.promotional_price && prod.promotional_price > 0 ? (
+                            <>
+                              <span className="text-[10px] text-slate-400 line-through">
+                                R$ {prod.sale_price.toFixed(2)}
+                              </span>
+                              <span className="text-sm font-black text-slate-900 dark:text-white">
+                                R$ {prod.promotional_price.toFixed(2)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-sm font-black text-slate-900 dark:text-white">
+                              R$ {prod.sale_price.toFixed(2)}
+                            </span>
+                          )}
                         </div>
                         <button
                           onClick={(e) => { e.stopPropagation(); addToCart(prod); }}
@@ -640,9 +665,18 @@ export default function StorefrontPage() {
                     onClick={() => openProductDetails(prod)}
                     className="bg-white dark:bg-zinc-900 rounded-[28px] border border-slate-100 dark:border-zinc-800/80 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow group relative cursor-pointer"
                   >
-                    {/* Badge */}
-                    <div className="absolute top-2.5 left-2.5 z-10 bg-pink-500/10 text-[var(--primary-color)] text-[8px] font-black tracking-widest px-2.5 py-0.5 rounded-full">
-                      FRETE GRÁTIS
+                    {/* Badges */}
+                    <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1">
+                      {prod.has_free_shipping && (
+                        <div className="bg-pink-500/10 text-[var(--primary-color)] text-[8px] font-black tracking-widest px-2.5 py-0.5 rounded-full" style={{ color: primaryColor }}>
+                          FRETE GRÁTIS
+                        </div>
+                      )}
+                      {prod.promotional_price && prod.promotional_price > 0 && (
+                        <div className="bg-emerald-505/10 text-emerald-600 bg-emerald-55 bg-emerald-500/10 text-[8px] font-black tracking-widest px-2.5 py-0.5 rounded-full">
+                          PROMO
+                        </div>
+                      )}
                     </div>
 
                     <div className="aspect-square bg-slate-50 dark:bg-zinc-950 relative flex items-center justify-center text-slate-300 border-b border-slate-50 dark:border-zinc-950 overflow-hidden">
@@ -670,13 +704,21 @@ export default function StorefrontPage() {
                       </div>
 
                       <div className="pt-2">
-                        <div className="flex items-baseline gap-1.5">
-                          <span className="text-xs font-black text-slate-900 dark:text-white">
-                            R$ {prod.sale_price.toFixed(2)}
-                          </span>
-                          <span className="text-[10px] text-slate-400 line-through">
-                            R$ {originalPrice.toFixed(2)}
-                          </span>
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                          {prod.promotional_price && prod.promotional_price > 0 ? (
+                            <>
+                              <span className="text-xs font-black text-slate-900 dark:text-white">
+                                R$ {prod.promotional_price.toFixed(2)}
+                              </span>
+                              <span className="text-[10px] text-slate-400 line-through">
+                                R$ {prod.sale_price.toFixed(2)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-xs font-black text-slate-900 dark:text-white">
+                              R$ {prod.sale_price.toFixed(2)}
+                            </span>
+                          )}
                         </div>
                         <button
                           onClick={(e) => { e.stopPropagation(); addToCart(prod); }}
@@ -726,6 +768,28 @@ export default function StorefrontPage() {
         </section>
 
       </main>
+
+      {/* Footer */}
+      <footer className="mt-20 border-t border-pink-100/30 dark:border-zinc-800/80 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md py-8 text-center text-xs text-slate-500 dark:text-zinc-400 space-y-4">
+        <div className="max-w-5xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="text-left space-y-1">
+            <h4 className="font-extrabold uppercase text-[var(--primary-color)] tracking-wide">{storeName}</h4>
+            {companyName && <p className="font-medium text-slate-750 dark:text-zinc-350">{companyName}</p>}
+            {cnpj && <p className="text-[10px] opacity-80">CNPJ: {cnpj}</p>}
+          </div>
+          
+          <div className="flex flex-col items-center md:items-end gap-1.5 text-slate-600 dark:text-zinc-300">
+            <div className="flex items-center gap-1.5 text-emerald-650 dark:text-emerald-450 text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
+              🛡️ Compra Segura
+            </div>
+            <p className="text-[10px] opacity-70">Seus dados pessoais e de pagamento estão 100% protegidos.</p>
+          </div>
+        </div>
+        <div className="text-[10px] opacity-60 max-w-5xl mx-auto px-4 border-t border-pink-100/10 dark:border-zinc-800/40 pt-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <p>© {new Date().getFullYear()} {storeName}. Todos os direitos reservados.</p>
+          <p>Compra Segura com tecnologia Mimus 🌸</p>
+        </div>
+      </footer>
 
       {/* Floating Cart Drawer Indicator */}
       {cartItemsCount > 0 && !cartOpen && (
@@ -916,9 +980,18 @@ export default function StorefrontPage() {
               
               {/* Product Large Image */}
               <div className="aspect-square bg-slate-50 dark:bg-zinc-950 rounded-3xl overflow-hidden border border-slate-100 dark:border-zinc-850/85 relative flex items-center justify-center text-slate-350 shadow-inner group">
-                {/* Sale Badge */}
-                <div className="absolute top-4 left-4 z-10 bg-[var(--primary-color)] text-white text-[10px] font-extrabold px-3 py-1 rounded-full shadow-md">
-                  30% OFF
+                {/* Badges */}
+                <div className="absolute top-4 left-4 z-10 flex flex-col gap-1.5">
+                  {selectedProduct.promotional_price && selectedProduct.promotional_price > 0 && (
+                    <div className="bg-[var(--primary-color)] text-white text-[10px] font-extrabold px-3 py-1 rounded-full shadow-md">
+                      {Math.round((1 - selectedProduct.promotional_price / selectedProduct.sale_price) * 100)}% OFF
+                    </div>
+                  )}
+                  {selectedProduct.has_free_shipping && (
+                    <div className="bg-emerald-600 text-white text-[10px] font-extrabold px-3 py-1 rounded-full shadow-md">
+                      FRETE GRÁTIS
+                    </div>
+                  )}
                 </div>
 
                 {selectedProduct.image_url ? (
@@ -953,8 +1026,14 @@ export default function StorefrontPage() {
               {/* Pricing section */}
               <div className="p-4 bg-slate-50 dark:bg-zinc-950/60 rounded-2xl border border-slate-100 dark:border-zinc-850/80 flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <span className="text-[10px] text-slate-400 line-through block">De: R$ {(selectedProduct.sale_price * 1.3).toFixed(2)}</span>
-                  <span className="text-2xl font-black text-slate-900 dark:text-white">R$ {selectedProduct.sale_price.toFixed(2)}</span>
+                  {selectedProduct.promotional_price && selectedProduct.promotional_price > 0 ? (
+                    <>
+                      <span className="text-[10px] text-slate-400 line-through block">De: R$ {selectedProduct.sale_price.toFixed(2)}</span>
+                      <span className="text-2xl font-black text-slate-900 dark:text-white">R$ {selectedProduct.promotional_price.toFixed(2)}</span>
+                    </>
+                  ) : (
+                    <span className="text-2xl font-black text-slate-900 dark:text-white">R$ {selectedProduct.sale_price.toFixed(2)}</span>
+                  )}
                 </div>
 
                 {/* Stock alert */}

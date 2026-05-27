@@ -30,6 +30,8 @@ interface Product {
   expiration_date: string | null
   image_url: string | null
   description: string | null
+  promotional_price?: number | null
+  has_free_shipping?: boolean
 }
 
 export default function ProductsPage() {
@@ -71,6 +73,8 @@ export default function ProductsPage() {
   const [formMinStock, setFormMinStock] = useState('5')
   const [formExpDate, setFormExpDate] = useState('')
   const [formDescription, setFormDescription] = useState('')
+  const [formPromotionalPrice, setFormPromotionalPrice] = useState('')
+  const [formHasFreeShipping, setFormHasFreeShipping] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [formLoading, setFormLoading] = useState(false)
@@ -386,6 +390,8 @@ export default function ProductsPage() {
       setFormMinStock(String(prod.min_stock_alert))
       setFormExpDate(prod.expiration_date || '')
       setFormDescription(prod.description || '')
+      setFormPromotionalPrice(prod.promotional_price ? prod.promotional_price.toFixed(2) : '')
+      setFormHasFreeShipping(!!prod.has_free_shipping)
       setImagePreview(prod.image_url)
     } else {
       setEditingProduct(null)
@@ -400,6 +406,8 @@ export default function ProductsPage() {
       setFormMinStock('5')
       setFormExpDate('')
       setFormDescription('')
+      setFormPromotionalPrice('')
+      setFormHasFreeShipping(false)
     }
     setModalOpen(true)
   }
@@ -486,6 +494,8 @@ export default function ProductsPage() {
         barcode: formBarcode || null,
         cost_price: parseFloat(formCostPrice) || 0,
         sale_price: parseFloat(formSalePrice) || 0,
+        promotional_price: formPromotionalPrice ? parseFloat(formPromotionalPrice) : null,
+        has_free_shipping: formHasFreeShipping,
         quantity_in_stock: editingProduct ? (parseInt(formStock) || 0) : 0,
         min_stock_alert: parseInt(formMinStock) || 5,
         expiration_date: formExpDate || null,
@@ -526,7 +536,11 @@ export default function ProductsPage() {
       await loadProducts()
       setModalOpen(false)
     } catch (err: any) {
-      setFormError(err.message || 'Erro ao salvar produto. Preencha todos os campos corretamente.')
+      if (err.code === '42703') {
+        setFormError('Colunas necessárias não existem na tabela de produtos. Por favor, execute a seguinte query no SQL Editor do Supabase:\n\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS promotional_price numeric(10,2);\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS has_free_shipping boolean NOT NULL DEFAULT false;')
+      } else {
+        setFormError(err.message || 'Erro ao salvar produto. Preencha todos os campos corretamente.')
+      }
     } finally {
       setFormLoading(false)
     }
@@ -889,6 +903,30 @@ export default function ProductsPage() {
                     onChange={(e) => setFormSalePrice(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 dark:text-zinc-500 mb-1">Preço Promocional (R$)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formPromotionalPrice}
+                    onChange={(e) => setFormPromotionalPrice(e.target.value)}
+                    placeholder="Deixe em branco se não houver"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 pt-5">
+                  <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600 dark:text-zinc-300">
+                    <input
+                      type="checkbox"
+                      checked={formHasFreeShipping}
+                      onChange={(e) => setFormHasFreeShipping(e.target.checked)}
+                      className="w-4 h-4 rounded text-rose-600 border-slate-200 focus:ring-rose-500 cursor-pointer"
+                    />
+                    <span>Ativar etiqueta de Frete Grátis</span>
+                  </label>
                 </div>
 
                 <div>

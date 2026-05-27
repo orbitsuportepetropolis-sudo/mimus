@@ -39,6 +39,8 @@ export default function SettingsPage() {
 
   // Form Fields
   const [storeName, setStoreName] = useState('')
+  const [companyName, setCompanyName] = useState('')
+  const [cnpj, setCnpj] = useState('')
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [primaryColor, setPrimaryColor] = useState('#b5127b')
   const [accentColor, setAccentColor] = useState('#1bbc9b')
@@ -110,6 +112,8 @@ interface BannerConfig {
 
         if (store) {
           setStoreName(store.name || '')
+          setCompanyName(store.company_name || '')
+          setCnpj(store.cnpj || '')
           setLogoUrl(store.logo_url || null)
           setLogoPreview(store.logo_url || null)
           setPrimaryColor(store.primary_color || '#b5127b')
@@ -321,14 +325,16 @@ interface BannerConfig {
           // New banners array
           banners: finalBannersToSave,
           marquee_text: marqueeText || null,
-          custom_domain: customDomain ? customDomain.trim().toLowerCase() : null
+          custom_domain: customDomain ? customDomain.trim().toLowerCase() : null,
+          company_name: companyName || null,
+          cnpj: cnpj || null
         })
         .eq('id', storeId)
 
       if (error) {
         // If it's a DDL missing column error, notify the user gracefully but save the rest
         if (error.code === '42703') {
-          throw new Error('Coluna "banners" não existe no banco de dados. Por favor, execute a query SQL indicada no SQL Editor do Supabase.')
+          throw new Error('Colunas necessárias não existem no banco de dados. Por favor, execute a seguinte query no SQL Editor do Supabase:\n\nALTER TABLE public.stores ADD COLUMN IF NOT EXISTS company_name text;\nALTER TABLE public.stores ADD COLUMN IF NOT EXISTS cnpj text;')
         }
         throw error
       }
@@ -393,6 +399,28 @@ interface BannerConfig {
                   required
                   value={storeName}
                   onChange={(e) => setStoreName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+
+              <div className="col-span-2 md:col-span-1">
+                <label className="block text-slate-400 dark:text-zinc-500 mb-1">Razão Social / Nome da Empresa</label>
+                <input
+                  type="text"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Ex: Mittos Cosméticos Ltda"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+
+              <div className="col-span-2 md:col-span-1">
+                <label className="block text-slate-400 dark:text-zinc-500 mb-1">CNPJ</label>
+                <input
+                  type="text"
+                  value={cnpj}
+                  onChange={(e) => setCnpj(e.target.value)}
+                  placeholder="Ex: 00.000.000/0000-00"
                   className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
                 />
               </div>

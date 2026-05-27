@@ -384,4 +384,10 @@ ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS plan_status text DEFAULT 'tri
 ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS asaas_customer_id text;
 ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS asaas_subscription_id text;
 ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS subscription_ends_at timestamp with time zone;
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS company_name text;
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS cnpj text;
+
+-- Adição de colunas na tabela products
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS promotional_price numeric(10,2);
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS has_free_shipping boolean NOT NULL DEFAULT false;
 
