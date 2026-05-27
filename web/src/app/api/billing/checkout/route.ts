@@ -6,9 +6,18 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
-const ASAAS_API_KEY = process.env.ASAAS_API_KEY || ''
-const IS_SANDBOX = process.env.NEXT_PUBLIC_ASAAS_ENV !== 'production'
-const ASAAS_URL = IS_SANDBOX ? 'https://sandbox.asaas.com/api/v3' : 'https://api.asaas.com/v3'
+const MERCADO_PAGO_ACCESS_TOKEN = process.env.MERCADO_PAGO_ACCESS_TOKEN || ''
+
+function detectCardBrand(number: string): string {
+  const cleanNumber = number.replace(/\D/g, '')
+  if (/^4/.test(cleanNumber)) return 'visa'
+  if (/^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720)/.test(cleanNumber)) return 'master'
+  if (/^3[47]/.test(cleanNumber)) return 'amex'
+  if (/^(606282|3841)/.test(cleanNumber)) return 'hipercard'
+  if (/^(4011|4312|4389|4514|4576|5041|5066|5090|6278|6362|6363|6504|6516|6550)/.test(cleanNumber)) return 'elo'
+  if (/^3(?:0[0-5]|[68])/.test(cleanNumber)) return 'diners'
+  return 'visa' // default/fallback
+}
 
 export async function POST(request: Request) {
   try {
@@ -20,15 +29,16 @@ export async function POST(request: Request) {
 
     const price = usePromo ? 39.00 : 49.00
 
-    // MOCK MODE: If no Asaas API Key is configured, run simulated checkout
-    if (!ASAAS_API_KEY || ASAAS_API_KEY === 'mock') {
+    // MOCK MODE: If no Mercado Pago Access Token is configured (or set to default placeholder), run simulated checkout
+    const isMock = !MERCADO_PAGO_ACCESS_TOKEN || MERCADO_PAGO_ACCESS_TOKEN === 'mock' || MERCADO_PAGO_ACCESS_TOKEN.startsWith('seu_')
+    if (isMock) {
       console.log('Running checkout in MOCK mode...')
       
       // Simulate slow response
       await new Promise(resolve => setTimeout(resolve, 1500))
 
-      const mockSubId = 'sub_mock_' + Math.random().toString(36).substr(2, 9)
-      const mockCustId = 'cus_mock_' + Math.random().toString(36).substr(2, 9)
+      const mockSubId = 'mp_sub_mock_' + Math.random().toString(36).substr(2, 9)
+      const mockCustId = 'mp_cus_mock_' + Math.random().toString(36).substr(2, 9)
 
       // Calculate promotional ends date if applicable (6 months from now)
       const promoEndsAt = usePromo ? new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000).toISOString() : null
@@ -69,131 +79,175 @@ export async function POST(request: Request) {
       })
     }
 
-    // REAL ASAAS INTEGRATION MODE
-    console.log('Running checkout in REAL ASAAS mode...')
+    // REAL MERCADO PAGO INTEGRATION MODE
+    console.log('Running checkout in REAL MERCADO PAGO mode...')
 
-    // 1. Create or Find Customer in Asaas
-    const customerResponse = await fetch(`${ASAAS_URL}/customers`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'access_token': ASAAS_API_KEY
-      },
-      body: JSON.stringify({
-        name,
-        email,
-        cpfCnpj,
-        phone: phone || undefined
-      })
-    })
+    // Dynamic notification/webhook url depending on request host
+    const host = request.headers.get('host') || 'localhost:3000'
+    const protocol = request.headers.get('x-forwarded-proto') || 'http'
+    const notificationUrl = `${protocol}://${host}/api/billing/webhook`
 
-    const customerData = await customerResponse.json()
-    if (!customerResponse.ok) {
-      throw new Error(customerData.errors?.[0]?.description || 'Erro ao criar cliente no Asaas.')
-    }
+    const nameParts = name.trim().split(/\s+/)
+    const firstName = nameParts[0] || 'Cliente'
+    const lastName = nameParts.slice(1).join(' ') || 'Mimus'
 
-    const asaasCustomerId = customerData.id
-
-    // 2. Create Subscription in Asaas
-    // First due date will be tomorrow (since Next.js trial runs locally, 
-    // but in Asaas we need a real date, let's set it to 1 day from now)
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const nextDueDate = tomorrow.toISOString().split('T')[0]
-
-    const subscriptionPayload: any = {
-      customer: asaasCustomerId,
-      billingType: paymentMethod, // 'PIX' or 'CREDIT_CARD'
-      value: price,
-      nextDueDate,
-      cycle: 'MONTHLY',
-      description: `Assinatura Mimus Pro - ${name}`
-    }
-
-    if (paymentMethod === 'CREDIT_CARD' && creditCard) {
-      subscriptionPayload.creditCard = {
-        holderName: creditCard.holderName,
-        number: creditCard.number,
-        expiryMonth: creditCard.expiryMonth,
-        expiryYear: creditCard.expiryYear,
-        ccv: creditCard.ccv
-      }
-      subscriptionPayload.creditCardHolderInfo = {
-        name,
-        email,
-        cpfCnpj,
-        postalCode: creditCard.postalCode || '01001-000',
-        addressNumber: creditCard.addressNumber || '1',
-        phone: phone || '11999999999'
-      }
-    }
-
-    const subscriptionResponse = await fetch(`${ASAAS_URL}/subscriptions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'access_token': ASAAS_API_KEY
-      },
-      body: JSON.stringify(subscriptionPayload)
-    })
-
-    const subscriptionData = await subscriptionResponse.json()
-    if (!subscriptionResponse.ok) {
-      throw new Error(subscriptionData.errors?.[0]?.description || 'Erro ao criar assinatura no Asaas.')
-    }
-
-    const asaasSubscriptionId = subscriptionData.id
-
-    // Calculate dates
-    const promoEndsAt = usePromo ? new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000).toISOString() : null
-    const subscriptionEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-
-    // Update Supabase Store status
-    const { error: dbError } = await supabaseAdmin
-      .from('stores')
-      .update({
-        plan: 'pro',
-        plan_status: paymentMethod === 'CREDIT_CARD' ? 'active' : 'pending',
-        promotional_ends_at: promoEndsAt,
-        asaas_customer_id: asaasCustomerId,
-        asaas_subscription_id: asaasSubscriptionId,
-        subscription_ends_at: subscriptionEndsAt
-      })
-      .eq('id', storeId)
-
-    if (dbError) throw dbError
-
-    // 3. For PIX, fetch the payment QR Code
     if (paymentMethod === 'PIX') {
-      // Fetch payments for this subscription to get the first one
-      const paymentsResponse = await fetch(`${ASAAS_URL}/subscriptions/${asaasSubscriptionId}/payments`, {
-        headers: { 'access_token': ASAAS_API_KEY }
-      })
-      const paymentsData = await paymentsResponse.json()
-      const firstPaymentId = paymentsData.data?.[0]?.id
-
-      if (firstPaymentId) {
-        // Fetch QR Code details
-        const qrCodeResponse = await fetch(`${ASAAS_URL}/payments/${firstPaymentId}/pixQrCode`, {
-          headers: { 'access_token': ASAAS_API_KEY }
-        })
-        const qrCodeData = await qrCodeResponse.json()
-
-        return NextResponse.json({
-          success: true,
-          subscriptionId: asaasSubscriptionId,
-          billingType: 'PIX',
-          pixCopyPaste: qrCodeData.payload,
-          pixQrCodeBase64: `data:image/png;base64,${qrCodeData.encodedImage}`
-        })
+      const paymentPayload = {
+        transaction_amount: price,
+        description: `Assinatura Mimus Pro - ${name}`,
+        payment_method_id: 'pix',
+        notification_url: notificationUrl,
+        payer: {
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          identification: {
+            type: 'CPF',
+            number: cpfCnpj
+          }
+        }
       }
-    }
 
-    return NextResponse.json({
-      success: true,
-      subscriptionId: asaasSubscriptionId,
-      billingType: paymentMethod
-    })
+      const paymentResponse = await fetch('https://api.mercadopago.com/v1/payments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`,
+          'X-Idempotency-Key': `pix-${storeId}-${Date.now()}`
+        },
+        body: JSON.stringify(paymentPayload)
+      })
+
+      const paymentData = await paymentResponse.json()
+      if (!paymentResponse.ok) {
+        throw new Error(paymentData.message || 'Erro ao criar pagamento Pix no Mercado Pago.')
+      }
+
+      const paymentId = String(paymentData.id)
+
+      // Update Supabase Store status to pending (Pix needs confirmation)
+      const { error: dbError } = await supabaseAdmin
+        .from('stores')
+        .update({
+          plan_status: 'pending',
+          asaas_subscription_id: paymentId,
+          subscription_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        })
+        .eq('id', storeId)
+
+      if (dbError) throw dbError
+
+      const qrCode = paymentData.point_of_interaction?.transaction_data?.qr_code
+      const qrCodeBase64 = paymentData.point_of_interaction?.transaction_data?.qr_code_base64
+
+      return NextResponse.json({
+        success: true,
+        subscriptionId: paymentId,
+        billingType: 'PIX',
+        pixCopyPaste: qrCode,
+        pixQrCodeBase64: `data:image/png;base64,${qrCodeBase64}`
+      })
+
+    } else if (paymentMethod === 'CREDIT_CARD' && creditCard) {
+      // 1. Generate Card Token
+      const currentYear = new Date().getFullYear()
+      const expiryYearFull = String(creditCard.expiryYear).length === 2 
+        ? String(currentYear).substring(0, 2) + creditCard.expiryYear 
+        : creditCard.expiryYear
+
+      const cardTokenPayload = {
+        card_number: creditCard.number,
+        expiration_month: parseInt(creditCard.expiryMonth, 10),
+        expiration_year: parseInt(expiryYearFull, 10),
+        security_code: creditCard.ccv,
+        cardholder: {
+          name: creditCard.holderName
+        }
+      }
+
+      const cardTokenResponse = await fetch('https://api.mercadopago.com/v1/card_tokens', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`
+        },
+        body: JSON.stringify(cardTokenPayload)
+      })
+
+      const cardTokenData = await cardTokenResponse.json()
+      if (!cardTokenResponse.ok) {
+        throw new Error(cardTokenData.message || 'Dados do cartão de crédito inválidos ou recusados.')
+      }
+
+      const cardTokenId = cardTokenData.id
+
+      // 2. Create Charge Payment
+      const cardBrand = detectCardBrand(creditCard.number)
+      const paymentPayload = {
+        token: cardTokenId,
+        transaction_amount: price,
+        description: `Assinatura Mimus Pro - ${name}`,
+        installments: 1,
+        payment_method_id: cardBrand,
+        notification_url: notificationUrl,
+        payer: {
+          email,
+          identification: {
+            type: 'CPF',
+            number: cpfCnpj
+          }
+        }
+      }
+
+      const paymentResponse = await fetch('https://api.mercadopago.com/v1/payments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`,
+          'X-Idempotency-Key': `card-${storeId}-${Date.now()}`
+        },
+        body: JSON.stringify(paymentPayload)
+      })
+
+      const paymentData = await paymentResponse.json()
+      if (!paymentResponse.ok) {
+        throw new Error(paymentData.message || 'Erro ao processar pagamento com cartão de crédito.')
+      }
+
+      if (paymentData.status !== 'approved') {
+        throw new Error(
+          paymentData.status_detail === 'cc_rejected_bad_filled_other' 
+            ? 'Dados do cartão incorretos.' 
+            : `Pagamento não aprovado. Status: ${paymentData.status} (${paymentData.status_detail || ''})`
+        )
+      }
+
+      const paymentId = String(paymentData.id)
+      const promoEndsAt = usePromo ? new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000).toISOString() : null
+      const subscriptionEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+
+      // Update Supabase Store status to active (Card approved instantly)
+      const { error: dbError } = await supabaseAdmin
+        .from('stores')
+        .update({
+          plan: 'pro',
+          plan_status: 'active',
+          promotional_ends_at: promoEndsAt,
+          asaas_subscription_id: paymentId,
+          subscription_ends_at: subscriptionEndsAt
+        })
+        .eq('id', storeId)
+
+      if (dbError) throw dbError
+
+      return NextResponse.json({
+        success: true,
+        subscriptionId: paymentId,
+        billingType: 'CREDIT_CARD'
+      })
+    } else {
+      throw new Error('Método de pagamento inválido ou dados ausentes.')
+    }
 
   } catch (err: any) {
     console.error('Checkout API Error:', err)

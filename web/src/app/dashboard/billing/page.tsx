@@ -430,7 +430,7 @@ export default function BillingPage() {
 
                 {/* Payment Method Selector */}
                 <div className="space-y-2">
-                  <label className="block text-slate-400 dark:text-zinc-500">Forma de Pagamento (Asaas):</label>
+                  <label className="block text-slate-400 dark:text-zinc-500">Forma de Pagamento (Mercado Pago):</label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
