@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -73,72 +74,171 @@ export async function POST(request: Request) {
     }
 
     // 2. CHECK IF IT IS A MERCADO PAGO WEBHOOK
-    let paymentId = ''
-    if (body.type === 'payment' && body.data?.id) {
-      paymentId = String(body.data.id)
-    } else if (body.data?.id) {
-      paymentId = String(body.data.id)
-    } else if (body.resource && (body.topic === 'payment' || body.resource.includes('payments'))) {
-      paymentId = body.resource.split('/').pop() || ''
-    } else if (body.id && body.topic === 'payment') {
-      paymentId = String(body.id)
+    const signatureHeader = request.headers.get('x-signature')
+    const xRequestId = request.headers.get('x-request-id') || ''
+    const MERCADO_PAGO_WEBHOOK_SECRET = process.env.MERCADO_PAGO_WEBHOOK_SECRET || ''
+
+    if (MERCADO_PAGO_WEBHOOK_SECRET && signatureHeader) {
+      console.log('Validating Mercado Pago webhook signature...')
+      const parts = signatureHeader.split(',')
+      let ts = ''
+      let v1 = ''
+      for (const part of parts) {
+        const [key, value] = part.split('=')
+        if (key?.trim() === 'ts') ts = value?.trim()
+        if (key?.trim() === 'v1') v1 = value?.trim()
+      }
+
+      if (!ts || !v1) {
+        console.error('Mercado Pago signature header missing ts or v1:', signatureHeader)
+        return NextResponse.json({ error: 'Assinatura inválida (cabeçalhos ausentes)' }, { status: 401 })
+      }
+
+      const { searchParams } = new URL(request.url)
+      const urlDataId = searchParams.get('data.id') || searchParams.get('id')
+      const rawId = urlDataId || body.data?.id || body.id || ''
+      const lowercaseId = String(rawId).toLowerCase()
+
+      const manifest = `id:${lowercaseId};request-id:${xRequestId};ts:${ts};`
+      const calculatedSignature = crypto
+        .createHmac('sha256', MERCADO_PAGO_WEBHOOK_SECRET)
+        .update(manifest)
+        .digest('hex')
+
+      if (calculatedSignature !== v1) {
+        console.error('Mercado Pago signature verification failed!', {
+          manifest,
+          received: v1,
+          calculated: calculatedSignature
+        })
+        return NextResponse.json({ error: 'Assinatura inválida' }, { status: 401 })
+      }
+
+      console.log('Mercado Pago signature verified successfully!')
     }
 
-    if (!paymentId) {
-      console.log('No payment ID found in webhook payload. Payload structure:', JSON.stringify(body))
+    let paymentId = ''
+    let preapprovalId = ''
+
+    if (body.type === 'payment' && body.data?.id) {
+      paymentId = String(body.data.id)
+    } else if (body.type === 'subscription_authorized' || body.type === 'preapproval') {
+      preapprovalId = String(body.data?.id || body.id)
+    } else if (body.action && (body.action.startsWith('subscription') || body.action.startsWith('preapproval'))) {
+      preapprovalId = String(body.data?.id || body.id)
+    } else if (body.resource) {
+      const parts = body.resource.split('/')
+      const resourceId = parts.pop() || ''
+      if (body.resource.includes('preapproval')) {
+        preapprovalId = resourceId
+      } else {
+        paymentId = resourceId
+      }
+    } else if (body.id && body.topic === 'payment') {
+      paymentId = String(body.id)
+    } else if (body.data?.id) {
+      paymentId = String(body.data.id)
+    }
+
+    if (!paymentId && !preapprovalId) {
+      console.log('No payment ID or preapproval ID found in webhook payload. Payload structure:', JSON.stringify(body))
       return NextResponse.json({ received: true, message: 'Nenhum ID de pagamento ou assinatura identificado.' })
     }
 
-    console.log(`Fetching details for Mercado Pago payment ${paymentId}...`)
+    let planUpdate: any = {}
+    let matchedId = ''
 
-    // Verify payment status directly with Mercado Pago API
-    const paymentResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-      headers: {
-        'Authorization': `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`
+    if (paymentId) {
+      console.log(`Fetching details for Mercado Pago payment ${paymentId}...`)
+
+      // Verify payment status directly with Mercado Pago API
+      const paymentResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+        headers: {
+          'Authorization': `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`
+        }
+      })
+
+      if (!paymentResponse.ok) {
+        const errorData = await paymentResponse.json()
+        console.error('Mercado Pago API error fetching payment:', errorData)
+        throw new Error(`Erro ao buscar detalhes do pagamento no Mercado Pago: ${paymentResponse.statusText}`)
       }
-    })
 
-    if (!paymentResponse.ok) {
-      const errorData = await paymentResponse.json()
-      console.error('Mercado Pago API error fetching payment:', errorData)
-      throw new Error(`Erro ao buscar detalhes do pagamento no Mercado Pago: ${paymentResponse.statusText}`)
+      const paymentData = await paymentResponse.json()
+      console.log(`Mercado Pago payment status for ${paymentId}: ${paymentData.status} (${paymentData.status_detail})`)
+
+      matchedId = paymentId
+
+      if (paymentData.status === 'approved') {
+        const newEndsDate = new Date()
+        newEndsDate.setDate(newEndsDate.getDate() + 30) // Extend by 30 days
+        planUpdate = {
+          plan: 'pro',
+          plan_status: 'active',
+          subscription_ends_at: newEndsDate.toISOString()
+        }
+      } else if (paymentData.status === 'rejected' || paymentData.status === 'cancelled') {
+        planUpdate = {
+          plan: 'free',
+          plan_status: 'canceled'
+        }
+      } else if (paymentData.status === 'refunded' || paymentData.status === 'charged_back') {
+        planUpdate = {
+          plan: 'free',
+          plan_status: 'canceled'
+        }
+      }
+    } else if (preapprovalId) {
+      console.log(`Fetching details for Mercado Pago preapproval ${preapprovalId}...`)
+
+      // Verify preapproval status directly with Mercado Pago API
+      const preapprovalResponse = await fetch(`https://api.mercadopago.com/preapproval/${preapprovalId}`, {
+        headers: {
+          'Authorization': `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`
+        }
+      })
+
+      if (!preapprovalResponse.ok) {
+        const errorData = await preapprovalResponse.json()
+        console.error('Mercado Pago API error fetching preapproval:', errorData)
+        throw new Error(`Erro ao buscar detalhes da assinatura no Mercado Pago: ${preapprovalResponse.statusText}`)
+      }
+
+      const preapprovalData = await preapprovalResponse.json()
+      console.log(`Mercado Pago preapproval status for ${preapprovalId}: ${preapprovalData.status}`)
+
+      matchedId = preapprovalId
+
+      if (preapprovalData.status === 'authorized') {
+        const newEndsDate = new Date()
+        newEndsDate.setDate(newEndsDate.getDate() + 30) // Extend by 30 days
+        planUpdate = {
+          plan: 'pro',
+          plan_status: 'active',
+          subscription_ends_at: newEndsDate.toISOString()
+        }
+      } else if (preapprovalData.status === 'paused') {
+        planUpdate = {
+          plan_status: 'pending'
+        }
+      } else if (preapprovalData.status === 'cancelled') {
+        planUpdate = {
+          plan: 'free',
+          plan_status: 'canceled'
+        }
+      }
     }
 
-    const paymentData = await paymentResponse.json()
-    console.log(`Mercado Pago payment status for ${paymentId}: ${paymentData.status} (${paymentData.status_detail})`)
-
-    // Find the store where asaas_subscription_id matches the payment ID
+    // Find the store where asaas_subscription_id matches the ID
     const { data: store, error: fetchErr } = await supabaseAdmin
       .from('stores')
       .select('id, plan, plan_status')
-      .eq('asaas_subscription_id', paymentId)
+      .eq('asaas_subscription_id', matchedId)
       .maybeSingle()
 
     if (fetchErr || !store) {
-      console.log(`Store com a assinatura/pagamento Mercado Pago ${paymentId} não foi encontrada no banco.`)
+      console.log(`Store com a assinatura/pagamento Mercado Pago ${matchedId} não foi encontrada no banco.`)
       return NextResponse.json({ received: true, message: 'Store correspondente não encontrada.' })
-    }
-
-    let planUpdate: any = {}
-
-    if (paymentData.status === 'approved') {
-      const newEndsDate = new Date()
-      newEndsDate.setDate(newEndsDate.getDate() + 30) // Extend by 30 days
-      planUpdate = {
-        plan: 'pro',
-        plan_status: 'active',
-        subscription_ends_at: newEndsDate.toISOString()
-      }
-    } else if (paymentData.status === 'rejected' || paymentData.status === 'cancelled') {
-      planUpdate = {
-        plan: 'free',
-        plan_status: 'canceled'
-      }
-    } else if (paymentData.status === 'refunded' || paymentData.status === 'charged_back') {
-      planUpdate = {
-        plan: 'free',
-        plan_status: 'canceled'
-      }
     }
 
     if (Object.keys(planUpdate).length > 0) {
