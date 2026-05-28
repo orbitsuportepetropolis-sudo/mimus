@@ -210,12 +210,15 @@ export async function POST(request: Request) {
       matchedId = preapprovalId
 
       if (preapprovalData.status === 'authorized') {
-        const newEndsDate = new Date()
-        newEndsDate.setDate(newEndsDate.getDate() + 30) // Extend by 30 days
+        const nextPaymentDate = preapprovalData.next_payment_date
+        const endsDate = nextPaymentDate 
+          ? new Date(nextPaymentDate).toISOString()
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+
         planUpdate = {
           plan: 'pro',
           plan_status: 'active',
-          subscription_ends_at: newEndsDate.toISOString()
+          subscription_ends_at: endsDate
         }
       } else if (preapprovalData.status === 'paused') {
         planUpdate = {

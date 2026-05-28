@@ -305,6 +305,26 @@ export default function BillingPage() {
         </div>
       )}
 
+      {/* Pro Active Subscription Status Card */}
+      {currentPlan === 'pro' && subscriptionEndsAt && (
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-zinc-900 dark:to-zinc-900 p-6 rounded-2xl border border-emerald-100 dark:border-zinc-800 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-505 flex items-center justify-center">
+              <ShieldCheck className="w-5 h-5 text-emerald-500" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-800 dark:text-white">Assinatura Mimus Pro Ativa</h4>
+              <p className="text-[10px] text-slate-550 dark:text-zinc-400 mt-0.5">
+                Sua conta está ativa e segura. Próximo vencimento em: <span className="font-bold text-emerald-600 dark:text-emerald-400">{new Date(subscriptionEndsAt).toLocaleDateString('pt-BR')}</span>.
+              </p>
+            </div>
+          </div>
+          <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-extrabold text-[10px] tracking-wider uppercase px-3 py-1.5 rounded-xl border border-emerald-500/20">
+            Assinatura Ativa
+          </span>
+        </div>
+      )}
+
       {/* Plan Usage Card (for Free users without active trial) */}
       {!isTrialActive && currentPlan === 'free' && (
         <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-100 dark:border-zinc-800 shadow-sm space-y-4">
@@ -377,6 +397,11 @@ export default function BillingPage() {
                 <span className="text-xs text-slate-400 ml-1">/mês</span>
               </div>
               <p className="text-[10px] text-slate-400">Acesso completo e ilimitado a todos os recursos da plataforma.</p>
+              {currentPlan === 'pro' && subscriptionEndsAt && (
+                <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-2 flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5" /> Vence em: {new Date(subscriptionEndsAt).toLocaleDateString('pt-BR')}
+                </p>
+              )}
             </div>
             <div className="h-px bg-slate-50 dark:bg-zinc-800 my-4" />
             <ul className="space-y-2.5 text-xs text-slate-600 dark:text-zinc-300">
