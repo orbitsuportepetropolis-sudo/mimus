@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Mimus",
+    "slug": "mimus-mobile",
+    "version": "1.0.0",
+    "scheme": "mimus",
+    "extra": {
+      "eas": {
+        "projectId": "aadc6f86-e1b2-41ef-8713-cae9038ef592"
+      }
+    },
+    "android": {
+      "package": "com.adrianojrdev.mimusmobile"
+    }
+  }
+}
