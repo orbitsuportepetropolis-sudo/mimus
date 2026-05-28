@@ -3,6 +3,7 @@
     "name": "Mimus",
     "slug": "mimus-mobile",
     "version": "1.0.0",
+    "sdkVersion": "54.0.0",
     "scheme": "mimus",
     "extra": {
       "eas": {

@@ -1,35 +1,57 @@
-Atue como um Arquiteto de Software e Desenvolvedor Senior especialista em React Native, TypeScript e Supabase. Estou expandindo o escopo do meu app "mimus".
+O meu objetivo atual é integrar o ecossistema "PaperClip" (5 agentes de IA operacionais rodando no DeepSeek) utilizando n8n (orquestrador de background) e Evolution API (Gateway de WhatsApp) de forma totalmente embutida neste mesmo repositório (Padrão Monorepo), preparando a arquitetura para ser futuramente implantada em produção em uma VPS (como Hostinger/DigitalOcean).
 
-O app atualmente é um gerenciador de catálogo/estoque e PDV local. O objetivo agora é transformá-lo em uma plataforma onde a lojista constrói e personaliza sua própria LOJA VIRTUAL COMPLETA. Ela deve ter autonomia para criar campanhas e mudar a identidade visual da loja dela (Cores, Fontes e Logo), além do catálogo.
 
-Gere a reestruturação do projeto em TypeScript e SQL considerando as seguintes especificações:
 
-1. MODELAGEM DO BANCO DE DADOS (SQL para o Supabase):
-Preciso criar ou atualizar a tabela 'store_preferences' (vinculada ao user_id da lojista) para salvar o DNA visual da loja. Gere o script SQL com os campos:
-- logo_url (text) -> URL da logo armazenada no Supabase Storage.
-- primary_color (varchar) -> Cor principal em Hexadecimal (ex: para botões, destaques).
-- secondary_color (varchar) -> Cor secundária em Hexadecimal.
-- background_color (varchar) -> Cor de fundo do e-commerce.
-- font_family (varchar) -> Nome da fonte selecionada (ex: 'Inter', 'Montserrat', 'Playfair Display').
-- whatsapp_number (varchar) -> Para onde o carrinho finalizado será enviado.
-- free_shipping_threshold (numeric) -> Valor mínimo para frete grátis.
-- gift_threshold (numeric) -> Valor mínimo para a barra de progresso de brindes.
+Gere e estruture os seguintes arquivos e passos organizados para a criação da pasta unificada de infraestrutura:
 
-Crie também a tabela 'store_campaigns' (id, user_id, image_url, title, redirect_type, redirect_id, active, position_order) para os banners rotativos da Home.
 
-2. TELA DE PERSONALIZAÇÃO VISUAL (Nova Screen no React Native):
-Gere o código de uma nova tela chamada 'StoreCustomizationScreen.tsx' usando TypeScript. Essa tela deve conter:
-- SELEÇÃO DE LOGO: Componente que usa 'expo-image-picker' para fazer upload da imagem para o bucket 'logos' do Supabase Storage e salvar o link no banco. Mostra um preview da logo atual ou um placeholder se estiver vazio.
-- PALETA DE CORES: Inputs ou seletores visuais onde a lojista escolhe a Cor Primária e Secundária da loja dela (pode usar um seletor simples de cores predefinidas em formato de círculos ou um Color Picker).
-- SELEÇÃO DE FONTES: Um componente Dropdown/Picker para escolher o estilo tipográfico da loja (Elegante, Moderna, Clean).
-- Botão "Salvar Identidade da Loja" que executa o .upsert() no Supabase.
 
-3. TELA DE GERENCIAMENTO DE CAMPANHAS E BANNERS:
-Insira dentro dessa mesma tela ou em um componente separado a gestão de 'store_campaigns':
-- Uma lista de banners já cadastrados (com imagem em miniatura e um botão de excluir/desativar).
-- Botão "Adicionar Novo Banner da Home", abrindo um formulário/modal para enviar a foto do banner, definir um título de campanha e associar a um produto existente (puxando os produtos do estoque atual).
+### 1. MAPEAMENTO DA NOVA PASTA DO REPOSITÓRIO
 
-4. ADAPTAÇÃO DA TELA DE ESTOQUE (StockScreen):
-Explique brevemente ou mostre como adaptar o formulário de produtos existente para que, além do preço padrão, a lojista possa preencher um 'promotional_price' e marcar um switch 'is_featured' (para jogar o produto na vitrine de "Mais Vendidos" do site).
+Crie uma pasta chamada `infra/` na raiz do projeto `mimus/` contendo:
 
-Gere o código limpo, modular, fortemente tipado e com foco total em usabilidade (UX) para que a dona da loja ache o processo de criar a identidade visual dela extremamente simples e intuitivo.
+- `infra/docker-compose.yml`: Configuração multi-container isolada em rede interna bridge para rodar o n8n e a Evolution API localmente na VPS. Garanta que o n8n possua chaves de criptografia e variáveis de ambiente explícitas, e que a Evolution API possua volumes persistentes para não perder as sessões do WhatsApp (`evolution_instances`).
+
+- `infra/workflows/`: Diretório destinado aos backups em formato JSON que serão exportados do n8n para manter o histórico de versionamento do Git.
+
+
+
+### 2. ARQUIVO DOCKER-COMPOSE.YML (PRONTO PARA PRODUÇÃO / HOSTINGER)
+
+Escreva o código YAML do `docker-compose.yml` completo, configurando:
+
+- Imagem oficial estável do n8n (com portas 5678 expostas).
+
+- Imagem oficial da Evolution API (com portas 8080 expostas).
+
+- Rede interna chamada `mimus_network`.
+
+- Volumes locais para ambos os serviços.
+
+
+
+### 3. MANUAL TÉCNICO DE IMPLEMENTAÇÃO E SYSTEM PROMPTS (README.md)
+
+Gere um arquivo `README.md` detalhado para ficar dentro da pasta `infra/`. Este arquivo deve documentar:
+
+- O passo a passo exato de comandos no terminal Linux/Ubuntu para rodar o docker-compose.
+
+- Como acessar e configurar as credenciais do DeepSeek dentro do n8n simulando o nó da OpenAI (Custom URL: `https://api.deepseek.com/v1`).
+
+- Os 5 Prompts de Sistema (System Prompts) cirúrgicos, hiper-estruturados com delimitadores [PAPEL], [DIRETRIZES DE LINGUAGEM] e [DIRETRIZES DE SAÍDA], otimizados para gastar o mínimo de tokens no modelo `deepseek-chat` (V3) e `deepseek-reasoner` (R1) para os seguintes agentes:
+
+  1. SDR / Inside Sales (WhatsApp - linguagem humana, foco em conversão e ativação de leads com gírias leves de estética).
+
+  2. CFO / Financeiro (Análise fria de SaaS: MRR, Churn, CAC, LTV, Burn rate em tabelas Markdown).
+
+  3. Customer Success (Retenção e engajamento ativo de lojistas frias via WhatsApp com dicas de negócios).
+
+  4. Suporte Nível 1 (FAQ operacional amigável baseado estritamente na documentação fornecida).
+
+  5. Core Developer / DevOps (Análise pesada em DeepSeek-R1 de logs de erro em tempo real com entrega de patch/código de correção pronto).
+
+
+
+### 4. DOCUMENTAÇÃO VISUAL DA ESTRUTURA FINAL DO MONOREPO
+
+Apresente visualmente como ficará a árvore de diretórios do projeto no VS Code após a execução.
