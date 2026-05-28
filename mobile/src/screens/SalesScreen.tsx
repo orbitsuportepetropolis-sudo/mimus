@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { StyleSheet, Text, View, FlatList, TextInput, TouchableOpacity, Alert, ActivityIndicator, Modal, ScrollView, Image } from 'react-native'
 import { supabase } from '../services/supabase'
-import { ShoppingBag, Coins, CreditCard, DollarSign, Plus, Minus, Trash2, Search, X, CheckCircle, UserPlus, Percent } from 'lucide-react-native'
+import { ShoppingBag, DollarSign, Plus, Minus, Trash2, Search, X, CheckCircle, UserPlus, Clipboard, Check } from 'lucide-react-native'
 
 interface Product {
   id: string
@@ -23,10 +23,24 @@ interface CartItem {
   quantity: number
 }
 
+interface Order {
+  id: string
+  created_at: string
+  total_value: number
+  payment_method: string
+  status: 'novo' | 'aguardando pagamento' | 'pago' | 'enviado' | 'concluído'
+  customer_id: string | null
+  customers?: {
+    name: string
+    phone: string | null
+  }
+}
+
 export default function SalesScreen({ navigation }: any) {
-  const [activeTab, setActiveTab] = useState<'catalog' | 'cart'>('catalog')
+  const [activeTab, setActiveTab] = useState<'catalog' | 'cart' | 'orders'>('catalog')
   const [products, setProducts] = useState<Product[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   
@@ -40,36 +54,41 @@ export default function SalesScreen({ navigation }: any) {
   const [successOpen, setSuccessOpen] = useState(false)
   const [lastSaleDetails, setLastSaleDetails] = useState<any>(null)
 
+  // Order Detail Modal State
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [orderModalOpen, setOrderModalOpen] = useState(false)
+  const [statusUpdateLoading, setStatusUpdateLoading] = useState(false)
+
   // Quick Customer Create Modal
   const [customerModalOpen, setCustomerModalOpen] = useState(false)
   const [newCustName, setNewCustName] = useState('')
   const [newCustPhone, setNewCustPhone] = useState('')
-  const [newCustInstagram, setNewCustInstagram] = useState('')
-  const [newCustBirthday, setNewCustBirthday] = useState('')
-  const [custLoading, setCustLoading] = useState(false)
 
   useEffect(() => {
-    // Reload data when screen is focused
     const unsubscribe = navigation.addListener('focus', () => {
-      loadPDVData()
+      loadSalesData()
     })
     return unsubscribe
-  }, [navigation])
+  }, [navigation, activeTab])
 
-  async function loadPDVData() {
+  async function loadSalesData() {
     try {
       setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        // Fallback mock
+        // Fallback Mock data
         setProducts([
           { id: '1', name: 'Batom Matte Rose V.', brand: 'Bruna Tavares', sale_price: 39.90, quantity_in_stock: 5, image_url: null },
           { id: '2', name: 'Corretivo Peach Glow', brand: 'Mimus', sale_price: 45.00, quantity_in_stock: 12, image_url: null },
           { id: '3', name: 'Sérum Renovador Skin Care', brand: 'Sallve', sale_price: 69.90, quantity_in_stock: 3, image_url: null }
         ])
         setCustomers([
-          { id: '1', name: 'Leticia Silva', phone: '11999999999' },
-          { id: '2', name: 'Mariana Costa', phone: '21988888888' }
+          { id: '1', name: 'Leticia Costa', phone: '11988887777' },
+          { id: '2', name: 'Mariana Silva', phone: '21977776666' }
+        ])
+        setOrders([
+          { id: 'ord-1', created_at: new Date().toISOString(), total_value: 84.90, payment_method: 'pix', status: 'aguardando pagamento', customer_id: '1', customers: { name: 'Leticia Costa', phone: '11988887777' } },
+          { id: 'ord-2', created_at: new Date(Date.now() - 24*60*60*1000).toISOString(), total_value: 45.00, payment_method: 'money', status: 'pago', customer_id: '2', customers: { name: 'Mariana Silva', phone: '21977776666' } }
         ])
         return
       }
@@ -81,7 +100,7 @@ export default function SalesScreen({ navigation }: any) {
         .single()
 
       if (profile) {
-        // Fetch products in stock
+        // Fetch products
         const { data: prods } = await supabase
           .from('products')
           .select('id, name, brand, sale_price, quantity_in_stock, image_url')
@@ -96,11 +115,19 @@ export default function SalesScreen({ navigation }: any) {
           .eq('store_id', profile.store_id)
           .order('name', { ascending: true })
 
+        // Fetch orders/sales
+        const { data: sls } = await supabase
+          .from('sales')
+          .select('*, customers(name, phone)')
+          .eq('store_id', profile.store_id)
+          .order('created_at', { ascending: false })
+
         setProducts(prods || [])
         setCustomers(custs || [])
+        setOrders((sls as any[]) || [])
       }
     } catch (err) {
-      console.error('Erro ao carregar dados do PDV:', err)
+      console.error(err)
     } finally {
       setLoading(false)
     }
@@ -138,10 +165,6 @@ export default function SalesScreen({ navigation }: any) {
     }
   }
 
-  function removeFromCart(prodId: string) {
-    setCart(cart.filter(item => item.product.id !== prodId))
-  }
-
   const subtotal = cart.reduce((acc, curr) => acc + (curr.product.sale_price * curr.quantity), 0)
   const total = Math.max(0, subtotal - discount)
 
@@ -151,16 +174,15 @@ export default function SalesScreen({ navigation }: any) {
       return
     }
 
-    setCustLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        // Fallback for demo
         const mockNew = { id: String(Date.now()), name: newCustName, phone: newCustPhone }
         setSelectedCustomer(mockNew)
         setCustomers([mockNew, ...customers])
         setCustomerModalOpen(false)
-        resetCustForm()
+        setNewCustName('')
+        setNewCustPhone('')
         return
       }
 
@@ -177,9 +199,7 @@ export default function SalesScreen({ navigation }: any) {
         .insert([{
           store_id: profile.store_id,
           name: newCustName,
-          phone: newCustPhone || null,
-          instagram: newCustInstagram || null,
-          birthday: newCustBirthday || null
+          phone: newCustPhone || null
         }])
         .select()
 
@@ -189,20 +209,12 @@ export default function SalesScreen({ navigation }: any) {
         setSelectedCustomer(newCust[0])
         setCustomers([newCust[0], ...customers])
         setCustomerModalOpen(false)
-        resetCustForm()
+        setNewCustName('')
+        setNewCustPhone('')
       }
     } catch (err: any) {
       Alert.alert('Erro', err.message || 'Erro ao criar cliente.')
-    } finally {
-      setCustLoading(false)
     }
-  }
-
-  function resetCustForm() {
-    setNewCustName('')
-    setNewCustPhone('')
-    setNewCustInstagram('')
-    setNewCustBirthday('')
   }
 
   async function handleCheckout() {
@@ -214,12 +226,16 @@ export default function SalesScreen({ navigation }: any) {
     setCheckoutLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
+      
+      const initialStatus = 
+        paymentMethod === 'money' ? 'pago' : 
+        paymentMethod === 'pix' ? 'aguardando pagamento' : 'pago'
+
       if (!user) {
-        // Fallback for demo
         setLastSaleDetails({
           id: String(Date.now()),
           total: total,
-          payment: paymentMethod === 'pix' ? 'PIX' : paymentMethod === 'money' ? 'Dinheiro' : paymentMethod === 'credit_card' ? 'Cartão de Crédito' : 'Cartão de Débito',
+          payment: paymentMethod.toUpperCase(),
           itemsCount: cart.length
         })
         setCart([])
@@ -237,7 +253,6 @@ export default function SalesScreen({ navigation }: any) {
 
       if (!profile) throw new Error('Loja não encontrada.')
 
-      // 1. Insert the Sale
       const { data: saleData, error: saleError } = await supabase
         .from('sales')
         .insert([{
@@ -245,14 +260,14 @@ export default function SalesScreen({ navigation }: any) {
           customer_id: selectedCustomer?.id || null,
           total_value: total,
           discount: discount,
-          payment_method: paymentMethod
+          payment_method: paymentMethod,
+          status: initialStatus
         }])
         .select()
 
       if (saleError) throw saleError
       const sale = saleData[0]
 
-      // 2. Insert Sale Items
       const saleItemsPayload = cart.map(item => ({
         sale_id: sale.id,
         product_id: item.product.id,
@@ -266,29 +281,64 @@ export default function SalesScreen({ navigation }: any) {
 
       if (itemsError) throw itemsError
 
-      // Record last sale details for feedback modal
-      const paymentLabel = 
-        paymentMethod === 'pix' ? 'PIX' : 
-        paymentMethod === 'money' ? 'Dinheiro' : 
-        paymentMethod === 'credit_card' ? 'Cartão de Crédito' : 'Cartão de Débito'
-
       setLastSaleDetails({
         id: sale.id,
         total: total,
-        payment: paymentLabel,
+        payment: paymentMethod.toUpperCase(),
         itemsCount: cart.length
       })
 
-      // Reset states
       setCart([])
       setSelectedCustomer(null)
       setDiscount(0)
       setSuccessOpen(true)
-      loadPDVData()
+      loadSalesData()
     } catch (err: any) {
       Alert.alert('Erro ao finalizar venda', err.message || 'Houve uma falha.')
     } finally {
       setCheckoutLoading(false)
+    }
+  }
+
+  async function handleUpdateStatus(newStatus: 'novo' | 'aguardando pagamento' | 'pago' | 'enviado' | 'concluído') {
+    if (!selectedOrder) return
+
+    setStatusUpdateLoading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setOrders(orders.map(o => o.id === selectedOrder.id ? { ...o, status: newStatus } : o))
+        setSelectedOrder({ ...selectedOrder, status: newStatus })
+        setOrderModalOpen(false)
+        return
+      }
+
+      const { error } = await supabase
+        .from('sales')
+        .update({ status: newStatus })
+        .eq('id', selectedOrder.id)
+
+      if (error) throw error
+
+      setOrders(orders.map(o => o.id === selectedOrder.id ? { ...o, status: newStatus } : o))
+      setSelectedOrder({ ...selectedOrder, status: newStatus })
+      setOrderModalOpen(false)
+      Alert.alert('Sucesso', 'Status do pedido atualizado! 🌸')
+    } catch (err: any) {
+      Alert.alert('Erro', err.message || 'Erro ao atualizar status.')
+    } finally {
+      setStatusUpdateLoading(false)
+    }
+  }
+
+  function getStatusStyle(status: string) {
+    switch (status) {
+      case 'novo': return { bg: '#F1F5F9', text: '#475569', label: 'Novo' }
+      case 'aguardando pagamento': return { bg: '#FEF3C7', text: '#D97706', label: 'Aguardando Pagamento' }
+      case 'pago': return { bg: '#ECFDF5', text: '#059669', label: 'Pago' }
+      case 'enviado': return { bg: '#EFF6FF', text: '#3B82F6', label: 'Enviado' }
+      case 'concluído': return { bg: '#F5F5F4', text: '#1C1917', label: 'Concluído' }
+      default: return { bg: '#F1F5F9', text: '#475569', label: 'Desconhecido' }
     }
   }
 
@@ -303,31 +353,28 @@ export default function SalesScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      {/* Tabs */}
+      {/* Tab bar */}
       <View style={styles.tabContainer}>
-        <TouchableOpacity 
-          style={[styles.tabButton, activeTab === 'catalog' && styles.tabActive]}
-          onPress={() => setActiveTab('catalog')}
-        >
+        <TouchableOpacity style={[styles.tabButton, activeTab === 'catalog' && styles.tabActive]} onPress={() => setActiveTab('catalog')}>
           <Text style={[styles.tabText, activeTab === 'catalog' && styles.tabTextActive]}>Catálogo</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tabButton, activeTab === 'cart' && styles.tabActive]}
-          onPress={() => setActiveTab('cart')}
-        >
-          <Text style={[styles.tabText, activeTab === 'cart' && styles.tabTextActive]}>
-            Carrinho ({cart.reduce((a, c) => a + c.quantity, 0)})
-          </Text>
+        <TouchableOpacity style={[styles.tabButton, activeTab === 'cart' && styles.tabActive]} onPress={() => setActiveTab('cart')}>
+          <Text style={[styles.tabText, activeTab === 'cart' && styles.tabTextActive]}>Carrinho ({cart.reduce((a, c) => a + c.quantity, 0)})</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.tabButton, activeTab === 'orders' && styles.tabActive]} onPress={() => setActiveTab('orders')}>
+          <Text style={[styles.tabText, activeTab === 'orders' && styles.tabTextActive]}>Pedidos</Text>
         </TouchableOpacity>
       </View>
 
-      {activeTab === 'catalog' ? (
-        <View style={styles.catalogTab}>
-          {/* Search */}
+      {loading ? (
+        <ActivityIndicator size="large" color="#E11D48" style={styles.loader} />
+      ) : activeTab === 'catalog' ? (
+        <View style={styles.tabContent}>
+          {/* Search bar */}
           <View style={styles.searchContainer}>
             <Search size={16} color="#94A3B8" style={styles.searchIcon} />
             <TextInput
-              placeholder="Buscar maquiagem..."
+              placeholder="Buscar maquiagens..."
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholderTextColor="#94A3B8"
@@ -335,289 +382,212 @@ export default function SalesScreen({ navigation }: any) {
             />
           </View>
 
-          {loading ? (
-            <ActivityIndicator size="large" color="#E11D48" style={styles.loader} />
-          ) : filteredProducts.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <ShoppingBag size={36} color="#CBD5E1" />
-              <Text style={styles.emptyText}>Nenhum produto disponível em estoque.</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={filteredProducts}
-              keyExtractor={(item) => item.id}
-              numColumns={2}
-              columnWrapperStyle={styles.gridRow}
-              showsVerticalScrollIndicator={false}
-              style={styles.gridList}
-              renderItem={({ item }) => {
-                const cartItem = cart.find(x => x.product.id === item.id)
-                const quantityInCart = cartItem ? cartItem.quantity : 0
-
-                return (
-                  <TouchableOpacity style={styles.prodCard} onPress={() => addToCart(item)}>
-                    <View style={styles.imageContainer}>
-                      {item.image_url ? (
-                        <Image source={{ uri: item.image_url }} style={styles.prodImage as any} />
-                      ) : (
-                        <View style={styles.fallbackImage}>
-                          <Text style={styles.fallbackText}>
-                            {item.name.slice(0, 3).toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
-                      {quantityInCart > 0 && (
-                        <View style={styles.cartBadge}>
-                          <Text style={styles.cartBadgeText}>{quantityInCart}</Text>
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.prodCardInfo}>
-                      <Text style={styles.prodCardBrand} numberOfLines={1}>
-                        {item.brand || 'COSMÉTICOS'}
-                      </Text>
-                      <Text style={styles.prodCardName} numberOfLines={2}>
-                        {item.name}
-                      </Text>
-                      <View style={styles.prodCardFooter}>
-                        <Text style={styles.prodCardPrice}>
-                          R$ {item.sale_price.toFixed(2)}
-                        </Text>
-                        <Text style={styles.prodCardStock}>
-                          {item.quantity_in_stock} un.
-                        </Text>
+          <FlatList
+            data={filteredProducts}
+            keyExtractor={(item) => item.id}
+            numColumns={2}
+            columnWrapperStyle={styles.gridRow}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => {
+              const cartItem = cart.find(x => x.product.id === item.id)
+              const qtyInCart = cartItem ? cartItem.quantity : 0
+              return (
+                <TouchableOpacity style={styles.prodCard} onPress={() => addToCart(item)}>
+                  <View style={styles.imageBox}>
+                    {item.image_url ? (
+                      <Image source={{ uri: item.image_url }} style={styles.prodImage as any} />
+                    ) : (
+                      <View style={styles.fallbackImage}>
+                        <Text style={styles.fallbackText}>{item.name.slice(0, 2).toUpperCase()}</Text>
                       </View>
-                    </View>
-                  </TouchableOpacity>
-                )
-              }}
-            />
-          )}
+                    )}
+                    {qtyInCart > 0 && (
+                      <View style={styles.badge}>
+                        <Text style={styles.badgeText}>{qtyInCart}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.brand} numberOfLines={1}>{item.brand || 'Geral'}</Text>
+                  <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+                  <View style={styles.prodFooter}>
+                    <Text style={styles.price}>R$ {item.sale_price.toFixed(2)}</Text>
+                    <Text style={styles.stock}>{item.quantity_in_stock} un.</Text>
+                  </View>
+                </TouchableOpacity>
+              )
+            }}
+          />
 
-          {/* Floating Cart Button */}
           {cart.length > 0 && (
-            <TouchableOpacity 
-              style={styles.floatingCartBtn} 
-              onPress={() => setActiveTab('cart')}
-            >
-              <View style={styles.floatingCartContent}>
-                <ShoppingBag size={18} color="#FFFFFF" />
-                <Text style={styles.floatingCartText}>
-                  Ver Carrinho ({cart.reduce((a, c) => a + c.quantity, 0)} itens)
-                </Text>
-              </View>
-              <Text style={styles.floatingCartPrice}>
-                R$ {total.toFixed(2)}
-              </Text>
+            <TouchableOpacity style={styles.floatingCart} onPress={() => setActiveTab('cart')}>
+              <ShoppingBag size={18} color="#FFFFFF" />
+              <Text style={styles.floatingCartText}>Ver Carrinho • R$ {total.toFixed(2)}</Text>
             </TouchableOpacity>
           )}
         </View>
-      ) : (
-        <ScrollView style={styles.cartTabContainer} showsVerticalScrollIndicator={false} contentContainerStyle={styles.cartTabContentContainer}>
-          {/* Cart Header */}
-          <View style={styles.cartItemsHeader}>
-            <Text style={styles.sectionTitle}>Itens Selecionados</Text>
-            {cart.length > 0 && (
-              <TouchableOpacity onPress={() => setCart([])}>
-                <Text style={styles.clearCartText}>Esvaziar</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Cart list */}
+      ) : activeTab === 'cart' ? (
+        <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
           {cart.length === 0 ? (
-            <View style={styles.emptyCartBox}>
-              <ShoppingBag size={32} color="#CBD5E1" />
-              <Text style={styles.emptyCartText}>Seu carrinho está vazio.</Text>
-              <TouchableOpacity style={styles.backToCatalogBtn} onPress={() => setActiveTab('catalog')}>
-                <Text style={styles.backToCatalogBtnText}>Ir para o Catálogo</Text>
+            <View style={styles.emptyCart}>
+              <ShoppingBag size={44} color="#FDA4AF" />
+              <Text style={styles.emptyCartTitle}>Seu carrinho está vazio 🌸</Text>
+              <TouchableOpacity style={styles.backBtn} onPress={() => setActiveTab('catalog')}>
+                <Text style={styles.backBtnText}>Ir para o Catálogo</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.cartListWrapper}>
+            <View style={styles.cartBox}>
+              <Text style={styles.sectionTitle}>Produtos</Text>
               {cart.map(item => (
                 <View key={item.product.id} style={styles.cartRow}>
-                  <View style={styles.cartItemInfo}>
-                    <Text style={styles.cartItemText} numberOfLines={1}>{item.product.name}</Text>
-                    <Text style={styles.cartItemSubprice}>R$ {item.product.sale_price.toFixed(2)}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cartProdName} numberOfLines={1}>{item.product.name}</Text>
+                    <Text style={styles.cartProdPrice}>R$ {item.product.sale_price.toFixed(2)}</Text>
                   </View>
-                  <View style={styles.cartItemActions}>
-                    <TouchableOpacity onPress={() => decreaseQty(item.product.id)} style={styles.qtyBtn}>
-                      <Minus size={12} color="#475569" />
+                  <View style={styles.cartQtyRow}>
+                    <TouchableOpacity style={styles.qtyBtn} onPress={() => decreaseQty(item.product.id)}>
+                      <Minus size={12} color="#64748B" />
                     </TouchableOpacity>
-                    <Text style={styles.qtyText}>{item.quantity}</Text>
-                    <TouchableOpacity onPress={() => addToCart(item.product)} style={styles.qtyBtn}>
-                      <Plus size={12} color="#475569" />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => removeFromCart(item.product.id)} style={styles.removeBtn}>
-                      <Trash2 size={14} color="#EF4444" />
+                    <Text style={styles.qtyVal}>{item.quantity}</Text>
+                    <TouchableOpacity style={styles.qtyBtn} onPress={() => addToCart(item.product)}>
+                      <Plus size={12} color="#64748B" />
                     </TouchableOpacity>
                   </View>
                 </View>
               ))}
-            </View>
-          )}
 
-          {/* Customer Selection */}
-          <View style={styles.customerSection}>
-            <View style={styles.customerHeader}>
               <Text style={styles.sectionTitle}>Cliente da Venda</Text>
-              <TouchableOpacity style={styles.addCustomerLink} onPress={() => setCustomerModalOpen(true)}>
-                <UserPlus size={14} color="#E11D48" />
-                <Text style={styles.addCustomerLinkText}>Rápido</Text>
-              </TouchableOpacity>
-            </View>
-
-            {selectedCustomer ? (
-              <View style={styles.selectedCustomerCard}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.selectedCustomerName}>{selectedCustomer.name}</Text>
-                  {selectedCustomer.phone && <Text style={styles.selectedCustomerPhone}>{selectedCustomer.phone}</Text>}
+              {selectedCustomer ? (
+                <View style={styles.selectedCustomer}>
+                  <Text style={styles.selectedCustomerText}>{selectedCustomer.name}</Text>
+                  <TouchableOpacity onPress={() => setSelectedCustomer(null)}>
+                    <X size={16} color="#E11D48" />
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => setSelectedCustomer(null)}>
-                  <X size={16} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.customerSearchWrapper}>
-                <TextInput
-                  placeholder="Buscar cliente ou deixar avulso..."
-                  value={customerSearch}
-                  onChangeText={setCustomerSearch}
-                  placeholderTextColor="#94A3B8"
-                  style={styles.customerInput}
-                />
-                {customerSearch.length > 0 && (
-                  <View style={styles.customerDropdown}>
-                    <ScrollView nestedScrollEnabled={true}>
+              ) : (
+                <View>
+                  <View style={styles.customerSearchRow}>
+                    <TextInput
+                      placeholder="Pesquisar cliente ou avulso..."
+                      value={customerSearch}
+                      onChangeText={setCustomerSearch}
+                      style={styles.customerInput}
+                    />
+                    <TouchableOpacity style={styles.addCustomerBtn} onPress={() => setCustomerModalOpen(true)}>
+                      <UserPlus size={16} color="#E11D48" />
+                    </TouchableOpacity>
+                  </View>
+                  {customerSearch.length > 0 && (
+                    <View style={styles.dropdown}>
                       {filteredCustomers.map(c => (
-                        <TouchableOpacity 
-                          key={c.id} 
-                          style={styles.dropdownItem}
-                          onPress={() => {
-                            setSelectedCustomer(c)
-                            setCustomerSearch('')
-                          }}
-                        >
-                          <Text style={styles.dropdownItemName}>{c.name}</Text>
+                        <TouchableOpacity key={c.id} style={styles.dropdownItem} onPress={() => {
+                          setSelectedCustomer(c)
+                          setCustomerSearch('')
+                        }}>
+                          <Text style={styles.dropdownText}>{c.name}</Text>
                         </TouchableOpacity>
                       ))}
-                      {filteredCustomers.length === 0 && (
-                        <Text style={styles.dropdownEmptyText}>Sem clientes encontrados.</Text>
-                      )}
-                    </ScrollView>
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
+                    </View>
+                  )}
+                </View>
+              )}
 
-          {/* Discount input */}
-          <View style={styles.discountSection}>
-            <Text style={styles.sectionTitle}>Desconto Geral (R$)</Text>
-            <View style={styles.discountInputWrapper}>
-              <Percent size={14} color="#94A3B8" style={styles.discountIcon} />
+              <Text style={styles.sectionTitle}>Desconto Geral (R$)</Text>
               <TextInput
-                placeholder="0.00"
-                value={discount ? String(discount) : ''}
-                onChangeText={val => setDiscount(Math.max(0, parseFloat(val) || 0))}
+                placeholder="R$ 0.00"
                 keyboardType="numeric"
+                value={discount ? String(discount) : ''}
+                onChangeText={val => setDiscount(parseFloat(val) || 0)}
                 style={styles.discountInput}
               />
-            </View>
-          </View>
 
-          {/* Payment Section */}
-          <View style={styles.paymentSection}>
-            <Text style={styles.sectionTitle}>Forma de Pagamento</Text>
-            <View style={styles.paymentRow}>
-              <TouchableOpacity 
-                style={[styles.paymentBtn, paymentMethod === 'pix' && styles.paymentBtnActive]}
-                onPress={() => setPaymentMethod('pix')}
-              >
-                <Text style={[styles.paymentBtnText, paymentMethod === 'pix' && styles.paymentBtnTextActive]}>PIX</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.paymentBtn, paymentMethod === 'money' && styles.paymentBtnActive]}
-                onPress={() => setPaymentMethod('money')}
-              >
-                <Text style={[styles.paymentBtnText, paymentMethod === 'money' && styles.paymentBtnTextActive]}>Dinheiro</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.paymentBtn, paymentMethod === 'credit_card' && styles.paymentBtnActive]}
-                onPress={() => setPaymentMethod('credit_card')}
-              >
-                <Text style={[styles.paymentBtnText, paymentMethod === 'credit_card' && styles.paymentBtnTextActive]}>Crédito</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.paymentBtn, paymentMethod === 'debit_card' && styles.paymentBtnActive]}
-                onPress={() => setPaymentMethod('debit_card')}
-              >
-                <Text style={[styles.paymentBtnText, paymentMethod === 'debit_card' && styles.paymentBtnTextActive]}>Débito</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Totals Summary & Checkout */}
-          <View style={styles.footer}>
-            <View style={styles.summaryRow}>
-              <View>
-                <Text style={styles.subtotalText}>Subtotal: R$ {subtotal.toFixed(2)}</Text>
-                {discount > 0 && <Text style={styles.discountText}>Desconto: -R$ {discount.toFixed(2)}</Text>}
+              <Text style={styles.sectionTitle}>Forma de Pagamento</Text>
+              <View style={styles.paymentRow}>
+                {[
+                  { id: 'pix', label: 'PIX' },
+                  { id: 'money', label: 'Dinheiro' },
+                  { id: 'credit_card', label: 'Crédito' },
+                  { id: 'debit_card', label: 'Débito' }
+                ].map(pm => (
+                  <TouchableOpacity key={pm.id} style={[styles.paymentBtn, paymentMethod === pm.id && styles.paymentBtnActive]} onPress={() => setPaymentMethod(pm.id as any)}>
+                    <Text style={[styles.paymentBtnText, paymentMethod === pm.id && styles.paymentBtnTextActive]}>{pm.label}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-              <Text style={styles.totalVal}>R$ {total.toFixed(2)}</Text>
-            </View>
 
-            <TouchableOpacity 
-              style={styles.checkoutBtn} 
-              disabled={cart.length === 0 || checkoutLoading} 
-              onPress={handleCheckout}
-            >
-              {checkoutLoading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.checkoutBtnText}>FINALIZAR VENDA</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+              <View style={styles.summaryBox}>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Subtotal</Text>
+                  <Text style={styles.summaryVal}>R$ {subtotal.toFixed(2)}</Text>
+                </View>
+                {discount > 0 && (
+                  <View style={styles.summaryRow}>
+                    <Text style={[styles.summaryLabel, { color: '#E11D48' }]}>Desconto</Text>
+                    <Text style={[styles.summaryVal, { color: '#E11D48' }]}>- R$ {discount.toFixed(2)}</Text>
+                  </View>
+                )}
+                <View style={[styles.summaryRow, { borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 10, marginTop: 10 }]}>
+                  <Text style={[styles.summaryLabel, { fontSize: 13, fontWeight: '800' }]}>Total</Text>
+                  <Text style={[styles.summaryVal, { fontSize: 14, fontWeight: '900', color: '#E11D48' }]}>R$ {total.toFixed(2)}</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity style={styles.checkoutBtn} disabled={checkoutLoading} onPress={handleCheckout}>
+                {checkoutLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.checkoutBtnText}>FINALIZAR VENDA</Text>}
+              </TouchableOpacity>
+            </View>
+          )}
         </ScrollView>
+      ) : (
+        <View style={styles.tabContent}>
+          {/* Orders list */}
+          <FlatList
+            data={orders}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => {
+              const theme = getStatusStyle(item.status)
+              return (
+                <TouchableOpacity style={styles.orderCard} onPress={() => { setSelectedOrder(item); setOrderModalOpen(true); }}>
+                  <View>
+                    <Text style={styles.orderCust}>{item.customers?.name || 'Cliente Avulso'}</Text>
+                    <Text style={styles.orderDate}>{new Date(item.created_at).toLocaleDateString('pt-BR')} • {item.payment_method.toUpperCase()}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                    <Text style={styles.orderTotal}>R$ {Number(item.total_value).toFixed(2)}</Text>
+                    <View style={[styles.statusTag, { backgroundColor: theme.bg }]}>
+                      <Text style={[styles.statusTagText, { color: theme.text }]}>{theme.label}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              )
+            }}
+          />
+        </View>
       )}
 
       {/* Success Modal */}
       {lastSaleDetails && (
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={successOpen}
-        >
+        <Modal animationType="fade" transparent={true} visible={successOpen}>
           <View style={styles.overlay}>
             <View style={styles.successModal}>
-              <View style={styles.checkCircle}>
-                <CheckCircle size={44} color="#10B981" />
-              </View>
-              <Text style={styles.successTitle}>Venda Concluída!</Text>
-              <Text style={styles.successSub}>Balanço de estoque e caixa atualizados no Mimus.</Text>
+              <CheckCircle size={48} color="#059669" />
+              <Text style={styles.successTitle}>Venda Concluída! 🌸</Text>
+              <Text style={styles.successSub}>O estoque e financeiro já foram atualizados no Mimus.</Text>
 
-              <View style={styles.receiptBox}>
+              <View style={styles.successReceipt}>
                 <View style={styles.receiptRow}>
-                  <Text style={styles.receiptLabel}>Total Geral:</Text>
+                  <Text style={styles.receiptLabel}>Total:</Text>
                   <Text style={styles.receiptVal}>R$ {lastSaleDetails.total.toFixed(2)}</Text>
                 </View>
                 <View style={styles.receiptRow}>
-                  <Text style={styles.receiptLabel}>Forma de Pagamento:</Text>
+                  <Text style={styles.receiptLabel}>Método:</Text>
                   <Text style={styles.receiptVal}>{lastSaleDetails.payment}</Text>
-                </View>
-                <View style={styles.receiptRow}>
-                  <Text style={styles.receiptLabel}>Produtos Vendidos:</Text>
-                  <Text style={styles.receiptVal}>{lastSaleDetails.itemsCount} itens</Text>
                 </View>
               </View>
 
-              <TouchableOpacity style={styles.successCloseBtn} onPress={() => {
-                setSuccessOpen(false)
-                setActiveTab('catalog')
-              }}>
-                <Text style={styles.successCloseBtnText}>Nova Venda</Text>
+              <TouchableOpacity style={styles.successBtn} onPress={() => { setSuccessOpen(false); setActiveTab('catalog'); }}>
+                <Text style={styles.successBtnText}>Nova Venda</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -625,11 +595,7 @@ export default function SalesScreen({ navigation }: any) {
       )}
 
       {/* Quick Customer Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={customerModalOpen}
-      >
+      <Modal animationType="slide" transparent={true} visible={customerModalOpen}>
         <View style={styles.overlayBottom}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -638,54 +604,67 @@ export default function SalesScreen({ navigation }: any) {
                 <X size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
-
-            <View style={styles.form}>
+            <View style={styles.modalForm}>
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Nome do Cliente *</Text>
-                <TextInput
-                  placeholder="Nome completo"
-                  value={newCustName}
-                  onChangeText={setNewCustName}
-                  style={styles.input}
-                />
+                <Text style={styles.label}>Nome Completo *</Text>
+                <TextInput placeholder="Ex: Ana Souza" value={newCustName} onChangeText={setNewCustName} style={styles.input} />
               </View>
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>WhatsApp / Telefone</Text>
-                <TextInput
-                  placeholder="DDD + Celular"
-                  value={newCustPhone}
-                  onChangeText={setNewCustPhone}
-                  keyboardType="phone-pad"
-                  style={styles.input}
-                />
+                <Text style={styles.label}>WhatsApp / Celular</Text>
+                <TextInput placeholder="Ex: 11999999999" value={newCustPhone} onChangeText={setNewCustPhone} keyboardType="phone-pad" style={styles.input} />
               </View>
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Instagram</Text>
-                <TextInput
-                  placeholder="@perfil"
-                  value={newCustInstagram}
-                  onChangeText={setNewCustInstagram}
-                  autoCapitalize="none"
-                  style={styles.input}
-                />
-              </View>
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Data Aniversário (AAAA-MM-DD)</Text>
-                <TextInput
-                  placeholder="AAAA-MM-DD"
-                  value={newCustBirthday}
-                  onChangeText={setNewCustBirthday}
-                  style={styles.input}
-                />
-              </View>
-
-              <TouchableOpacity style={styles.modalSaveBtn} disabled={custLoading} onPress={handleQuickCustomerCreate}>
-                {custLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.modalSaveBtnText}>CADASTRAR E SELECIONAR</Text>}
+              <TouchableOpacity style={styles.saveBtn} onPress={handleQuickCustomerCreate}>
+                <Text style={styles.saveBtnText}>CADASTRAR E SELECIONAR</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+
+      {/* Order Status Action Modal */}
+      {selectedOrder && (
+        <Modal animationType="slide" transparent={true} visible={orderModalOpen}>
+          <View style={styles.overlayBottom}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalTitle}>Pedido de {selectedOrder.customers?.name || 'Cliente Avulso'}</Text>
+                  <Text style={styles.modalSubtitle}>Código: #{selectedOrder.id.slice(0,8).toUpperCase()}</Text>
+                </View>
+                <TouchableOpacity onPress={() => setOrderModalOpen(false)}>
+                  <X size={20} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalForm}>
+                <Text style={[styles.label, { marginBottom: 12 }]}>Atualizar Status do Pedido:</Text>
+                <View style={styles.statusButtonsCol}>
+                  {[
+                    { id: 'novo', label: 'Novo (Orçamento)' },
+                    { id: 'aguardando pagamento', label: 'Aguardando Pagamento' },
+                    { id: 'pago', label: 'Pago (Confirmado)' },
+                    { id: 'enviado', label: 'Enviado (A caminho)' },
+                    { id: 'concluído', label: 'Concluído (Entregue)' }
+                  ].map(st => {
+                    const active = selectedOrder.status === st.id
+                    return (
+                      <TouchableOpacity 
+                        key={st.id} 
+                        style={[styles.statusSelectBtn, active && styles.statusSelectBtnActive]} 
+                        disabled={statusUpdateLoading}
+                        onPress={() => handleUpdateStatus(st.id as any)}
+                      >
+                        <Text style={[styles.statusSelectBtnText, active && styles.statusSelectBtnTextActive]}>{st.label}</Text>
+                        {active && <Check size={14} color="#E11D48" />}
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
 
     </View>
   )
@@ -694,7 +673,7 @@ export default function SalesScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFF8FA',
     padding: 16,
   },
   tabContainer: {
@@ -722,15 +701,18 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     fontWeight: '700',
   },
-  catalogTab: {
+  tabContent: {
     flex: 1,
+  },
+  loader: {
+    marginTop: 40,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#FFE4E6',
     borderRadius: 12,
     paddingHorizontal: 12,
     marginBottom: 12,
@@ -744,22 +726,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#1E293B',
   },
-  loader: {
-    marginVertical: 20,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  emptyText: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 8,
-  },
-  gridList: {
-    flex: 1,
-  },
   gridRow: {
     justifyContent: 'space-between',
     marginBottom: 12,
@@ -769,21 +735,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    overflow: 'hidden',
+    borderColor: '#FFE4E6',
     padding: 10,
   },
-  imageContainer: {
+  imageBox: {
     width: '100%',
-    aspectRatio: 1,
-    borderRadius: 12,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+    aspectRatio: 1.1,
+    borderRadius: 10,
     overflow: 'hidden',
+    marginBottom: 8,
     position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   prodImage: {
     width: '100%',
@@ -798,303 +759,219 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fallbackText: {
+    color: '#E11D48',
     fontSize: 12,
     fontWeight: '800',
-    color: '#FDA4AF',
   },
-  cartBadge: {
+  badge: {
     position: 'absolute',
     top: 6,
     right: 6,
     backgroundColor: '#E11D48',
-    borderRadius: 10,
     width: 20,
     height: 20,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cartBadgeText: {
+  badgeText: {
     color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '800',
   },
-  prodCardInfo: {
-    marginTop: 8,
-    gap: 2,
-  },
-  prodCardBrand: {
+  brand: {
     fontSize: 9,
-    fontWeight: '700',
     color: '#E11D48',
+    fontWeight: '700',
     textTransform: 'uppercase',
   },
-  prodCardName: {
-    fontSize: 11.5,
-    fontWeight: '700',
+  name: {
+    fontSize: 12,
+    fontWeight: '800',
     color: '#1E293B',
-    height: 32,
-    lineHeight: 16,
+    marginTop: 2,
   },
-  prodCardFooter: {
+  prodFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
+    alignItems: 'baseline',
+    marginTop: 6,
   },
-  prodCardPrice: {
-    fontSize: 12,
+  price: {
+    fontSize: 11.5,
     fontWeight: '800',
     color: '#0F172A',
   },
-  prodCardStock: {
-    fontSize: 9.5,
+  stock: {
+    fontSize: 9,
     color: '#94A3B8',
-    fontWeight: '500',
   },
-  floatingCartBtn: {
+  floatingCart: {
     position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
+    bottom: 12,
+    left: 12,
+    right: 12,
     backgroundColor: '#E11D48',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
     borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#E11D48',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  floatingCartContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 8,
+    shadowColor: '#E11D48',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
   },
   floatingCartText: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  floatingCartPrice: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  cartTabContainer: {
-    flex: 1,
-  },
-  cartTabContentContainer: {
-    paddingBottom: 80,
-  },
-  cartItemsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 6,
-  },
-  clearCartText: {
     fontSize: 11.5,
-    color: '#E11D48',
-    fontWeight: '700',
+    fontWeight: '800',
   },
-  emptyCartBox: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
+  emptyCart: {
+    flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 80,
     gap: 8,
   },
-  emptyCartText: {
-    fontSize: 11.5,
-    color: '#94A3B8',
-    fontWeight: '500',
+  emptyCartTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#E11D48',
+    marginTop: 8,
   },
-  backToCatalogBtn: {
-    marginTop: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: '#FFF1F2',
+  backBtn: {
+    borderWidth: 1,
+    borderColor: '#E11D48',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginTop: 10,
   },
-  backToCatalogBtnText: {
+  backBtnText: {
+    color: '#E11D48',
     fontSize: 11,
     fontWeight: '700',
-    color: '#E11D48',
   },
-  cartListWrapper: {
-    marginBottom: 16,
+  cartBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#FFE4E6',
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#475569',
+    textTransform: 'uppercase',
+    marginTop: 16,
+    marginBottom: 8,
   },
   cartRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    padding: 12,
-    borderRadius: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingVertical: 8,
   },
-  cartItemInfo: {
-    flex: 1,
-    marginRight: 8,
-  },
-  cartItemText: {
-    fontSize: 12,
-    fontWeight: '700',
+  cartProdName: {
+    fontSize: 12.5,
+    fontWeight: '800',
     color: '#1E293B',
   },
-  cartItemSubprice: {
+  cartProdPrice: {
     fontSize: 10.5,
-    color: '#64748B',
+    color: '#E11D48',
+    fontWeight: '700',
     marginTop: 2,
   },
-  cartItemActions: {
+  cartQtyRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 10,
   },
   qtyBtn: {
     width: 24,
     height: 24,
     borderRadius: 6,
     backgroundColor: '#F1F5F9',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  qtyText: {
+  qtyVal: {
     fontSize: 12,
     fontWeight: '800',
     color: '#1E293B',
-    width: 16,
-    textAlign: 'center',
   },
-  removeBtn: {
-    padding: 4,
-  },
-  customerSection: {
-    marginBottom: 16,
-  },
-  customerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  addCustomerLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  addCustomerLinkText: {
-    fontSize: 11,
-    color: '#E11D48',
-    fontWeight: '700',
-  },
-  selectedCustomerCard: {
+  selectedCustomer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#FFF1F2',
-    borderColor: '#FECDD3',
     borderWidth: 1,
-    padding: 12,
-    borderRadius: 12,
+    borderColor: '#FFE4E6',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  selectedCustomerName: {
+  selectedCustomerText: {
     fontSize: 12,
-    fontWeight: '700',
     color: '#E11D48',
+    fontWeight: '800',
   },
-  selectedCustomerPhone: {
-    fontSize: 10,
-    color: '#FB7185',
-    marginTop: 1,
-  },
-  customerSearchWrapper: {
-    position: 'relative',
-    zIndex: 30,
+  customerSearchRow: {
+    flexDirection: 'row',
+    gap: 8,
   },
   customerInput: {
-    backgroundColor: '#FFFFFF',
+    flex: 1,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
     height: 38,
+    paddingHorizontal: 12,
     fontSize: 12,
-    color: '#1E293B',
   },
-  customerDropdown: {
-    position: 'absolute',
-    top: 40,
-    left: 0,
-    right: 0,
+  addCustomerBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#FFF1F2',
+    borderWidth: 1,
+    borderColor: '#FFE4E6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dropdown: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
+    borderRadius: 10,
+    marginTop: 4,
     maxHeight: 120,
-    zIndex: 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    overflow: 'hidden',
   },
   dropdownItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
-  dropdownItemName: {
+  dropdownText: {
     fontSize: 11.5,
-    fontWeight: '600',
     color: '#475569',
-  },
-  dropdownEmptyText: {
-    padding: 10,
-    fontSize: 11,
-    color: '#94A3B8',
-    textAlign: 'center',
-  },
-  discountSection: {
-    marginBottom: 16,
-  },
-  discountInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-  },
-  discountIcon: {
-    marginRight: 6,
+    fontWeight: '600',
   },
   discountInput: {
-    flex: 1,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
     height: 38,
+    paddingHorizontal: 12,
     fontSize: 12,
-    color: '#1E293B',
-  },
-  paymentSection: {
-    marginBottom: 20,
   },
   paymentRow: {
     flexDirection: 'row',
@@ -1102,70 +979,97 @@ const styles = StyleSheet.create({
   },
   paymentBtn: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 10,
-    paddingVertical: 10,
     alignItems: 'center',
   },
   paymentBtnActive: {
-    backgroundColor: '#FFF1F2',
     borderColor: '#E11D48',
+    backgroundColor: '#FFF1F2',
   },
   paymentBtnText: {
-    fontSize: 10.5,
-    fontWeight: '600',
+    fontSize: 9.5,
     color: '#64748B',
+    fontWeight: '700',
   },
   paymentBtnTextActive: {
     color: '#E11D48',
-    fontWeight: '700',
   },
-  footer: {
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    paddingTop: 16,
+  summaryBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 4,
   },
-  subtotalText: {
+  summaryLabel: {
     fontSize: 11,
     color: '#64748B',
-    fontWeight: '500',
-  },
-  discountText: {
-    fontSize: 11,
-    color: '#EF4444',
     fontWeight: '600',
-    marginTop: 2,
   },
-  totalVal: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#E11D48',
+  summaryVal: {
+    fontSize: 11,
+    color: '#1E293B',
+    fontWeight: '700',
   },
   checkoutBtn: {
     backgroundColor: '#E11D48',
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#E11D48',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    marginTop: 16,
   },
   checkoutBtnText: {
     color: '#FFFFFF',
+    fontSize: 11.5,
     fontWeight: '800',
+  },
+  orderCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#FFE4E6',
+    padding: 14,
+    marginBottom: 8,
+  },
+  orderCust: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  orderDate: {
+    fontSize: 9.5,
+    color: '#94A3B8',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  orderTotal: {
     fontSize: 12,
-    letterSpacing: 0.5,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  statusTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  statusTagText: {
+    fontSize: 8,
+    fontWeight: '800',
+    textTransform: 'uppercase',
   },
   overlay: {
     flex: 1,
@@ -1176,74 +1080,63 @@ const styles = StyleSheet.create({
   },
   successModal: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 24,
     alignItems: 'center',
     width: '100%',
     maxWidth: 320,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  checkCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#ECFDF5',
-    alignItems: 'center',
-    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#A7F3D0',
-    marginBottom: 12,
+    borderColor: '#FFE4E6',
   },
   successTitle: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '900',
     color: '#0F172A',
+    marginTop: 14,
   },
   successSub: {
-    fontSize: 11,
+    fontSize: 10.5,
     color: '#64748B',
     textAlign: 'center',
     marginTop: 4,
-    marginBottom: 16,
+    lineHeight: 14,
   },
-  receiptBox: {
-    width: '100%',
+  successReceipt: {
     backgroundColor: '#F8FAFC',
     borderRadius: 12,
+    padding: 12,
+    width: '100%',
+    marginTop: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    padding: 12,
-    marginBottom: 18,
-    gap: 6,
+    gap: 4,
   },
   receiptRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   receiptLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#64748B',
+    fontWeight: '500',
   },
   receiptVal: {
-    fontSize: 11,
+    fontSize: 10,
+    color: '#1E293B',
     fontWeight: '700',
-    color: '#334155',
   },
-  successCloseBtn: {
-    backgroundColor: '#0F172A',
+  successBtn: {
+    backgroundColor: '#E11D48',
     width: '100%',
-    paddingVertical: 12,
+    paddingVertical: 11,
     borderRadius: 12,
     alignItems: 'center',
+    marginTop: 18,
   },
-  successCloseBtnText: {
+  successBtnText: {
     color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 11.5,
+    fontSize: 11,
+    fontWeight: '800',
   },
   overlayBottom: {
     flex: 1,
@@ -1264,14 +1157,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
     paddingBottom: 10,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   modalTitle: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: '800',
     color: '#0F172A',
   },
-  form: {
+  modalSubtitle: {
+    fontSize: 9.5,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  modalForm: {
     gap: 12,
   },
   inputGroup: {
@@ -1290,18 +1188,44 @@ const styles = StyleSheet.create({
     height: 38,
     paddingHorizontal: 12,
     fontSize: 12,
-    color: '#1E293B',
   },
-  modalSaveBtn: {
+  saveBtn: {
     backgroundColor: '#E11D48',
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
-  modalSaveBtnText: {
+  saveBtnText: {
     color: '#FFFFFF',
-    fontWeight: '700',
     fontSize: 10.5,
+    fontWeight: '800',
+  },
+  statusButtonsCol: {
+    gap: 8,
+  },
+  statusSelectBtn: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  statusSelectBtnActive: {
+    backgroundColor: '#FFF1F2',
+    borderColor: '#E11D48',
+  },
+  statusSelectBtnText: {
+    fontSize: 11,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  statusSelectBtnTextActive: {
+    color: '#E11D48',
+    fontWeight: '800',
   },
 })

@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { StatusBar } from 'expo-status-bar'
-import { LayoutDashboard, Package, ShoppingBag, Users, DollarSign } from 'lucide-react-native'
+import { LayoutDashboard, Package, ShoppingBag, Users, DollarSign, MessageSquare } from 'lucide-react-native'
 import { supabase } from './src/services/supabase'
 
 // Import Screens
@@ -12,6 +12,7 @@ import StockScreen from './src/screens/StockScreen'
 import SalesScreen from './src/screens/SalesScreen'
 import CustomerScreen from './src/screens/CustomerScreen'
 import FinanceScreen from './src/screens/FinanceScreen'
+import FollowUpScreen from './src/screens/FollowUpScreen'
 import LoginScreen from './src/screens/LoginScreen'
 import RegisterScreen from './src/screens/RegisterScreen'
 
@@ -23,14 +24,14 @@ function AppTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ color, size }) => {
-          if (route.name === 'Dashboard') {
+          if (route.name === 'Home') {
             return <LayoutDashboard size={size} color={color} />
-          } else if (route.name === 'Estoque') {
-            return <Package size={size} color={color} />
-          } else if (route.name === 'Vendas') {
+          } else if (route.name === 'Pedidos') {
             return <ShoppingBag size={size} color={color} />
           } else if (route.name === 'Clientes') {
             return <Users size={size} color={color} />
+          } else if (route.name === 'FollowUp') {
+            return <MessageSquare size={size} color={color} />
           } else {
             return <DollarSign size={size} color={color} />
           }
@@ -58,11 +59,11 @@ function AppTabs() {
         },
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Painel' }} />
-      <Tab.Screen name="Vendas" component={SalesScreen} options={{ title: 'PDV' }} />
-      <Tab.Screen name="Estoque" component={StockScreen} options={{ title: 'Estoque' }} />
-      <Tab.Screen name="Financeiro" component={FinanceScreen} options={{ title: 'Financeiro' }} />
+      <Tab.Screen name="Home" component={DashboardScreen} options={{ title: 'Início' }} />
       <Tab.Screen name="Clientes" component={CustomerScreen} options={{ title: 'Clientes' }} />
+      <Tab.Screen name="Pedidos" component={SalesScreen} options={{ title: 'Pedidos' }} />
+      <Tab.Screen name="FollowUp" component={FollowUpScreen} options={{ title: 'Follow-up' }} />
+      <Tab.Screen name="Financeiro" component={FinanceScreen} options={{ title: 'Financeiro' }} />
     </Tab.Navigator>
   )
 }
@@ -101,6 +102,18 @@ export default function App() {
       {session ? (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="MainTabs" component={AppTabs} />
+          <Stack.Screen 
+            name="Estoque" 
+            component={StockScreen} 
+            options={{ 
+              headerShown: true, 
+              title: 'Meus Produtos', 
+              headerTintColor: '#E11D48',
+              headerStyle: { backgroundColor: '#FFFFFF' },
+              headerShadowVisible: false,
+              headerTitleStyle: { fontWeight: '800', fontSize: 16 }
+            }} 
+          />
         </Stack.Navigator>
       ) : (
         <Stack.Navigator screenOptions={{ headerShown: false }}>

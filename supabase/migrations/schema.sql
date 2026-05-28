@@ -391,3 +391,11 @@ ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS cnpj text;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS promotional_price numeric(10,2);
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS has_free_shipping boolean NOT NULL DEFAULT false;
 
+-- Adição de colunas para gerenciamento de clientes e vendas no mobile
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS tags text;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS status text DEFAULT 'active';
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS notes text;
+
+ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS status text DEFAULT 'novo';
+
+

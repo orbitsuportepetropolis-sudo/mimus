@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { StyleSheet, Text, View, FlatList, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView, Modal, Image } from 'react-native'
 import { supabase } from '../services/supabase'
-import { Package, Search, AlertCircle, Plus, Edit, Trash2, X, ArrowUpDown, RefreshCw, Camera } from 'lucide-react-native'
+import { Package, Search, AlertCircle, Plus, Edit, Trash2, X, ArrowUpDown, RefreshCw, Camera, ChevronDown, ChevronUp } from 'lucide-react-native'
 import * as ImagePicker from 'expo-image-picker'
 
 export default function StockScreen() {
@@ -10,6 +10,8 @@ export default function StockScreen() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [storePlan, setStorePlan] = useState<'free' | 'pro'>('free')
+  const [showAdvancedNew, setShowAdvancedNew] = useState(false)
+  const [showAdvancedEdit, setShowAdvancedEdit] = useState(false)
 
   // Form State (New Product)
   const [formName, setFormName] = useState('')
@@ -412,6 +414,8 @@ export default function StockScreen() {
     setFormMinStock('5')
     setFormExpDate('')
     setFormImageUri(null)
+    setShowAdvancedNew(false)
+    setShowAdvancedEdit(false)
   }
 
   function openOptions(product: any) {
@@ -554,48 +558,14 @@ export default function StockScreen() {
               />
             </View>
 
-            <View style={styles.grid2}>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.label}>Marca</Text>
-                <TextInput
-                  placeholder="Ex: Bruna Tavares"
-                  value={formBrand}
-                  onChangeText={setFormBrand}
-                  style={styles.input}
-                />
-              </View>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.label}>Categoria</Text>
-                <TextInput
-                  placeholder="Ex: Boca, Pele"
-                  value={formCategory}
-                  onChangeText={setFormCategory}
-                  style={styles.input}
-                />
-              </View>
-            </View>
-
-            <View style={styles.grid2}>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.label}>SKU</Text>
-                <TextInput
-                  placeholder="Ex: GLOSS-ROSE"
-                  value={formSku}
-                  onChangeText={setFormSku}
-                  autoCapitalize="characters"
-                  style={styles.input}
-                />
-              </View>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.label}>Código Barras</Text>
-                <TextInput
-                  placeholder="EAN-13"
-                  value={formBarcode}
-                  onChangeText={setFormBarcode}
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-              </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Categoria</Text>
+              <TextInput
+                placeholder="Ex: Boca, Pele"
+                value={formCategory}
+                onChangeText={setFormCategory}
+                style={styles.input}
+              />
             </View>
 
             <View style={styles.grid2}>
@@ -621,35 +591,13 @@ export default function StockScreen() {
               </View>
             </View>
 
-            <View style={styles.grid2}>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.label}>Estoque Inicial</Text>
-                <TextInput
-                  placeholder="0"
-                  value={formStock}
-                  onChangeText={setFormStock}
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-              </View>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.label}>Alerta Mínimo</Text>
-                <TextInput
-                  placeholder="5"
-                  value={formMinStock}
-                  onChangeText={setFormMinStock}
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-              </View>
-            </View>
-
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Data Validade (AAAA-MM-DD)</Text>
+              <Text style={styles.label}>Estoque Inicial</Text>
               <TextInput
-                placeholder="Ex: 2027-12-31"
-                value={formExpDate}
-                onChangeText={setFormExpDate}
+                placeholder="0"
+                value={formStock}
+                onChangeText={setFormStock}
+                keyboardType="numeric"
                 style={styles.input}
               />
             </View>
@@ -671,6 +619,74 @@ export default function StockScreen() {
                 )}
               </View>
             </View>
+
+            {/* Accordion for advanced settings */}
+            <TouchableOpacity 
+              style={styles.advancedToggle} 
+              onPress={() => setShowAdvancedNew(!showAdvancedNew)}
+            >
+              <Text style={styles.advancedToggleText}>Campos Avançados</Text>
+              {showAdvancedNew ? <ChevronUp size={16} color="#E11D48" /> : <ChevronDown size={16} color="#E11D48" />}
+            </TouchableOpacity>
+
+            {showAdvancedNew && (
+              <View style={styles.advancedContainer}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Marca</Text>
+                  <TextInput
+                    placeholder="Ex: Bruna Tavares"
+                    value={formBrand}
+                    onChangeText={setFormBrand}
+                    style={styles.input}
+                  />
+                </View>
+
+                <View style={styles.grid2}>
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.label}>SKU</Text>
+                    <TextInput
+                      placeholder="Ex: GLOSS-ROSE"
+                      value={formSku}
+                      onChangeText={setFormSku}
+                      autoCapitalize="characters"
+                      style={styles.input}
+                    />
+                  </View>
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.label}>Código Barras</Text>
+                    <TextInput
+                      placeholder="EAN-13"
+                      value={formBarcode}
+                      onChangeText={setFormBarcode}
+                      keyboardType="numeric"
+                      style={styles.input}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.grid2}>
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.label}>Alerta Mínimo</Text>
+                    <TextInput
+                      placeholder="5"
+                      value={formMinStock}
+                      onChangeText={setFormMinStock}
+                      keyboardType="numeric"
+                      style={styles.input}
+                    />
+                  </View>
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.label}>Data Validade (AAAA-MM-DD)</Text>
+                    <TextInput
+                      placeholder="Ex: 2027-12-31"
+                      value={formExpDate}
+                      onChangeText={setFormExpDate}
+                      style={styles.input}
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
 
             <TouchableOpacity 
               style={styles.btn} 
@@ -815,47 +831,14 @@ export default function StockScreen() {
                     />
                   </View>
 
-                  <View style={styles.grid2}>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.label}>Marca</Text>
-                      <TextInput
-                        placeholder="Marca"
-                        value={formBrand}
-                        onChangeText={setFormBrand}
-                        style={styles.input}
-                      />
-                    </View>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.label}>Categoria</Text>
-                      <TextInput
-                        placeholder="Categoria"
-                        value={formCategory}
-                        onChangeText={setFormCategory}
-                        style={styles.input}
-                      />
-                    </View>
-                  </View>
-
-                  <View style={styles.grid2}>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.label}>SKU</Text>
-                      <TextInput
-                        placeholder="SKU"
-                        value={formSku}
-                        onChangeText={setFormSku}
-                        style={styles.input}
-                      />
-                    </View>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.label}>Cód. Barras</Text>
-                      <TextInput
-                        placeholder="EAN"
-                        value={formBarcode}
-                        onChangeText={setFormBarcode}
-                        keyboardType="numeric"
-                        style={styles.input}
-                      />
-                    </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Categoria</Text>
+                    <TextInput
+                      placeholder="Categoria"
+                      value={formCategory}
+                      onChangeText={setFormCategory}
+                      style={styles.input}
+                    />
                   </View>
 
                   <View style={styles.grid2}>
@@ -881,28 +864,6 @@ export default function StockScreen() {
                     </View>
                   </View>
 
-                  <View style={styles.grid2}>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.label}>Aviso Mínimo</Text>
-                      <TextInput
-                        placeholder="5"
-                        value={formMinStock}
-                        onChangeText={setFormMinStock}
-                        keyboardType="numeric"
-                        style={styles.input}
-                      />
-                    </View>
-                    <View style={[styles.inputGroup, { flex: 1 }]}>
-                      <Text style={styles.label}>Validade (AAAA-MM-DD)</Text>
-                      <TextInput
-                        placeholder="AAAA-MM-DD"
-                        value={formExpDate}
-                        onChangeText={setFormExpDate}
-                        style={styles.input}
-                      />
-                    </View>
-                  </View>
-
                   <View style={styles.inputGroup}>
                     <Text style={styles.label}>Foto do Produto</Text>
                     <View style={styles.imagePickerContainer}>
@@ -920,6 +881,73 @@ export default function StockScreen() {
                       )}
                     </View>
                   </View>
+
+                  {/* Accordion for advanced settings (edit modal) */}
+                  <TouchableOpacity 
+                    style={styles.advancedToggle} 
+                    onPress={() => setShowAdvancedEdit(!showAdvancedEdit)}
+                  >
+                    <Text style={styles.advancedToggleText}>Campos Avançados</Text>
+                    {showAdvancedEdit ? <ChevronUp size={16} color="#E11D48" /> : <ChevronDown size={16} color="#E11D48" />}
+                  </TouchableOpacity>
+
+                  {showAdvancedEdit && (
+                    <View style={styles.advancedContainer}>
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Marca</Text>
+                        <TextInput
+                          placeholder="Marca"
+                          value={formBrand}
+                          onChangeText={setFormBrand}
+                          style={styles.input}
+                        />
+                      </View>
+
+                      <View style={styles.grid2}>
+                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                          <Text style={styles.label}>SKU</Text>
+                          <TextInput
+                            placeholder="SKU"
+                            value={formSku}
+                            onChangeText={setFormSku}
+                            style={styles.input}
+                          />
+                        </View>
+                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                          <Text style={styles.label}>Cód. Barras</Text>
+                          <TextInput
+                            placeholder="EAN"
+                            value={formBarcode}
+                            onChangeText={setFormBarcode}
+                            keyboardType="numeric"
+                            style={styles.input}
+                          />
+                        </View>
+                      </View>
+
+                      <View style={styles.grid2}>
+                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                          <Text style={styles.label}>Aviso Mínimo</Text>
+                          <TextInput
+                            placeholder="5"
+                            value={formMinStock}
+                            onChangeText={setFormMinStock}
+                            keyboardType="numeric"
+                            style={styles.input}
+                          />
+                        </View>
+                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                          <Text style={styles.label}>Validade (AAAA-MM-DD)</Text>
+                          <TextInput
+                            placeholder="AAAA-MM-DD"
+                            value={formExpDate}
+                            onChangeText={setFormExpDate}
+                            style={styles.input}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  )}
 
                   <View style={styles.modalActionsRow}>
                     <TouchableOpacity style={styles.cancelModalBtn} onPress={() => setActionType('options')}>
@@ -1388,5 +1416,33 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: '#FDA4AF',
+  },
+  advancedToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 6,
+    marginBottom: 14,
+  },
+  advancedToggleText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#E11D48',
+    textTransform: 'uppercase',
+  },
+  advancedContainer: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
+    gap: 4,
   },
 })

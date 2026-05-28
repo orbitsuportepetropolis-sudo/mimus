@@ -27,9 +27,9 @@ export default function FinanceScreen({ navigation }: any) {
 
   // Computed Totals
   const [totals, setTotals] = useState({
-    revenue: 0,
-    expense: 0,
-    balance: 0
+    todayInflow: 0,
+    weekSales: 0,
+    expenses: 0
   })
 
   useEffect(() => {
@@ -82,19 +82,43 @@ export default function FinanceScreen({ navigation }: any) {
   }
 
   function calculateStats(data: Transaction[]) {
-    let rev = 0
-    let exp = 0
+    const d = new Date()
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    const todayStr = `${year}-${month}-${day}`
+
+    const startOfWeek = new Date()
+    const dayOfWeek = startOfWeek.getDay()
+    const diffToMonday = startOfWeek.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)
+    startOfWeek.setDate(diffToMonday)
+    const wYear = startOfWeek.getFullYear()
+    const wMonth = String(startOfWeek.getMonth() + 1).padStart(2, '0')
+    const wDay = String(startOfWeek.getDate()).padStart(2, '0')
+    const startOfWeekStr = `${wYear}-${wMonth}-${wDay}`
+
+    let todayInflow = 0
+    let weekSales = 0
+    let expenses = 0
+
     data.forEach((t) => {
+      const val = Number(t.value)
       if (t.type === 'revenue') {
-        rev += Number(t.value)
+        if (t.date === todayStr) {
+          todayInflow += val
+        }
+        if (t.date >= startOfWeekStr) {
+          weekSales += val
+        }
       } else {
-        exp += Number(t.value)
+        expenses += val
       }
     })
+
     setTotals({
-      revenue: rev,
-      expense: exp,
-      balance: rev - exp
+      todayInflow,
+      weekSales,
+      expenses
     })
   }
 
@@ -238,23 +262,23 @@ export default function FinanceScreen({ navigation }: any) {
       <View style={styles.kpiRow}>
         <View style={styles.kpiCard}>
           <TrendingUp size={16} color="#10B981" />
-          <Text style={styles.kpiLabel}>Entradas</Text>
+          <Text style={styles.kpiLabel}>Entrou hoje</Text>
           <Text style={[styles.kpiValue, { color: '#10B981' }]}>
-            R$ {totals.revenue.toFixed(2)}
+            R$ {totals.todayInflow.toFixed(2)}
+          </Text>
+        </View>
+        <View style={styles.kpiCard}>
+          <DollarSign size={16} color="#6366F1" />
+          <Text style={styles.kpiLabel}>Vendas da semana</Text>
+          <Text style={[styles.kpiValue, { color: '#6366F1' }]}>
+            R$ {totals.weekSales.toFixed(2)}
           </Text>
         </View>
         <View style={styles.kpiCard}>
           <TrendingDown size={16} color="#EF4444" />
-          <Text style={styles.kpiLabel}>Saídas</Text>
+          <Text style={styles.kpiLabel}>Saídas/Pagamentos</Text>
           <Text style={[styles.kpiValue, { color: '#EF4444' }]}>
-            R$ {totals.expense.toFixed(2)}
-          </Text>
-        </View>
-        <View style={styles.kpiCard}>
-          <DollarSign size={16} color={totals.balance >= 0 ? '#0F172A' : '#EF4444'} />
-          <Text style={styles.kpiLabel}>Saldo</Text>
-          <Text style={[styles.kpiValue, { color: totals.balance >= 0 ? '#0F172A' : '#EF4444' }]}>
-            R$ {totals.balance.toFixed(2)}
+            R$ {totals.expenses.toFixed(2)}
           </Text>
         </View>
       </View>
