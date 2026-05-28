@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native'
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Linking } from 'react-native'
 import { supabase } from '../services/supabase'
 
 export default function RegisterScreen({ navigation }: any) {
@@ -38,6 +38,26 @@ export default function RegisterScreen({ navigation }: any) {
       )
     } catch (err: any) {
       Alert.alert('Erro ao cadastrar', err.message || 'Houve uma falha ao realizar o cadastro.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleGoogleRegister() {
+    setLoading(true)
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: 'mimus://auth-callback',
+        }
+      })
+      if (error) throw error
+      if (data?.url) {
+        Linking.openURL(data.url)
+      }
+    } catch (err: any) {
+      Alert.alert('Erro', err.message || 'Não foi possível iniciar o cadastro com o Google.')
     } finally {
       setLoading(false)
     }
@@ -97,6 +117,16 @@ export default function RegisterScreen({ navigation }: any) {
 
         <TouchableOpacity style={styles.btn} disabled={loading} onPress={handleRegister}>
           {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.btnText}>CRIAR CONTA GRÁTIS</Text>}
+        </TouchableOpacity>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>ou continue com</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <TouchableOpacity style={styles.googleBtn} disabled={loading} onPress={handleGoogleRegister}>
+          <Text style={styles.googleBtnText}>Cadastrar com o Google</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.switchLink}>
@@ -191,5 +221,39 @@ const styles = StyleSheet.create({
   switchHighlight: {
     color: '#E11D48',
     fontWeight: '700',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 18,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  dividerText: {
+    fontSize: 10,
+    color: '#94A3B8',
+    paddingHorizontal: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  googleBtnText: {
+    color: '#334155',
+    fontWeight: '700',
+    fontSize: 12,
   },
 })

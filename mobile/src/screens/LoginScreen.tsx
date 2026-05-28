@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native'
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert, Linking } from 'react-native'
 import { supabase } from '../services/supabase'
 
 export default function LoginScreen({ navigation }: any) {
@@ -23,6 +23,26 @@ export default function LoginScreen({ navigation }: any) {
       if (error) throw error
     } catch (err: any) {
       Alert.alert('Erro de Acesso', err.message || 'E-mail ou senha incorretos.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleGoogleLogin() {
+    setLoading(true)
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: 'mimus://auth-callback',
+        }
+      })
+      if (error) throw error
+      if (data?.url) {
+        Linking.openURL(data.url)
+      }
+    } catch (err: any) {
+      Alert.alert('Erro', err.message || 'Não foi possível iniciar o login com o Google.')
     } finally {
       setLoading(false)
     }
@@ -62,6 +82,16 @@ export default function LoginScreen({ navigation }: any) {
 
         <TouchableOpacity style={styles.btn} disabled={loading} onPress={handleLogin}>
           {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.btnText}>ENTRAR NO PAINEL</Text>}
+        </TouchableOpacity>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>ou continue com</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <TouchableOpacity style={styles.googleBtn} disabled={loading} onPress={handleGoogleLogin}>
+          <Text style={styles.googleBtnText}>Entrar com o Google</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.switchLink}>
@@ -155,5 +185,39 @@ const styles = StyleSheet.create({
   switchHighlight: {
     color: '#E11D48',
     fontWeight: '700',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 18,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  dividerText: {
+    fontSize: 10,
+    color: '#94A3B8',
+    paddingHorizontal: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  googleBtnText: {
+    color: '#334155',
+    fontWeight: '700',
+    fontSize: 12,
   },
 })

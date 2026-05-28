@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { Linking } from 'react-native'
 import { NavigationContainer } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
@@ -87,8 +88,43 @@ export default function App() {
       setSession(session)
     })
 
+    // Handle deep links (OAuth callback)
+    const handleDeepLink = async (event: { url: string }) => {
+      const url = event.url
+      if (url && (url.includes('access_token') || url.includes('refresh_token'))) {
+        const parts = url.split(/[#?]/)
+        const query = parts[1] || ''
+        const pairs = query.split('&')
+        const params: any = {}
+        for (let i = 0; i < pairs.length; i++) {
+          const pair = pairs[i].split('=')
+          params[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1] || '')
+        }
+        
+        if (params.access_token && params.refresh_token) {
+          const { error } = await supabase.auth.setSession({
+            access_token: params.access_token,
+            refresh_token: params.refresh_token,
+          })
+          if (error) {
+            console.error('Erro ao definir sessão via link:', error)
+          }
+        }
+      }
+    }
+
+    const subscriptionLink = Linking.addEventListener('url', handleDeepLink)
+
+    // Check if the app was opened via a deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink({ url })
+      }
+    })
+
     return () => {
       subscription.unsubscribe()
+      subscriptionLink.remove()
     }
   }, [])
 
