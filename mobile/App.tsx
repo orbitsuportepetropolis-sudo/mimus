@@ -16,6 +16,7 @@ import FinanceScreen from './src/screens/FinanceScreen'
 import FollowUpScreen from './src/screens/FollowUpScreen'
 import LoginScreen from './src/screens/LoginScreen'
 import RegisterScreen from './src/screens/RegisterScreen'
+import SettingsScreen from './src/screens/SettingsScreen'
 
 const Tab = createBottomTabNavigator()
 const Stack = createNativeStackNavigator()
@@ -144,6 +145,18 @@ export default function App() {
             options={{ 
               headerShown: true, 
               title: 'Meus Produtos', 
+              headerTintColor: '#E11D48',
+              headerStyle: { backgroundColor: '#FFFFFF' },
+              headerShadowVisible: false,
+              headerTitleStyle: { fontWeight: '800', fontSize: 16 }
+            }} 
+          />
+          <Stack.Screen 
+            name="Configuracoes" 
+            component={SettingsScreen} 
+            options={{ 
+              headerShown: true, 
+              title: 'Configurações da Loja', 
               headerTintColor: '#E11D48',
               headerStyle: { backgroundColor: '#FFFFFF' },
               headerShadowVisible: false,

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, Share, Alert, Clipboard } from 'react-native'
 import { supabase } from '../services/supabase'
-import { LayoutDashboard, ShoppingBag, Users, MessageSquare, Award, Share2, Copy, Play } from 'lucide-react-native'
+import { LayoutDashboard, ShoppingBag, Users, MessageSquare, Award, Share2, Copy, Play, Settings } from 'lucide-react-native'
 
 export default function DashboardScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true)
@@ -146,8 +146,13 @@ export default function DashboardScreen({ navigation }: any) {
           <Text style={styles.greeting}>Olá, Empreendedora! 🌸</Text>
           <Text style={styles.storeName}>{storeName}</Text>
         </View>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>ASSISTENTE</Text>
+        <View style={styles.headerRight}>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>ASSISTENTE</Text>
+          </View>
+          <TouchableOpacity style={styles.settingsBtn} onPress={() => navigation.navigate('Configuracoes')}>
+            <Settings size={20} color="#E11D48" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -326,6 +331,18 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '800',
     color: '#E11D48',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  settingsBtn: {
+    padding: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FFE4E6',
   },
   priorityBox: {
     backgroundColor: '#FFFFFF',
