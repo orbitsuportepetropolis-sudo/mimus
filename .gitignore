@@ -63,3 +63,7 @@ GoogleService-Info.plist
 *.sw?
 .DS_Store
 Thumbs.db
+
+# Paperclip
+.paperclip/
+infra/.paperclip/
