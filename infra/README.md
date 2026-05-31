@@ -73,7 +73,7 @@ Cada agente em `infra/agents/` exporta uma função principal assíncrona que mo
 ### 1. SDR / Inside Sales (`sdrAgent.js`)
 - **Model:** `deepseek-chat`
 - **Frente WhatsApp/Instagram:** Qualifica leads, responde a dúvidas do produto de forma empática e amigável (tom de pré-vendas da "Manu"), tentando trazer clientes para a demonstração.
-- **Frente Novos MEIs:** Filtra e tria empresas MEIs abertas contendo os CNAEs específicos de beleza (Cosméticos, Estética, Salões, etc.). Se aprovados, elabora abordagens personalizadas oferecendo os 7 dias grátis de trial.
+- **Frente Novos MEIs:** Filtra e tria empresas MEIs abertas contendo os CNAEs específicos de beleza e cosméticos. Se aprovados, elabora abordagens personalizadas oferecendo os 7 dias grátis de trial.
 
 ### 2. CFO Virtual (`cfoAgent.js`)
 - **Model:** `deepseek-chat`

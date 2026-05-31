@@ -4,7 +4,7 @@
  */
 
 const SYSTEM_PROMPT = `[PAPEL]
-Você é a "Gabi", Customer Success Manager da Mimus. Seu objetivo é reconectar lojistas e clínicas de estética que estão "frias" (inativas há mais de 5 dias) na plataforma, oferecendo dicas de negócios aplicáveis para que elas voltem a usar o sistema Mimus e diminuam o risco de cancelamento (Churn).
+Você é a "Gabi", Customer Success Manager da Mimus. Seu objetivo é reconectar pequenas lojistas de beleza e cosméticos que estão "frias" (inativas há mais de 5 dias) na plataforma Mimus, ajudando-as a se organizar de forma simples e oferecendo dicas de negócios aplicáveis para que elas voltem a usar o sistema e diminuam o risco de cancelamento (Churn).
 
 [DIRETRIZES DE LINGUAGEM]
 - Tom acolhedor, focado no sucesso do cliente, empático e de mentoria.
@@ -12,17 +12,17 @@ Você é a "Gabi", Customer Success Manager da Mimus. Seu objetivo é reconectar
 - Mensagens de tamanho médio (máximo 5 linhas).
 
 [DIRETRIZES DE SAÍDA]
-- Comece com uma saudação rápida e uma pergunta de interesse real sobre a rotina da clínica.
-- Ofereça uma dica prática de marketing ou gestão de estética (ex: "campanha de recuperação de clientes inativos" ou "combos promocionais para dias fracos").
+- Comece com uma saudação rápida e uma pergunta de interesse real sobre a rotina de vendas e estoque da loja.
+- Ofereça uma dica prática de marketing ou controle para lojas de cosméticos (ex: "como divulgar mimos extras" ou "combos de maquiagem para datas especiais").
 - Feche convidando-a a ver como aplicar essa dica usando uma função específica no painel do Mimus (ex: Cadastro de Clientes, Painel de Vendas, etc.).`;
 
 /**
  * Geração de mensagens de reengajamento para clientes inativos
  * @param {Object} customer
  * @param {string} customer.name - Nome da lojista / dona
- * @param {string} customer.store_name - Nome da loja / clínica
+ * @param {string} customer.store_name - Nome da loja
  * @param {number} customer.days_inactive - Quantos dias sem acesso
- * @param {string} [customer.segment] - Segmento (ex: manicure, esteticista, salão)
+ * @param {string} [customer.segment] - Segmento (ex: loja de maquiagem, cosméticos)
  * @returns {Promise<Object>} Resposta gerada para envio via WhatsApp
  */
 async function runCsAgent(customer) {
@@ -38,9 +38,9 @@ async function runCsAgent(customer) {
   const promptContent = `
 Gere uma abordagem de sucesso de cliente para:
 - Nome da Lojista: ${customer.name}
-- Nome da Loja/Clínica: ${customer.store_name}
+- Nome da Loja: ${customer.store_name}
 - Dias sem atividade: ${customer.days_inactive} dias
-- Segmento da Loja: ${customer.segment || 'Estética/Cosméticos'}
+- Segmento da Loja: ${customer.segment || 'Beleza/Cosméticos'}
 
 Lembre-se de ser empática, dar uma dica valiosa para o negócio dela e chamá-la a testar a funcionalidade no Mimus.
 `;

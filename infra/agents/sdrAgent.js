@@ -6,7 +6,7 @@
 // Lista de CNAEs permitidos do mercado de beleza para prospecção ativa
 const BEAUTY_CNAES = [
   '4772-5/00', // Comércio varejista de cosméticos, produtos de perfumaria e higiene pessoal
-  '9602-5/02', // Atividades de estética e outros serviços de cuidados com a beleza
+  '9602-5/02', // Atividades e outros serviços de cuidados com a beleza (cosméticos e maquiagem)
   '4789-0/01', // Comércio varejista de suvenires, bijuterias e artesanatos (pincéis, cílios, etc.)
   '4772-5/02', // Comércio varejista de artigos de armarinho (acessórios de cabelo, skin prep)
   '4791-8/00', // Comércio varejista por internet (e-commerces de maquiagem)
@@ -15,13 +15,13 @@ const BEAUTY_CNAES = [
 
 const SYSTEM_PROMPTS = {
   whatsapp: `[PAPEL]
-Você é a "Manu", SDR / Pré-vendedora da Mimus (plataforma SaaS de gestão e marketing para clínicas de estética e salões de beleza). Seu objetivo é engajar leads via WhatsApp, qualificar o interesse delas e levá-las a agendar uma demonstração gratuita do Mimus.
+Você é a "Manu", SDR / Pré-vendedora da Mimus (plataforma SaaS de gestão e estoque para lojas de beleza e cosméticos, focada em pequenas empreendedoras). Seu objetivo é ajudar essas empreendedoras a organizar e otimizar suas vendas e estoque de forma simples, engajando leads via WhatsApp, qualificando o interesse delas e levando-las a agendar uma demonstração gratuita do Mimus.
 
 [DIRETRIZES DE LINGUAGEM]
 - Tom humano, caloroso, empático e extremamente natural. Evite formalidades excessivas.
-- Use gírias leves do mundo da beleza e estética (ex: "glow up", "maravilhosa", "miga", "estética de milhões", "skin care", "mimos").
+- Use gírias leves do mundo da beleza e cosméticos (ex: "glow up", "maravilhosa", "miga", "makes de milhões", "skin prep", "mimos").
 - Escreva mensagens curtas (máximo de 3 linhas por mensagem). Use emojis de forma moderada.
-- Adapte-se à linguagem de lojistas, esteticistas, manicures e donas de clínicas de estética.
+- Adapte-se à linguagem de lojistas de maquiagem, revendedoras e donas de pequenas lojas de cosméticos.
 
 [DIRETRIZES DE SAÍDA]
 - Responda apenas à última mensagem do cliente.
@@ -80,13 +80,13 @@ async function runSdrAgent({ text, channel = 'whatsapp', history = [], meiDetail
     if (!isValidBeautyCnae(cnae)) {
       return {
         success: false,
-        reason: `CNAE ${cnae} não pertence ao nicho de beleza/estética cadastrado. Prospecção descartada.`,
+        reason: `CNAE ${cnae} não pertence ao nicho de beleza/cosméticos cadastrado. Prospecção descartada.`,
         shouldSend: false
       };
     }
 
     const promptMei = `
-Você é a "Manu", SDR da Mimus. Acabamos de detectar um novo MEI cadastrado na área da beleza e estética.
+Você é a "Manu", SDR da Mimus. Acabamos de detectar um novo MEI cadastrado na área de beleza e cosméticos.
 Dados da nova empresa:
 - Razão Social: ${razao_social}
 - Proprietária: ${nome_empreendedora || 'Empreendedora'}
@@ -94,7 +94,7 @@ Dados da nova empresa:
 
 Crie uma mensagem inicial de boas-vindas calorosa e curta para o WhatsApp da empreendedora.
 Diretrizes:
-- Dê os parabéns pela conquista de abrir a própria empresa de beleza!
+- Dê os parabéns pela conquista de abrir a própria loja de beleza/cosméticos!
 - Ofereça 7 dias totalmente grátis na plataforma Mimus para ajudá-la a organizar o novo estoque e vendas nesse início de jornada.
 - Seja humana, use gírias leves (glow up, maravilhosa) e termine com uma pergunta curta e engajadora sobre como ela planeja gerenciar a loja.
 - Limite máximo: 4 linhas.

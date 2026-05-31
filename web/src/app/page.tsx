@@ -457,7 +457,7 @@ export default function LandingPage() {
           <div className="text-center space-y-4 max-w-2xl mx-auto mb-16 md:mb-24">
             <h2 className="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest">Tudo em um só lugar</h2>
             <p className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">A estrutura que sua loja precisa para lucrar mais</p>
-            <p className="text-slate-500 dark:text-zinc-400 text-sm md:text-base">Módulos perfeitamente integrados e adaptados para o setor de beleza, cosméticos e estética.</p>
+            <p className="text-slate-500 dark:text-zinc-400 text-sm md:text-base">Módulos perfeitamente integrados e adaptados para o setor de beleza e cosméticos.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
