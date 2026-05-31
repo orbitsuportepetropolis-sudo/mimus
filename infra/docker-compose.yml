@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: mimus_n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_METRICS=true
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=change_this_secure_password
+      - N8N_ENCRYPTION_KEY=generate_a_random_encryption_key_here
+      - N8N_WEBHOOK_JWT_SECRET=generate_a_random_jwt_secret_here
+      - WEBHOOK_URL=http://your-vps-ip:5678/
+      - TZ=America/Sao_Paulo
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - mimus_network
+
+  evolution-api:
+    image: evoapicloud/evolution-api:latest
+    container_name: mimus_evolution_api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_URL=http://your-vps-ip:8080
+      - SERVER_PORT=8080
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=generate_a_secure_api_key_here
+      - TZ=America/Sao_Paulo
+      # Persistent local session storage configuration
+      - DATABASE_ENABLED=false
+      - DELAY_SEND_MESSAGES=true
+      - MIN_DELAY=1000
+      - MAX_DELAY=3000
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks:
+      - mimus_network
+
+volumes:
+  n8n_data:
+    driver: local
+  evolution_instances:
+    driver: local
+
+networks:
+  mimus_network:
+    driver: bridge
