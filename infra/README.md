@@ -1,92 +1,92 @@
-# Mimus Infrastructure Operations & System Prompts Manual
+# Manual de Operações de Infraestrutura e Prompts de Sistema Mimus
 
-This directory contains the production-ready infrastructure setup for hosting the **Mimus Monorepo background engine** (n8n and Evolution API) on virtual private servers (VPS) like Hostinger, DigitalOcean, or AWS, along with the system prompts for the **PaperClip AI Agent Ecosystem**.
+Este diretório contém a configuração de infraestrutura pronta para produção para hospedar o **motor de background do Monorepo Mimus** (n8n e Evolution API) em servidores virtuais privados (VPS) como Hostinger, DigitalOcean ou AWS, junto com os prompts de sistema para o **Ecossistema de Agentes de IA PaperClip**.
 
 ---
 
-## 1. Directory Structure
+## 1. Estrutura de Diretórios
 
 ```
 mimus/
 ├── infra/
-│   ├── docker-compose.yml        # Multi-container orchestration (n8n + Evolution API)
-│   ├── README.md                 # Technical documentation and System Prompts (This file)
+│   ├── docker-compose.yml        # Orquestração multi-container (n8n + Evolution API)
+│   ├── README.md                 # Documentação técnica e Prompts de Sistema (Este arquivo)
 │   └── workflows/
-│       └── .gitkeep              # Directory for backup of exported n8n JSON workflows
-├── mobile/                       # React Native / Expo Mobile App
+│       └── .gitkeep              # Diretório para backup dos fluxos JSON exportados do n8n
+├── mobile/                       # Aplicativo móvel React Native / Expo
 │   └── ...
-├── web/                          # Next.js Web App / Dashboard
+├── web/                          # Aplicativo Web / Painel Next.js
 │   └── ...
 └── ...
 ```
 
 ---
 
-## 2. Production VPS Setup Guide (Linux/Ubuntu)
+## 2. Guia de Configuração VPS em Produção (Linux/Ubuntu)
 
-Execute the following commands in order on your clean Linux VPS server to install dependencies and run the containers:
+Execute os seguintes comandos em ordem em seu servidor VPS Linux limpo para instalar as dependências e iniciar os containers:
 
-### Step 2.1: Update System Packages
+### Passo 2.1: Atualizar Pacotes do Sistema
 ```bash
 sudo apt update && sudo apt upgrade -y
 ```
 
-### Step 2.2: Install Docker and Docker Compose v2
+### Passo 2.2: Instalar o Docker e Docker Compose v2
 ```bash
 sudo apt install docker.io docker-compose-v2 -y
 sudo systemctl enable --now docker
 ```
 
-### Step 2.3: Start Infrastructure
-Navigate to the `infra/` folder and run Docker Compose in detached mode:
+### Passo 2.3: Iniciar a Infraestrutura
+Navegue até a pasta `infra/` e execute o Docker Compose em modo de segundo plano (detached):
 ```bash
 cd mimus/infra
 docker compose up -d
 ```
 
-### Step 2.4: Monitor and Manage Services
-- Check container status:
+### Passo 2.4: Monitorar e Gerenciar Serviços
+- Verificar o status dos containers:
   ```bash
   docker compose ps
   ```
-- View real-time logs:
+- Visualizar logs em tempo real:
   ```bash
   docker compose logs -f
   ```
-- Stopping services:
+- Parar os serviços:
   ```bash
   docker compose down
   ```
 
 ---
 
-## 3. Configuring DeepSeek in n8n
+## 3. Configurando o DeepSeek no n8n
 
-DeepSeek models can be integrated into n8n by simulating the standard OpenAI node structure:
+Os modelos do DeepSeek podem ser integrados no n8n simulando a estrutura do nó padrão da OpenAI:
 
-1. Open the n8n interface at `http://your-vps-ip:5678`.
-2. Go to **Credentials** -> **Add Credential** -> Search for **OpenAI API**.
-3. Configure the credential fields as follows:
+1. Abra a interface do n8n em `http://ip-do-seu-vps:5678`.
+2. Vá em **Credentials** (Credenciais) -> **Add Credential** (Adicionar Credencial) -> Pesquise por **OpenAI API**.
+3. Configure os campos de credenciais da seguinte forma:
    - **Resource**: `OpenAI API`
    - **Authentication Method**: `API Key`
-   - **API Key**: `<YOUR_DEEPSEEK_API_KEY>`
-4. Within your n8n workflow, add an **Advanced AI** node or **OpenAI Chat Model** node.
-5. In the Model settings, click on **OpenAI API** credentials and check **Override API URL**. Set the **Custom API URL** to:
+   - **API Key**: `<SUA_CHAVE_API_DEEPSEEK>`
+4. Dentro do seu fluxo do n8n, adicione um nó **Advanced AI** (IA Avançada) ou o nó **OpenAI Chat Model** (Modelo de Chat OpenAI).
+5. Nas configurações do modelo, clique nas credenciais da **OpenAI API** e marque a opção **Override API URL** (Sobrescrever URL da API). Defina a **Custom API URL** para:
    `https://api.deepseek.com/v1`
-6. Under **Model**, select or manually write the model identifier:
-   - `deepseek-chat` (for V3 text/SDR/CFO)
-   - `deepseek-reasoner` (for R1 deep analysis/DevOps)
+6. Em **Model** (Modelo), selecione ou digite manualmente o identificador do modelo:
+   - `deepseek-chat` (para texto padrão V3 / SDR / CFO)
+   - `deepseek-reasoner` (para análises profundas R1 / DevOps)
 
 ---
 
-## 4. PaperClip AI Agent System Prompts
+## 4. Prompts de Sistema dos Agentes PaperClip
 
-All system prompts are designed with strict XML/Markdown delimiters, optimized for high performance and low token consumption on DeepSeek models.
+Todos os prompts de sistema foram desenvolvidos com delimitadores estritos em formato XML/Markdown, otimizados para alto desempenho e baixo consumo de tokens nos modelos do DeepSeek.
 
 ---
 
-### Agent 1: SDR / Inside Sales (WhatsApp)
-Optimized for: `deepseek-chat`
+### Agente 1: SDR / Inside Sales (WhatsApp)
+Otimizado para: `deepseek-chat`
 
 ```markdown
 [PAPEL]
@@ -106,8 +106,8 @@ Você é a "Manu", SDR / Pré-vendedora da Mimus (plataforma SaaS de gestão e m
 
 ---
 
-### Agent 2: CFO / Financeiro (SaaS Analyst)
-Optimized for: `deepseek-chat` / `deepseek-reasoner`
+### Agente 2: CFO / Financeiro (Análise de SaaS)
+Otimizado para: `deepseek-chat` / `deepseek-reasoner`
 
 ```markdown
 [PAPEL]
@@ -125,8 +125,8 @@ Você é o CFO Virtual do Mimus. Sua função é analisar friamente os dados fin
 
 ---
 
-### Agent 3: Customer Success (Merchant Retention)
-Optimized for: `deepseek-chat`
+### Agente 3: Customer Success (Retenção de Clientes)
+Otimizado para: `deepseek-chat`
 
 ```markdown
 [PAPEL]
@@ -145,8 +145,8 @@ Você é a "Gabi", Customer Success Manager da Mimus. Seu objetivo é reconectar
 
 ---
 
-### Agent 4: Suporte Nível 1 (FAQ Operational)
-Optimized for: `deepseek-chat`
+### Agente 4: Suporte Nível 1 (FAQ Operacional)
+Otimizado para: `deepseek-chat`
 
 ```markdown
 [PAPEL]
@@ -163,8 +163,8 @@ Você é o Assistente Virtual do Suporte Nível 1 da Mimus. Seu papel é sanar d
 
 ---
 
-### Agent 5: Core Developer / DevOps (R1 Logs Analyzer)
-Optimized for: `deepseek-reasoner`
+### Agente 5: Core Developer / DevOps (Análise de Logs R1)
+Otimizado para: `deepseek-reasoner`
 
 ```markdown
 [PAPEL]
@@ -182,8 +182,8 @@ Você é o DevOps / Core Developer AI da Mimus. Você recebe logs de erro de ser
 
 ---
 
-### Agent 6: Captador de Lead (CNAE Scraper & Qualifier)
-Optimized for: `deepseek-chat`
+### Agente 6: Captador de Lead (Scraper de CNAE & Qualificação)
+Otimizado para: `deepseek-chat`
 
 ```markdown
 [PAPEL]
