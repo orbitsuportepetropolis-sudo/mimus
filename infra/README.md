@@ -66,20 +66,13 @@ docker compose up -d
 
 ## 3. Configurando o DeepSeek no n8n
 
-Os modelos do DeepSeek podem ser integrados no n8n simulando a estrutura do nó padrão da OpenAI:
+O n8n moderno possui suporte nativo direto ao DeepSeek:
 
-1. Abra a interface do n8n em `http://ip-do-seu-vps:5678`.
-2. Vá em **Credentials** (Credenciais) -> **Add Credential** (Adicionar Credencial) -> Pesquise por **OpenAI API**.
-3. Configure os campos de credenciais da seguinte forma:
-   - **Resource**: `OpenAI API`
-   - **Authentication Method**: `API Key`
-   - **API Key**: `<SUA_CHAVE_API_DEEPSEEK>`
-4. Dentro do seu fluxo do n8n, adicione um nó **Advanced AI** (IA Avançada) ou o nó **OpenAI Chat Model** (Modelo de Chat OpenAI).
-5. Nas configurações do modelo, clique nas credenciais da **OpenAI API** e marque a opção **Override API URL** (Sobrescrever URL da API). Defina a **Custom API URL** para:
-   `https://api.deepseek.com/v1`
-6. Em **Model** (Modelo), selecione ou digite manualmente o identificador do modelo:
-   - `deepseek-chat` (para texto padrão V3 / SDR / CFO)
-   - `deepseek-reasoner` (para análises profundas R1 / DevOps)
+1. Abra a interface do n8n em `http://localhost:5678` (ou o IP do seu VPS).
+2. Vá em **Credentials** (Credenciais) -> **Add Credential** (Adicionar Credencial) -> Pesquise por **DeepSeek**.
+3. Selecione a opção **DeepSeek** e insira sua API Key.
+4. Salve a credencial exatamente com o nome: `DeepSeek account`.
+5. Com isso, os nós de IA dos workflows importados identificarão e se vincularão a essa credencial automaticamente!
 
 ---
 
@@ -228,7 +221,7 @@ Para cada um dos 5 workflows criados em `infra/workflows/`, siga os passos abaix
 5. Clique em **Save** (Salvar).
 
 ### Passo 5.3: Vincular as Credenciais de APIs
-- **DeepSeek (OpenAI API Override)**: No nó `OpenAI Chat Model` ou `DeepSeek CFO Agent`, vincule a credencial criada no **Passo 3** deste manual (OpenAI API com override para a URL do DeepSeek).
+- **DeepSeek**: No nó `DeepSeek Chat Model` ou `DeepSeek CFO Agent`, certifique-se de que a credencial `DeepSeek account` criada no **Passo 3** está selecionada (o n8n faz o vínculo automático na importação se o nome bater).
 - **Evolution API (WhatsApp)**: No nó `HTTP Request (Evolution API WhatsApp)`, ajuste a URL se necessário (em rede interna Docker, `http://mimus_evolution_api:8080` resolve perfeitamente) e insira a API Key gerada na Evolution API no cabeçalho `apikey`.
 - **Supabase**: Nos nós integrados com o Supabase, adicione e configure a credencial com a URL e a Service Role Key da sua instância do Supabase.
 - **Discord Webhook**: Nos workflows de CS, CFO e DEV, configure a URL real do canal do seu servidor Discord no nó `HTTP Request`.

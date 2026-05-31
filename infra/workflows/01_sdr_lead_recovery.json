@@ -57,17 +57,17 @@
         }
       },
       "id": "b01a35e8-b80c-4467-bc1a-514e8c1b3f9c",
-      "name": "OpenAI Chat Model",
-      "type": "n8n-nodes-base.lmChatOpenAi",
+      "name": "DeepSeek Chat Model",
+      "type": "n8n-nodes-base.lmChatDeepSeek",
       "typeVersion": 1,
       "position": [
         600,
         100
       ],
       "credentials": {
-        "openAiApi": {
+        "deepseekApi": {
           "id": "placeholder_deepseek_credential",
-          "name": "DeepSeek API Connection"
+          "name": "DeepSeek account"
         }
       }
     },
@@ -154,7 +154,7 @@
         ]
       ]
     },
-    "OpenAI Chat Model": {
+    "DeepSeek Chat Model": {
       "ai_languageModel": [
         [
           {

@@ -48,16 +48,16 @@
       },
       "id": "a31a35e8-b80c-4467-bc1a-514e8c1b3f9k",
       "name": "DeepSeek CFO Agent",
-      "type": "n8n-nodes-base.openAi",
+      "type": "n8n-nodes-base.deepseek",
       "typeVersion": 1,
       "position": [
         580,
         300
       ],
       "credentials": {
-        "openAiApi": {
+        "deepseekApi": {
           "id": "placeholder_deepseek_credential",
-          "name": "DeepSeek API Connection"
+          "name": "DeepSeek account"
         }
       }
     },

@@ -26,16 +26,16 @@
       },
       "id": "a41a35e8-b80c-4467-bc1a-514e8c1b3f9l",
       "name": "DeepSeek Reasoner (R1)",
-      "type": "n8n-nodes-base.openAi",
+      "type": "n8n-nodes-base.deepseek",
       "typeVersion": 1,
       "position": [
         450,
         300
       ],
       "credentials": {
-        "openAiApi": {
+        "deepseekApi": {
           "id": "placeholder_deepseek_credential",
-          "name": "DeepSeek API Connection"
+          "name": "DeepSeek account"
         }
       }
     },
