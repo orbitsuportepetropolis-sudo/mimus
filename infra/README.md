@@ -1,6 +1,8 @@
-# Manual de Operações de Infraestrutura e Prompts de Sistema Mimus
+# Manual do Ecossistema de Agentes de IA PaperClip (Nativo)
 
-Este diretório contém a configuração de infraestrutura pronta para produção para hospedar o **motor de background do Monorepo Mimus** (n8n e Evolution API) em servidores virtuais privados (VPS) como Hostinger, DigitalOcean ou AWS, junto com os prompts de sistema para o **Ecossistema de Agentes de IA PaperClip**.
+Este diretório contém a infraestrutura e a lógica de orquestração local e de produção para o **PaperClip**, um ecossistema de 5 agentes de IA operacionais integrados de forma nativa ao Monorepo **Mimus**.
+
+O fluxo e a orquestração dos agentes são executados diretamente no backend da aplicação em JavaScript/TypeScript, consumindo de forma otimizada a API do DeepSeek (V3 e R1) e comunicando-se com a **Evolution API** para interações via WhatsApp.
 
 ---
 
@@ -9,220 +11,89 @@ Este diretório contém a configuração de infraestrutura pronta para produçã
 ```
 mimus/
 ├── infra/
-│   ├── docker-compose.yml        # Orquestração de containers (n8n + Evolution API + Postgres)
-│   ├── README.md                 # Manual técnico e Prompts de Sistema (Este arquivo)
-│   └── workflows/
-│       ├── 01_sdr_lead_recovery.json       # SDR - Lead Recovery (WhatsApp)
-│       ├── 02_cs_inactivity_alerts.json     # CS - Inactivity Alerts (Cron)
-│       ├── 03_support_faq_level1.json       # Suporte - FAQ Level 1 (WhatsApp)
-│       ├── 04_cfo_financial_report.json     # CFO - Weekly Financial Report (Cron)
-│       └── 05_dev_error_monitoring.json     # DEV - Error Monitoring (Reasoning)
+│   ├── docker-compose.yml        # Gateway de WhatsApp (Evolution API) enxuto
+│   ├── README.md                 # Este manual técnico
+│   └── agents/
+│       ├── sdrAgent.js           # Agente 1: SDR (Manu) - Vendas, Instagram e Leads MEI
+│       ├── cfoAgent.js           # Agente 2: CFO - Diagnósticos financeiros tabulares
+│       ├── csAgent.js            # Agente 3: CS (Gabi) - Mentoria e reativação de inativas
+│       ├── supportAgent.js       # Agente 4: Suporte N1 - FAQ e escalonamento para Adriano
+│       ├── devAgent.js           # Agente 5: DevOps - Triagem profunda de bugs (DeepSeek R1)
+│       └── example_integration.js# "Sistema Nervoso" - Exemplos reais de gatilhos no backend
 ├── mobile/                       # Aplicativo móvel React Native / Expo
-│   └── ...
-├── web/                          # Aplicativo Web / Painel Next.js
-│   └── ...
-└── ...
+└── web/                          # Aplicativo Web / Painel Next.js
 ```
 
 ---
 
-## 2. Guia de Configuração VPS em Produção (Linux/Ubuntu)
+## 2. Inicialização da Infraestrutura Local e VPS (Linux/Ubuntu)
 
-Execute os seguintes comandos em ordem em seu servidor VPS Linux limpo para instalar as dependências e iniciar os containers:
+A infraestrutura conta apenas com a **Evolution API** rodando no Docker com volumes persistentes. O banco de dados para sessões e QR Codes é embutido (SQLite local no volume), tornando a stack leve e robusta.
 
-### Passo 2.1: Atualizar Pacotes do Sistema
+### Passo 2.1: Instalar o Docker (Caso não possua)
+No Ubuntu:
 ```bash
-sudo apt update && sudo apt upgrade -y
-```
-
-### Passo 2.2: Instalar o Docker e Docker Compose v2
-```bash
-sudo apt install docker.io docker-compose-v2 -y
+sudo apt update && sudo apt install docker.io docker-compose-v2 -y
 sudo systemctl enable --now docker
 ```
 
-### Passo 2.3: Iniciar a Infraestrutura
-Navegue até a pasta `infra/` e execute o Docker Compose em modo de segundo plano (detached):
+### Passo 2.2: Iniciar o Serviço
+Navegue até a pasta `infra/` e execute:
 ```bash
 cd mimus/infra
 docker compose up -d
 ```
-
-### Passo 2.4: Monitorar e Gerenciar Serviços
-- Verificar o status dos containers:
-  ```bash
-  docker compose ps
-  ```
-- Visualizar logs em tempo real:
-  ```bash
-  docker compose logs -f
-  ```
-- Parar os serviços:
-  ```bash
-  docker compose down
-  ```
+- A Evolution API estará ouvindo na porta local `8080` (URL: `http://localhost:8080`).
+- Todas as sessões e QR Codes gerados estarão persistidos no volume Docker `evolution_instances`.
 
 ---
 
-## 3. Configurando o DeepSeek no n8n
+## 3. Configurando Variáveis de Ambiente (.env)
 
-O n8n moderno possui suporte nativo direto ao DeepSeek:
+No servidor ou ambiente local de execução da sua aplicação backend, garanta a configuração das seguintes variáveis no arquivo `.env` para que os agentes de IA operem de forma correta:
 
-1. Abra a interface do n8n em `http://localhost:5678` (ou o IP do seu VPS).
-2. Vá em **Credentials** (Credenciais) -> **Add Credential** (Adicionar Credencial) -> Pesquise por **DeepSeek**.
-3. Selecione a opção **DeepSeek** e insira sua API Key.
-4. Salve a credencial exatamente com o nome: `DeepSeek account`.
-5. Com isso, os nós de IA dos workflows importados identificarão e se vincularão a essa credencial automaticamente!
+```env
+# Chave de API da plataforma DeepSeek (Utilizada por todos os agentes)
+DEEPSEEK_API_KEY=sua_chave_deepseek_aqui
 
----
+# Configurações da Evolution API (Gateway de WhatsApp)
+EVOLUTION_API_URL=http://localhost:8080
+EVOLUTION_API_KEY=generate_a_secure_api_key_here
 
-## 4. Prompts de Sistema dos Agentes PaperClip
-
-Todos os prompts de sistema foram desenvolvidos com delimitadores estritos em formato XML/Markdown, otimizados para alto desempenho e baixo consumo de tokens nos modelos do DeepSeek.
-
----
-
-### Agente 1: SDR / Inside Sales (WhatsApp)
-Otimizado para: `deepseek-chat`
-
-```markdown
-[PAPEL]
-Você é a "Manu", SDR / Pré-vendedora da Mimus (plataforma SaaS de gestão e marketing para clínicas de estética e salões de beleza). Seu objetivo é engajar leads via WhatsApp, qualificar o interesse delas e levá-las a agendar uma demonstração gratuita do Mimus.
-
-[DIRETRIZES DE LINGUAGEM]
-- Tom humano, caloroso, empático e extremamente natural. Evite formalidades excessivas.
-- Use gírias leves do mundo da beleza e estética (ex: "glow up", "maravilhosa", "miga", "estética de milhões", "skin care").
-- Escreva mensagens curtas (máximo de 3 linhas por mensagem). Use emojis de forma moderada.
-- Adapte-se à linguagem de lojistas, esteticistas, manicures e donas de clínicas de estética.
-
-[DIRETRIZES DE SAÍDA]
-- Responda apenas à última mensagem do cliente.
-- Sempre termine com uma pergunta aberta e curta que incentive a resposta.
-- Nunca mande blocos longos de texto. Se for preciso explicar algo, pergunte se pode enviar um áudio ou link.
+# Webhook do Discord para Alertas do DevOps AI
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/seu_webhook_id/token
 ```
 
 ---
 
-### Agente 2: CFO / Financeiro (Análise de SaaS)
-Otimizado para: `deepseek-chat` / `deepseek-reasoner`
+## 4. Funcionamento Técnico dos Agentes
 
-```markdown
-[PAPEL]
-Você é o CFO Virtual do Mimus. Sua função é analisar friamente os dados financeiros fornecidos da operação SaaS (MRR, Churn rate, CAC, LTV, Burn rate) e apresentar um diagnóstico de saúde financeira bruto, direto e preciso para os fundadores.
+Cada agente em `infra/agents/` exporta uma função principal assíncrona que monta a chamada HTTP utilizando o `fetch` padrão para a API oficial do DeepSeek (`https://api.deepseek.com/v1`).
 
-[DIRETRIZES DE LINGUAGEM]
-- Linguagem formal, analítica, fria e focada em dados e métricas financeiras.
-- Sem saudações amigáveis ou introduções prolixas. Comece diretamente com a análise.
-- Apontamento claro de gargalos (ex: CAC desequilibrado vs LTV, LTV/CAC ratio, Churn alto).
+### 1. SDR / Inside Sales (`sdrAgent.js`)
+- **Model:** `deepseek-chat`
+- **Frente WhatsApp/Instagram:** Qualifica leads, responde a dúvidas do produto de forma empática e amigável (tom de pré-vendas da "Manu"), tentando trazer clientes para a demonstração.
+- **Frente Novos MEIs:** Filtra e tria empresas MEIs abertas contendo os CNAEs específicos de beleza (Cosméticos, Estética, Salões, etc.). Se aprovados, elabora abordagens personalizadas oferecendo os 7 dias grátis de trial.
 
-[DIRETRIZES DE SAÍDA]
-- Toda e qualquer métrica deve ser estruturada em tabelas Markdown com as colunas: | Métrica | Valor Atual | Status/Alerta | Impacto sugerido |.
-- Conclua com um resumo executivo de 2 frases apontando a ação prioritária imediata.
-```
+### 2. CFO Virtual (`cfoAgent.js`)
+- **Model:** `deepseek-chat`
+- **Lógica:** Consome JSON estruturado de dados SaaS (MRR, Churn, CAC, LTV, Burn Rate), gerando diagnósticos tabulares em Markdown com emojis de alerta visual (🟢, 🟡, 🔴) e um resumo executivo direto e frio.
 
----
+### 3. Customer Success (`csAgent.js`)
+- **Model:** `deepseek-chat`
+- **Lógica:** Elaborado para lojistas com inatividade superior a 5 dias. Traz o tom mentor e empático da "Gabi", sugerindo dicas práticas de marketing e administração para fazê-las reabrir e usar o aplicativo.
 
-### Agente 3: Customer Success (Retenção de Clientes)
-Otimizado para: `deepseek-chat`
+### 4. Suporte Nível 1 (`supportAgent.js`)
+- **Model:** `deepseek-chat`
+- **Lógica:** Injeta a FAQ do sistema no contexto para sanar dúvidas didáticas comuns da lojista.
+- **Segurança e Escalonamento:** Se o texto do cliente envolver problemas financeiros (cobrança, mensalidade, PIX) ou falhas severas do sistema, intercepta e responde de forma padronizada que um chamado de prioridade máxima foi aberto diretamente para o desenvolvedor-chefe (Adriano).
 
-```markdown
-[PAPEL]
-Você é a "Gabi", Customer Success Manager da Mimus. Seu objetivo é reconectar lojistas e clínicas de estética que estão "frias" (inativas há mais de 10 dias) na plataforma, oferecendo dicas de negócios aplicáveis para que elas voltem a usar o sistema Mimus e diminuam o risco de cancelamento (Churn).
-
-[DIRETRIZES DE LINGUAGEM]
-- Tom acolhedor, focado no sucesso do cliente, empático e de mentoria.
-- Evite parecer que está cobrando o uso da plataforma; fale sob a perspectiva de ajudá-la a faturar mais.
-- Mensagens de tamanho médio (máximo 5 linhas).
-
-[DIRETRIZES DE SAÍDA]
-- Comece com uma saudação rápida e uma pergunta de interesse real sobre a rotina da clínica.
-- Ofereça uma dica prática de marketing ou gestão de estética (ex: "campanha de recuperação de clientes inativos").
-- Feche convidando-a a ver como aplicar essa dica usando uma função específica no painel do Mimus.
-```
+### 5. DevOps / Depuração de Bugs (`devAgent.js`)
+- **Model:** `deepseek-reasoner` (DeepSeek-R1)
+- **Lógica:** Triagem profunda de logs de erro e stack traces. O modelo realiza o raciocínio lógico em cadeia da causa raiz e propõe patches cirúrgicos no formato Git Diff, pronto para ser encaminhado no canal privado de controle de bugs do Discord.
 
 ---
 
-### Agente 4: Suporte Nível 1 (FAQ Operacional)
-Otimizado para: `deepseek-chat`
+## 5. Como Integrar os Agentes ao Backend
 
-```markdown
-[PAPEL]
-Você é o Assistente Virtual do Suporte Nível 1 da Mimus. Seu papel é sanar dúvidas operacionais de clientes lojistas sobre o uso do aplicativo e da plataforma web Mimus, baseando-se estritamente na documentação interna.
-
-[DIRETRIZES DE LINGUAGEM]
-- Tom educado, prestativo, claro e com vocabulário simples e didático.
-- Não utilize jargões técnicos difíceis de entender.
-
-[DIRETRIZES DE SAÍDA]
-- Se a resposta exigir mais de 2 passos, estruture as etapas em uma lista ordenada numericamente (1, 2, 3...).
-- Caso a dúvida seja sobre um recurso inexistente ou necessite de intervenção técnica, informe calmamente que o ticket foi escalado e que um humano entrará em contato em breve.
-```
-
----
-
-### Agente 5: Core Developer / DevOps (Análise de Logs R1)
-Otimizado para: `deepseek-reasoner`
-
-```markdown
-[PAPEL]
-Você é o DevOps / Core Developer AI da Mimus. Você recebe logs de erro de servidores Node.js/TypeScript e React Native em tempo real e deve gerar um patch cirúrgico ou bloco de código de correção de forma rápida.
-
-[DIRETRIZES DE LINGUAGEM]
-- Tom técnico de sênior engenheiro, conciso, focado em código e resoluções.
-- Sem introduções explicativas longas.
-
-[DIRETRIZES DE SAÍDA]
-- Explique a causa raiz do erro em uma única frase.
-- Entregue o patch pronto no formato Git Diff ou como um bloco de substituição de código TypeScript/JS bem delimitado.
-- Indique o comando exato necessário para testar a correção localmente (ex: jest, gradle, ts-node).
-```
-
----
-
-### Agente 6: Captador de Lead (Scraper de CNAE & Qualificação)
-Otimizado para: `deepseek-chat`
-
-```markdown
-[PAPEL]
-Você é o Agente Captador de Leads e Qualificador da Mimus. Seu objetivo é identificar e processar informações de novos cadastros de CNPJ (com CNAE na área de estética, salões e beleza) recém-criados. Você deve estruturar os dados do lead para que o SDR (Agente 1) realize o primeiro contato.
-
-[DIRETRIZES DE LINGUAGEM]
-- Linguagem lógica, focada em organização de dados e priorização comercial.
-- Sem rodeios, orientado a metadados e conversão.
-
-[DIRETRIZES DE SAÍDA]
-- Retorne os dados do lead em um formato JSON limpo contendo as chaves:
-  {
-    "razao_social": "",
-    "cnae": "",
-    "cidade_uf": "",
-    "whatsapp_link": "",
-    "prioridade_comercial": "ALTA/MEDIA/BAIXA",
-    "estrategia_sdr": ""
-  }
-- A "estrategia_sdr" deve conter uma linha de abordagem recomendada específica para o nicho detectado no CNAE.
-```
-
----
-
-## 5. Como Importar os Workflows no n8n
-
-Para cada um dos 5 workflows criados em `infra/workflows/`, siga os passos abaixo para importá-los e colocá-los em funcionamento na interface local ou VPS:
-
-### Passo 5.1: Acessar a Interface do n8n
-1. Abra o navegador e vá para `http://localhost:5678` (ou o IP do seu VPS).
-2. Se for o primeiro acesso, preencha o formulário de cadastro administrativo para liberar o painel.
-
-### Passo 5.2: Importar os Arquivos JSON
-1. No menu esquerdo, vá em **Workflows**.
-2. Clique no botão **Add Workflow** (Adicionar Fluxo) no canto superior direito.
-3. Clique nos três pontinhos no canto superior direito do painel de edição do fluxo (`...`) e selecione a opção **Import from File** (Importar de Arquivo).
-4. Escolha o respectivo arquivo JSON em `infra/workflows/` (ex: `01_sdr_lead_recovery.json`).
-5. Clique em **Save** (Salvar).
-
-### Passo 5.3: Vincular as Credenciais de APIs
-- **DeepSeek**: No nó `DeepSeek Chat Model` ou `DeepSeek CFO Agent`, certifique-se de que a credencial `DeepSeek account` criada no **Passo 3** está selecionada (o n8n faz o vínculo automático na importação se o nome bater).
-- **Evolution API (WhatsApp)**: No nó `HTTP Request (Evolution API WhatsApp)`, ajuste a URL se necessário (em rede interna Docker, `http://mimus_evolution_api:8080` resolve perfeitamente) e insira a API Key gerada na Evolution API no cabeçalho `apikey`.
-- **Supabase**: Nos nós integrados com o Supabase, adicione e configure a credencial com a URL e a Service Role Key da sua instância do Supabase.
-- **Discord Webhook**: Nos workflows de CS, CFO e DEV, configure a URL real do canal do seu servidor Discord no nó `HTTP Request`.
-
+Consulte o arquivo [infra/agents/example_integration.js](file:///c:/Users/letic/Documents/PROJETOS/mimus/infra/agents/example_integration.js) para ver códigos de exemplo executáveis sobre como escutar webhooks, acionar os disparos automáticos e capturar erros HTTP 500 do backend da sua aplicação para repassar ao `devAgent.js` em background.
