@@ -1,0 +1,131 @@
+{
+  "name": "04. CFO - Weekly Financial Report (Cron)",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyWeek",
+              "hour": 8,
+              "weekday": "1"
+            }
+          ]
+        }
+      },
+      "id": "e74c2079-c5c8-47fb-86bf-6228c238b7fd",
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getRow",
+        "table": "financeiro_metricas",
+        "rowId": "latest",
+        "options": {}
+      },
+      "id": "6a3f4e19-c1ab-40a2-ad6f-bd1a2e7c3b9c",
+      "name": "Supabase (Métricas)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        380,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "deepseek-chat",
+        "prompt": "=Por favor, realize a análise financeira com base nas métricas extraídas:\n- MRR: {{$json.mrr}}\n- Churn Rate: {{$json.churn_rate}}%\n- CAC: R$ {{$json.cac}}\n- LTV: R$ {{$json.ltv}}\n- Burn Rate: R$ {{$json.burn_rate}}\n- Runway: {{$json.runway}} meses\n\nGere a tabela estruturada de acordo com o seu papel de CFO.",
+        "options": {
+          "systemMessage": "[PAPEL]\nVocê é o CFO Virtual do Mimus. Sua função é analisar friamente os dados financeiros fornecidos da operação SaaS (MRR, Churn rate, CAC, LTV, Burn rate) e apresentar um diagnóstico de saúde financeira bruto, direto e preciso para os fundadores.\n\n[DIRETRIZES DE LINGUAGEM]\n- Linguagem formal, analítica, fria e focada em dados e métricas financeiras.\n- Sem saudações amigáveis ou introduções prolixas. Comece diretamente com a análise.\n- Apontamento claro de gargalos (ex: CAC desequilibrado vs LTV, LTV/CAC ratio, Churn alto).\n\n[DIRETRIZES DE SAÍDA]\n- Toda e qualquer métrica deve ser estruturada em tabelas Markdown com as colunas: | Métrica | Valor Atual | Status/Alerta | Impacto sugerido |.\n- Conclua com um resumo executivo de 2 frases apontando a ação prioritária imediata."
+        }
+      },
+      "id": "a31a35e8-b80c-4467-bc1a-514e8c1b3f9k",
+      "name": "DeepSeek CFO Agent",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        580,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "placeholder_deepseek_credential",
+          "name": "DeepSeek API Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/placeholder_discord_webhook_url",
+        "sendHeaders": true,
+        "headers": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"### 📊 Relatório Semanal do CFO Virtual (Mimus)\\n\\n{{$json.message.content.replace(/\"/g, '\\\"')}}\"\n}",
+        "options": {}
+      },
+      "id": "7b4f18ba-1a5c-48be-a690-bd3d2d4f2e9e",
+      "name": "Discord (Enviar Relatório)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        800,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "Supabase (Métricas)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase (Métricas)": {
+      "main": [
+        [
+          {
+            "node": "DeepSeek CFO Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek CFO Agent": {
+      "main": [
+        [
+          {
+            "node": "Discord (Enviar Relatório)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

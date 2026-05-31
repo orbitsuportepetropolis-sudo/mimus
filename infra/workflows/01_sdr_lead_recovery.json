@@ -1,0 +1,206 @@
+{
+  "name": "01. SDR - Lead Recovery (WhatsApp)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "supabase-lead-created",
+        "options": {}
+      },
+      "id": "e44c2079-c5c8-47fb-86bf-6228c238b7ef",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getRow",
+        "table": "leads",
+        "rowId": "={{$json.body.record.id}}",
+        "options": {}
+      },
+      "id": "673f4e19-c1ab-40a2-ad6f-bd1a2e7c3b99",
+      "name": "Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Olá, por favor inicie o contato de qualificação com a lead que acabamos de obter. Dados da Lead:\nNome: {{$json.name}}\nSegmento: {{$json.segmento}}\nCidade: {{$json.cidade}}\nTelefone: {{$json.telefone}}\n\nUse as diretrizes para iniciar uma conversa calorosa e natural de SDR no WhatsApp.",
+        "options": {
+          "systemMessage": "[PAPEL]\nVocê é a \"Manu\", SDR / Pré-vendedora da Mimus (plataforma SaaS de gestão e marketing para clínicas de estética e salões de beleza). Seu objetivo é engajar leads via WhatsApp, qualificar o interesse delas e levá-las a agendar uma demonstração gratuita do Mimus.\n\n[DIRETRIZES DE LINGUAGEM]\n- Tom humano, caloroso, empático e extremamente natural. Evite formalidades excessivas.\n- Use gírias leves do mundo da beleza e estética (ex: \"glow up\", \"maravilhosa\", \"miga\", \"estética de milhões\", \"skin care\").\n- Escreva mensagens curtas (máximo de 3 linhas por mensagem). Use emojis de forma moderada.\n- Adapte-se à linguagem de lojistas, esteticistas, manicures e donas de clínicas de estética.\n\n[DIRETRIZES DE SAÍDA]\n- Responda apenas à última mensagem do cliente.\n- Sempre termine com uma pergunta aberta e curta que incentive a resposta.\n- Nunca mande blocos longos de texto. Se for preciso explicar algo, pergunte se pode enviar um áudio ou link."
+        }
+      },
+      "id": "a01a35e8-b80c-4467-bc1a-514e8c1b3f9b",
+      "name": "Mimus SDR Agent",
+      "type": "n8n-nodes-base.advancedAi",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "deepseek-chat",
+        "options": {
+          "temperature": 0.7
+        }
+      },
+      "id": "b01a35e8-b80c-4467-bc1a-514e8c1b3f9c",
+      "name": "OpenAI Chat Model",
+      "type": "n8n-nodes-base.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        600,
+        100
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "placeholder_deepseek_credential",
+          "name": "DeepSeek API Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 10
+      },
+      "id": "c01a35e8-b80c-4467-bc1a-514e8c1b3f9d",
+      "name": "Window Buffer Memory",
+      "type": "n8n-nodes-base.windowBufferMemory",
+      "typeVersion": 1,
+      "position": [
+        700,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "table": "chat_memory",
+        "options": {}
+      },
+      "id": "d01a35e8-b80c-4467-bc1a-514e8c1b3f9e",
+      "name": "Supabase (Read/Write Memory Store)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        800,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://mimus_evolution_api:8080/message/sendText/{{$node[\"Supabase\"].json.instance || 'default_instance'}}",
+        "sendHeaders": true,
+        "headers": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "generate_a_secure_api_key_here"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{$node[\"Supabase\"].json.telefone}}\",\n  \"text\": \"{{$json.output}}\"\n}",
+        "options": {}
+      },
+      "id": "784f18ba-1a5c-48be-a690-bd3d2d4f2e9b",
+      "name": "HTTP Request (Evolution API WhatsApp)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        950,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase": {
+      "main": [
+        [
+          {
+            "node": "Mimus SDR Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Mimus SDR Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Mimus SDR Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase (Read/Write Memory Store)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Mimus SDR Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mimus SDR Agent": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request (Evolution API WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

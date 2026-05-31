@@ -9,10 +9,14 @@ Este diretório contém a configuração de infraestrutura pronta para produçã
 ```
 mimus/
 ├── infra/
-│   ├── docker-compose.yml        # Orquestração multi-container (n8n + Evolution API)
-│   ├── README.md                 # Documentação técnica e Prompts de Sistema (Este arquivo)
+│   ├── docker-compose.yml        # Orquestração de containers (n8n + Evolution API + Postgres)
+│   ├── README.md                 # Manual técnico e Prompts de Sistema (Este arquivo)
 │   └── workflows/
-│       └── .gitkeep              # Diretório para backup dos fluxos JSON exportados do n8n
+│       ├── 01_sdr_lead_recovery.json       # SDR - Lead Recovery (WhatsApp)
+│       ├── 02_cs_inactivity_alerts.json     # CS - Inactivity Alerts (Cron)
+│       ├── 03_support_faq_level1.json       # Suporte - FAQ Level 1 (WhatsApp)
+│       ├── 04_cfo_financial_report.json     # CFO - Weekly Financial Report (Cron)
+│       └── 05_dev_error_monitoring.json     # DEV - Error Monitoring (Reasoning)
 ├── mobile/                       # Aplicativo móvel React Native / Expo
 │   └── ...
 ├── web/                          # Aplicativo Web / Painel Next.js
@@ -205,3 +209,27 @@ Você é o Agente Captador de Leads e Qualificador da Mimus. Seu objetivo é ide
   }
 - A "estrategia_sdr" deve conter uma linha de abordagem recomendada específica para o nicho detectado no CNAE.
 ```
+
+---
+
+## 5. Como Importar os Workflows no n8n
+
+Para cada um dos 5 workflows criados em `infra/workflows/`, siga os passos abaixo para importá-los e colocá-los em funcionamento na interface local ou VPS:
+
+### Passo 5.1: Acessar a Interface do n8n
+1. Abra o navegador e vá para `http://localhost:5678` (ou o IP do seu VPS).
+2. Se for o primeiro acesso, preencha o formulário de cadastro administrativo para liberar o painel.
+
+### Passo 5.2: Importar os Arquivos JSON
+1. No menu esquerdo, vá em **Workflows**.
+2. Clique no botão **Add Workflow** (Adicionar Fluxo) no canto superior direito.
+3. Clique nos três pontinhos no canto superior direito do painel de edição do fluxo (`...`) e selecione a opção **Import from File** (Importar de Arquivo).
+4. Escolha o respectivo arquivo JSON em `infra/workflows/` (ex: `01_sdr_lead_recovery.json`).
+5. Clique em **Save** (Salvar).
+
+### Passo 5.3: Vincular as Credenciais de APIs
+- **DeepSeek (OpenAI API Override)**: No nó `OpenAI Chat Model` ou `DeepSeek CFO Agent`, vincule a credencial criada no **Passo 3** deste manual (OpenAI API com override para a URL do DeepSeek).
+- **Evolution API (WhatsApp)**: No nó `HTTP Request (Evolution API WhatsApp)`, ajuste a URL se necessário (em rede interna Docker, `http://mimus_evolution_api:8080` resolve perfeitamente) e insira a API Key gerada na Evolution API no cabeçalho `apikey`.
+- **Supabase**: Nos nós integrados com o Supabase, adicione e configure a credencial com a URL e a Service Role Key da sua instância do Supabase.
+- **Discord Webhook**: Nos workflows de CS, CFO e DEV, configure a URL real do canal do seu servidor Discord no nó `HTTP Request`.
+

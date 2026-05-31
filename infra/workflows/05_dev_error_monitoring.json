@@ -1,0 +1,98 @@
+{
+  "name": "05. DEV - Error Monitoring (Reasoning)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "system-errors-webhook",
+        "options": {}
+      },
+      "id": "e84c2079-c5c8-47fb-86bf-6228c238b7fe",
+      "name": "Webhook (System Errors)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "deepseek-reasoner",
+        "prompt": "=Analise o erro recebido e gere o patch corretivo:\n\n[DADOS DO ERRO]\nLog de Erro: {{$json.body.error_message || $json.body.message}}\nStack Trace: {{$json.body.stack || 'Não fornecido'}}\nArquivo/Componente: {{$json.body.file || 'Desconhecido'}}\nAmbiente: {{$json.body.environment || 'Produção'}}\n\nSiga as diretrizes técnicas do Core Developer AI.",
+        "options": {
+          "systemMessage": "[PAPEL]\nVocê é o DevOps / Core Developer AI da Mimus. Você recebe logs de erro de servidores Node.js/TypeScript e React Native em tempo real e deve gerar um patch cirúrgico ou bloco de código de correção de forma rápida.\n\n[DIRETRIZES DE LINGUAGEM]\n- Tom técnico de sênior engenheiro, conciso, focado em código e resoluções.\n- Sem introduções explicativas longas.\n\n[DIRETRIZES DE SAÍDA]\n- Explique a causa raiz do erro em uma única frase.\n- Entregue o patch pronto no formato Git Diff ou como um bloco de substituição de código TypeScript/JS bem delimitado.\n- Indique o comando exato necessário para testar a correção localmente (ex: jest, gradle, ts-node)."
+        }
+      },
+      "id": "a41a35e8-b80c-4467-bc1a-514e8c1b3f9l",
+      "name": "DeepSeek Reasoner (R1)",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "placeholder_deepseek_credential",
+          "name": "DeepSeek API Connection"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/placeholder_discord_webhook_url",
+        "sendHeaders": true,
+        "headers": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"### 🛠️ Alerta de Erro detectado no Mimus (DevOps AI)\\n\\n{{$json.message.content.replace(/\"/g, '\\\"')}}\"\n}",
+        "options": {}
+      },
+      "id": "7c4f18ba-1a5c-48be-a690-bd3d2d4f2e9f",
+      "name": "Discord (Notificar DEV)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        700,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook (System Errors)": {
+      "main": [
+        [
+          {
+            "node": "DeepSeek Reasoner (R1)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Reasoner (R1)": {
+      "main": [
+        [
+          {
+            "node": "Discord (Notificar DEV)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
