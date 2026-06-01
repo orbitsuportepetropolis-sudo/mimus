@@ -29,7 +29,7 @@ import {
 
 interface DashboardShellProps {
   children: React.ReactNode
-  profile: { name: string; role: string } | null
+  profile: { name: string; role: string; store_id?: string } | null
   store: { 
     name: string; 
     plan?: string; 
@@ -86,11 +86,19 @@ export default function DashboardShell({ children, profile, store, lowStockCount
   const showBlocker = !hasAccess && pathname !== '/dashboard/billing'
 
   useEffect(() => {
-    if (!store) return
-    if (!hasAccess && pathname !== '/dashboard/billing') {
+    if (!store || !profile) return
+
+    // Verify if onboarding is completed
+    const onboardingCompleted = localStorage.getItem(`mimus_onboarding_completed_${profile.store_id || 'default'}`)
+    if (!onboardingCompleted && pathname !== '/onboarding') {
+      router.push('/onboarding')
+      return
+    }
+
+    if (!hasAccess && pathname !== '/dashboard/billing' && pathname !== '/onboarding') {
       router.push('/dashboard/billing')
     }
-  }, [store, pathname, router, hasAccess])
+  }, [store, profile, pathname, router, hasAccess])
 
   async function loadAgentData() {
     try {

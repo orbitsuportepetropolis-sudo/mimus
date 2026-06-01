@@ -6,6 +6,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { StatusBar } from 'expo-status-bar'
 import { LayoutDashboard, Package, ShoppingBag, Users, DollarSign, MessageSquare } from 'lucide-react-native'
 import { supabase } from './src/services/supabase'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import OnboardingScreen from './src/screens/OnboardingScreen'
 
 // Import Screens
 import DashboardScreen from './src/screens/DashboardScreen'
@@ -73,20 +75,53 @@ function AppTabs() {
 export default function App() {
   const [session, setSession] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [isOnboardingRequired, setIsOnboardingRequired] = useState(false)
+
+  async function checkOnboarding(userId: string) {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('store_id')
+        .eq('id', userId)
+        .single()
+        
+      if (profile?.store_id) {
+        const completed = await AsyncStorage.getItem(`mimus_onboarding_completed_${profile.store_id}`)
+        if (!completed) {
+          setIsOnboardingRequired(true)
+          setLoading(false)
+          return
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao verificar onboarding:', err)
+    }
+    setIsOnboardingRequired(false)
+    setLoading(false)
+  }
 
   useEffect(() => {
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
         setSession(session)
-        setLoading(false)
+        if (session) {
+          checkOnboarding(session.user.id)
+        } else {
+          setLoading(false)
+        }
       })
       .catch(() => {
         setLoading(false)
       })
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session)
+      if (session) {
+        await checkOnboarding(session.user.id)
+      } else {
+        setIsOnboardingRequired(false)
+      }
     })
 
     // Handle deep links (OAuth callback)
@@ -138,31 +173,45 @@ export default function App() {
       <StatusBar style="dark" />
       {session ? (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="MainTabs" component={AppTabs} />
-          <Stack.Screen 
-            name="Estoque" 
-            component={StockScreen} 
-            options={{ 
-              headerShown: true, 
-              title: 'Meus Produtos', 
-              headerTintColor: '#E11D48',
-              headerStyle: { backgroundColor: '#FFFFFF' },
-              headerShadowVisible: false,
-              headerTitleStyle: { fontWeight: '800', fontSize: 16 }
-            }} 
-          />
-          <Stack.Screen 
-            name="Configuracoes" 
-            component={SettingsScreen} 
-            options={{ 
-              headerShown: true, 
-              title: 'Configurações da Loja', 
-              headerTintColor: '#E11D48',
-              headerStyle: { backgroundColor: '#FFFFFF' },
-              headerShadowVisible: false,
-              headerTitleStyle: { fontWeight: '800', fontSize: 16 }
-            }} 
-          />
+          {isOnboardingRequired ? (
+            <Stack.Screen name="Onboarding">
+              {(props) => (
+                <OnboardingScreen 
+                  {...props} 
+                  userId={session.user.id} 
+                  onComplete={() => setIsOnboardingRequired(false)} 
+                />
+              )}
+            </Stack.Screen>
+          ) : (
+            <>
+              <Stack.Screen name="MainTabs" component={AppTabs} />
+              <Stack.Screen 
+                name="Estoque" 
+                component={StockScreen} 
+                options={{ 
+                  headerShown: true, 
+                  title: 'Meus Produtos', 
+                  headerTintColor: '#E11D48',
+                  headerStyle: { backgroundColor: '#FFFFFF' },
+                  headerShadowVisible: false,
+                  headerTitleStyle: { fontWeight: '800', fontSize: 16 }
+                }} 
+              />
+              <Stack.Screen 
+                name="Configuracoes" 
+                component={SettingsScreen} 
+                options={{ 
+                  headerShown: true, 
+                  title: 'Configurações da Loja', 
+                  headerTintColor: '#E11D48',
+                  headerStyle: { backgroundColor: '#FFFFFF' },
+                  headerShadowVisible: false,
+                  headerTitleStyle: { fontWeight: '800', fontSize: 16 }
+                }} 
+              />
+            </>
+          )}
         </Stack.Navigator>
       ) : (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
