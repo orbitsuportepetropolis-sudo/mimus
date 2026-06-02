@@ -5,13 +5,18 @@
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
     "scheme": "mimus",
+    "icon": "./assets/icon.png",
     "extra": {
       "eas": {
         "projectId": "aadc6f86-e1b2-41ef-8713-cae9038ef592"
       }
     },
     "android": {
-      "package": "com.adrianojrdev.mimusmobile"
+      "package": "com.adrianojrdev.mimusmobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
     }
   }
 }
