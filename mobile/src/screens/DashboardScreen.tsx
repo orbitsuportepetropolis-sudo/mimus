@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react'
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, Share, Alert, Clipboard } from 'react-native'
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, Share, Alert, Clipboard, Modal } from 'react-native'
 import { supabase } from '../services/supabase'
-import { LayoutDashboard, ShoppingBag, Users, MessageSquare, Award, Share2, Copy, Play, Settings } from 'lucide-react-native'
+import { LayoutDashboard, ShoppingBag, Users, MessageSquare, Award, Share2, Copy, Play, Settings, Sparkles } from 'lucide-react-native'
+import AIChatModal from './AIChatModal'
 
 export default function DashboardScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true)
   const [storeName, setStoreName] = useState('Mimus Cosméticos')
   const [storeId, setStoreId] = useState('')
+  const [chatVisible, setChatVisible] = useState(false)
   
   // Dashboard Action States
   const [clientsToReply, setClientsToReply] = useState(0)
@@ -139,7 +141,8 @@ export default function DashboardScreen({ navigation }: any) {
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1, backgroundColor: '#FFF8FA' }}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Welcome Header */}
       <View style={styles.header}>
         <View>
@@ -285,7 +288,30 @@ export default function DashboardScreen({ navigation }: any) {
       </View>
 
       <View style={{ height: 32 }} />
-    </ScrollView>
+      </ScrollView>
+
+      {/* Floating Chat Button */}
+      <TouchableOpacity 
+        style={styles.floatingChatBtn} 
+        onPress={() => setChatVisible(true)}
+      >
+        <Sparkles size={24} color="#FFFFFF" />
+      </TouchableOpacity>
+
+      {/* Mimus AI Chat Modal */}
+      <Modal
+        visible={chatVisible}
+        animationType="slide"
+        onRequestClose={() => setChatVisible(false)}
+      >
+        <AIChatModal
+          visible={chatVisible}
+          onClose={() => setChatVisible(false)}
+          storeId={storeId}
+          onRefresh={loadDashboardMetrics}
+        />
+      </Modal>
+    </View>
   )
 }
 
@@ -536,5 +562,21 @@ const styles = StyleSheet.create({
   },
   shareBtn: {
     backgroundColor: '#E11D48',
+  },
+  floatingChatBtn: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#E11D48',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.27,
+    shadowRadius: 4.65,
   },
 })
