@@ -86,12 +86,31 @@ export default function App() {
         .single()
         
       if (profile?.store_id) {
+        // 1. Check local storage
         const completed = await AsyncStorage.getItem(`mimus_onboarding_completed_${profile.store_id}`)
-        if (!completed) {
-          setIsOnboardingRequired(true)
+        if (completed) {
+          setIsOnboardingRequired(false)
           setLoading(false)
           return
         }
+
+        // 2. Check if store already has products in database (meaning they completed onboarding steps)
+        const { count: productCount } = await supabase
+          .from('products')
+          .select('*', { count: 'exact', head: true })
+          .eq('store_id', profile.store_id)
+
+        if (productCount && productCount > 0) {
+          // Set flag in local storage for future fast checks
+          await AsyncStorage.setItem(`mimus_onboarding_completed_${profile.store_id}`, 'true')
+          setIsOnboardingRequired(false)
+          setLoading(false)
+          return
+        }
+
+        setIsOnboardingRequired(true)
+        setLoading(false)
+        return
       }
     } catch (err) {
       console.error('Erro ao verificar onboarding:', err)

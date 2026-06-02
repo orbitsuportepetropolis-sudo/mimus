@@ -88,12 +88,28 @@ export default function DashboardShell({ children, profile, store, lowStockCount
   useEffect(() => {
     if (!store || !profile) return
 
-    // Verify if onboarding is completed
-    const onboardingCompleted = localStorage.getItem(`mimus_onboarding_completed_${profile.store_id || 'default'}`)
-    if (!onboardingCompleted && pathname !== '/onboarding') {
-      router.push('/onboarding')
-      return
+    async function checkOnboardingDb() {
+      const onboardingCompleted = localStorage.getItem(`mimus_onboarding_completed_${profile?.store_id || 'default'}`)
+      if (onboardingCompleted) {
+        return
+      }
+
+      const { count } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('store_id', profile?.store_id)
+
+      if (count && count > 0) {
+        localStorage.setItem(`mimus_onboarding_completed_${profile?.store_id || 'default'}`, 'true')
+        return
+      }
+
+      if (pathname !== '/onboarding') {
+        router.push('/onboarding')
+      }
     }
+
+    checkOnboardingDb()
 
     if (!hasAccess && pathname !== '/dashboard/billing' && pathname !== '/onboarding') {
       router.push('/dashboard/billing')
