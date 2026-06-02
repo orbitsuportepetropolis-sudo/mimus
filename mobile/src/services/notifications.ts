@@ -108,10 +108,10 @@ export async function scheduleDailyReminder() {
         sound: 'default',
       },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour: 9,
         minute: 0,
-      },
+        repeats: true,
+      } as any,
     })
 
     await AsyncStorage.setItem(REMINDER_STORAGE_KEY, id)
