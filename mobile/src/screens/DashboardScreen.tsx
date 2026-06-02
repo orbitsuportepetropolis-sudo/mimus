@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator
 import { supabase } from '../services/supabase'
 import { LayoutDashboard, ShoppingBag, Users, MessageSquare, Award, Share2, Copy, Play, Settings, Sparkles } from 'lucide-react-native'
 import AIChatModal from './AIChatModal'
+import { fireSmartAlerts } from '../services/notifications'
 
 export default function DashboardScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true)
@@ -96,6 +97,24 @@ export default function DashboardScreen({ navigation }: any) {
             }
           })
           setRebuysCount(staleCount)
+
+          // ─── SMART NOTIFICATIONS ─────────────────────────────
+          // Fetch low-stock products for notification content
+          const { data: lowStockProds } = await supabase
+            .from('products')
+            .select('name')
+            .eq('store_id', profile.store_id)
+            .lte('quantity_in_stock', 5)
+
+          fireSmartAlerts({
+            pendingOrders: salesList.filter(s => s.status === 'novo' || s.status === 'aguardando pagamento').length,
+            clientsToReply: salesList.filter(s => s.status === 'novo').length,
+            lowStockProducts: (lowStockProds || []).map((p: any) => p.name),
+            pendingPaymentsValue: salesList
+              .filter(s => s.status === 'aguardando pagamento')
+              .reduce((sum, curr) => sum + Number(curr.total_value), 0)
+          })
+          // ─────────────────────────────────────────────────────
         }
       } else {
         // Fallback Mock values for demo mode

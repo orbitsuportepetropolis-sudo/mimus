@@ -6,6 +6,16 @@
     "sdkVersion": "54.0.0",
     "scheme": "mimus",
     "icon": "./assets/icon.png",
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#E11D48",
+          "sounds": []
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "aadc6f86-e1b2-41ef-8713-cae9038ef592"

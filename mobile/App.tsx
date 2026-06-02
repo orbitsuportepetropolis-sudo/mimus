@@ -8,6 +8,7 @@ import { LayoutDashboard, Package, ShoppingBag, Users, DollarSign, MessageSquare
 import { supabase } from './src/services/supabase'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import OnboardingScreen from './src/screens/OnboardingScreen'
+import { requestNotificationPermissions, scheduleDailyReminder, cancelDailyReminder } from './src/services/notifications'
 
 // Import Screens
 import DashboardScreen from './src/screens/DashboardScreen'
@@ -125,6 +126,10 @@ export default function App() {
         setSession(session)
         if (session) {
           checkOnboarding(session.user.id)
+          // Request notification permissions and schedule daily reminder on login
+          requestNotificationPermissions().then((granted) => {
+            if (granted) scheduleDailyReminder()
+          })
         } else {
           setLoading(false)
         }
@@ -138,8 +143,13 @@ export default function App() {
       setSession(session)
       if (session) {
         await checkOnboarding(session.user.id)
+        // Schedule daily reminder for newly logged-in sessions
+        const granted = await requestNotificationPermissions()
+        if (granted) scheduleDailyReminder()
       } else {
         setIsOnboardingRequired(false)
+        // Cancel daily reminder on logout
+        cancelDailyReminder()
       }
     })
 

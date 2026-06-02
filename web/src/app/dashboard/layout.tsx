@@ -30,6 +30,19 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
+  // --- ONBOARDING GUARD (first-access only) ---
+  // Check if store has any products. If not, this is a brand-new user and they
+  // must complete onboarding before accessing the dashboard.
+  const { count: productCount } = await supabase
+    .from('products')
+    .select('*', { count: 'exact', head: true })
+    .eq('store_id', profile.store_id)
+
+  if (productCount === 0) {
+    redirect('/onboarding')
+  }
+  // --- END ONBOARDING GUARD ---
+
   // Fetch store details
   const { data: store } = await supabase
     .from('stores')
@@ -42,7 +55,7 @@ export default async function DashboardLayout({
     .from('products')
     .select('*', { count: 'exact', head: true })
     .eq('store_id', profile.store_id)
-    .lte('quantity_in_stock', 5) // count standard lower bound or min_stock_alert
+    .lte('quantity_in_stock', 5)
 
   return (
     <DashboardShell 
