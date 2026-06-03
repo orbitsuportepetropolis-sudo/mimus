@@ -306,7 +306,7 @@ export default function BillingPage() {
       )}
 
       {/* Pro Active Subscription Status Card */}
-      {currentPlan === 'pro' && subscriptionEndsAt && (
+      {currentPlan === 'pro' && (
         <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-zinc-900 dark:to-zinc-900 p-6 rounded-2xl border border-emerald-100 dark:border-zinc-800 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-505 flex items-center justify-center">
@@ -315,7 +315,11 @@ export default function BillingPage() {
             <div>
               <h4 className="text-xs font-bold text-slate-800 dark:text-white">Assinatura Mimus Pro Ativa</h4>
               <p className="text-[10px] text-slate-550 dark:text-zinc-400 mt-0.5">
-                Sua conta está ativa e segura. Próximo vencimento em: <span className="font-bold text-emerald-600 dark:text-emerald-400">{new Date(subscriptionEndsAt).toLocaleDateString('pt-BR')}</span>.
+                {subscriptionEndsAt ? (
+                  <>Sua conta está ativa e segura. Próximo vencimento em: <span className="font-bold text-emerald-600 dark:text-emerald-400">{new Date(subscriptionEndsAt).toLocaleDateString('pt-BR')}</span>.</>
+                ) : (
+                  <>Sua conta está ativa e segura no Plano Pro.</>
+                )}
               </p>
             </div>
           </div>
@@ -380,7 +384,7 @@ export default function BillingPage() {
         <div className={`bg-white dark:bg-zinc-900 p-8 rounded-3xl border shadow-sm relative flex flex-col justify-between ${
           currentPlan === 'pro' || isTrialActive ? 'border-rose-500 ring-2 ring-rose-500/10' : 'border-slate-100 dark:border-zinc-850'
         }`}>
-          {(currentPlan === 'pro' && planStatus === 'active') && (
+          {(currentPlan === 'pro' && (planStatus === 'active' || planStatus === 'pro')) && (
             <span className="absolute top-4 right-4 bg-rose-500 text-white font-extrabold text-[8px] tracking-wider uppercase px-2 py-1 rounded-full">
               Ativo
             </span>

@@ -81,7 +81,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
   const status = store?.plan_status || 'trial'
   const trialEnds = store?.trial_ends_at ? new Date(store.trial_ends_at).getTime() : 0
   const isTrialValid = status === 'trial' && trialEnds > Date.now()
-  const isProValid = plan === 'pro' && (status === 'active' || status === 'pending')
+  const isProValid = plan === 'pro' && (status === 'active' || status === 'pending' || status === 'pro')
   const isPro = isTrialValid || isProValid
   const hasAccess = true
   const showBlocker = false
