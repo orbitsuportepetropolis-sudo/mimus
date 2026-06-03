@@ -375,9 +375,56 @@ export default function StorefrontPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-zinc-950">
-        <Loader2 className="w-10 h-10 animate-spin text-rose-500" />
-        <p className="mt-4 text-xs font-semibold text-slate-500 dark:text-zinc-400">Preparando vitrine virtual...</p>
+      <div className="min-h-screen bg-[#FCF8F9] dark:bg-zinc-950 pb-24 text-slate-800 dark:text-zinc-100 transition-colors duration-200 font-sans">
+        {/* Ticker Promotional Bar Skeleton */}
+        <div className="bg-neutral-900 h-8 w-full border-b border-white/5 animate-pulse" />
+
+        {/* Header Skeleton */}
+        <header className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md sticky top-0 z-40 border-b border-pink-100/30 dark:border-zinc-800/50">
+          <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-zinc-850 animate-pulse" />
+                <div>
+                  <div className="w-24 h-4 bg-slate-200 dark:bg-zinc-850 rounded animate-pulse" />
+                  <div className="w-16 h-2.5 bg-slate-200 dark:bg-zinc-850 rounded mt-1.5 animate-pulse" />
+                </div>
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-zinc-850 animate-pulse" />
+          </div>
+        </header>
+
+        {/* Main Content Skeleton */}
+        <main className="max-w-5xl mx-auto px-4 py-6 space-y-8">
+          {/* Banner Skeleton */}
+          <div className="w-full bg-slate-200 dark:bg-zinc-900 rounded-[32px] min-h-[260px] md:min-h-[300px] animate-pulse" />
+
+          {/* Categories Bar Skeleton */}
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="w-28 h-8 bg-slate-200 dark:bg-zinc-900 rounded-xl animate-pulse flex-shrink-0" />
+            ))}
+          </div>
+
+          {/* Products Grid Skeleton */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+              <div key={i} className="bg-white dark:bg-zinc-900 rounded-[28px] border border-slate-100 dark:border-zinc-800/80 shadow-sm overflow-hidden flex flex-col p-4 space-y-3">
+                <div className="aspect-square w-full bg-slate-100 dark:bg-zinc-950 rounded-2xl animate-pulse" />
+                <div className="space-y-2">
+                  <div className="w-12 h-3 bg-slate-200 dark:bg-zinc-850 rounded animate-pulse" />
+                  <div className="w-full h-4 bg-slate-200 dark:bg-zinc-850 rounded animate-pulse" />
+                  <div className="w-2/3 h-4 bg-slate-200 dark:bg-zinc-850 rounded animate-pulse" />
+                </div>
+                <div className="pt-2 space-y-2">
+                  <div className="w-16 h-4 bg-slate-200 dark:bg-zinc-850 rounded animate-pulse" />
+                  <div className="w-full h-9 bg-slate-200 dark:bg-zinc-850 rounded-xl animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
       </div>
     )
   }

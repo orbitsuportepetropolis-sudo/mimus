@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { 
   Sparkles, 
@@ -47,6 +48,7 @@ export default function SettingsPage() {
   const [fontFamily, setFontFamily] = useState('Inter')
   const [marqueeText, setMarqueeText] = useState('')
   const [customDomain, setCustomDomain] = useState('')
+  const [isProUser, setIsProUser] = useState(true)
 
 interface BannerConfig {
   title: string
@@ -121,6 +123,14 @@ interface BannerConfig {
           setFontFamily(store.font_family || 'Inter')
           setMarqueeText(store.marquee_text || '')
           setCustomDomain(store.custom_domain || '')
+
+          const plan = store.plan || 'free'
+          const status = store.plan_status || 'trial'
+          const trialEnds = store.trial_ends_at ? new Date(store.trial_ends_at).getTime() : 0
+          const isTrialValid = status === 'trial' && trialEnds > Date.now()
+          const isProValid = plan === 'pro' && (status === 'active' || status === 'pending')
+          const isPro = isTrialValid || isProValid
+          setIsProUser(isPro)
 
           // Load banners
           let loadedBanners: any[] = []
@@ -543,102 +553,125 @@ interface BannerConfig {
               })}
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold pt-2">
-              <div className="col-span-2">
-                <label className="block text-slate-400 dark:text-zinc-500 mb-1">Título da Campanha (Banner {activeBannerIndex + 1})</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Coleção Especial Outono/Inverno 🍂"
-                  value={banners[activeBannerIndex].title}
-                  onChange={(e) => handleBannerFieldChange('title', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
-                />
+            {activeBannerIndex > 0 && !isProUser ? (
+              <div className="p-6 bg-slate-50 dark:bg-zinc-950 rounded-xl border border-slate-200/50 dark:border-zinc-800 text-center space-y-3 mt-4 col-span-2">
+                <Sparkles className="w-8 h-8 text-rose-500 mx-auto animate-pulse" />
+                <h4 className="text-sm font-bold text-slate-800 dark:text-white">Banners Extras são Exclusivos do Plano Pro</h4>
+                <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed">
+                  No Plano Grátis você pode configurar 1 banner ativo para sua vitrine. Atualize para o Plano Pro para ativar o carrossel rotativo com até 3 banners!
+                </p>
+                <Link
+                  href="/dashboard/billing"
+                  className="inline-block px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-all active:scale-[0.98]"
+                >
+                  Conhecer Plano Pro
+                </Link>
               </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold pt-2 w-full col-span-2">
+                <div className="col-span-2">
+                  <label className="block text-slate-400 dark:text-zinc-500 mb-1">Título da Campanha (Banner {activeBannerIndex + 1})</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Coleção Especial Outono/Inverno 🍂"
+                    value={banners[activeBannerIndex].title}
+                    onChange={(e) => handleBannerFieldChange('title', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
 
-              <div className="col-span-2">
-                <label className="block text-slate-400 dark:text-zinc-500 mb-1">Subtítulo / Descrição da Campanha</label>
-                <textarea
-                  rows={2}
-                  placeholder="Ex: Descubra cosméticos com até 30% OFF selecionados especialmente."
-                  value={banners[activeBannerIndex].subtitle}
-                  onChange={(e) => handleBannerFieldChange('subtitle', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
-                />
-              </div>
+                <div className="col-span-2">
+                  <label className="block text-slate-400 dark:text-zinc-500 mb-1">Subtítulo / Descrição da Campanha</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Ex: Descubra cosméticos com até 30% OFF selecionados especialmente."
+                    value={banners[activeBannerIndex].subtitle}
+                    onChange={(e) => handleBannerFieldChange('subtitle', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-slate-400 dark:text-zinc-500 mb-1">Texto do Botão (CTA)</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Ver Coleção"
-                  value={banners[activeBannerIndex].cta}
-                  onChange={(e) => handleBannerFieldChange('cta', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
-                />
-              </div>
+                <div>
+                  <label className="block text-slate-400 dark:text-zinc-500 mb-1">Texto do Botão (CTA)</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Ver Coleção"
+                    value={banners[activeBannerIndex].cta}
+                    onChange={(e) => handleBannerFieldChange('cta', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-slate-400 dark:text-zinc-500 mb-1">Filtrar por Categoria / Tag</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Boca"
-                  value={banners[activeBannerIndex].tag}
-                  onChange={(e) => handleBannerFieldChange('tag', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
-                />
-                <span className="text-[9px] text-slate-400 dark:text-zinc-550 mt-1 block">Filtra os produtos destacados que correspondem a este termo.</span>
-              </div>
+                <div>
+                  <label className="block text-slate-400 dark:text-zinc-500 mb-1">Filtrar por Categoria / Tag</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Boca"
+                    value={banners[activeBannerIndex].tag}
+                    onChange={(e) => handleBannerFieldChange('tag', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                  <span className="text-[9px] text-slate-400 dark:text-zinc-550 mt-1 block font-normal">Filtra os produtos destacados que correspondem a este termo.</span>
+                </div>
 
-              <div className="col-span-2">
-                <label className="block text-slate-400 dark:text-zinc-500 mb-1">Texto da Barra de Anúncios Superior (Rotativa)</label>
-                <input
-                  type="text"
-                  placeholder="Ex: ⚡ FRETE GRÁTIS EM COMPRAS ACIMA DE R$ 150 • 💳 PARCELE EM ATÉ 3X SEM JUROS"
-                  value={marqueeText}
-                  onChange={(e) => setMarqueeText(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
-                />
-                <span className="text-[9px] text-slate-400 dark:text-zinc-550 mt-1 block font-normal">Escreva a mensagem promocional que ficará rolando no topo da sua vitrine.</span>
-              </div>
+                <div className="col-span-2">
+                  <label className="block text-slate-400 dark:text-zinc-500 mb-1">Texto da Barra de Anúncios Superior (Rotativa)</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: ⚡ FRETE GRÁTIS EM COMPRAS ACIMA DE R$ 150 • 💳 PARCELE EM ATÉ 3X SEM JUROS"
+                    value={marqueeText}
+                    onChange={(e) => setMarqueeText(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                  <span className="text-[9px] text-slate-400 dark:text-zinc-550 mt-1 block font-normal">Escreva a mensagem promocional que ficará rolando no topo da sua vitrine.</span>
+                </div>
 
-              {/* Campaign Banner Upload */}
-              <div className="col-span-2 space-y-2 pt-2">
-                <label className="block text-slate-400 dark:text-zinc-500">Banner de Fundo da Campanha (Hero - Banner {activeBannerIndex + 1})</label>
-                <div className="flex flex-col md:flex-row items-center gap-4">
-                  <div className="w-full md:w-64 h-24 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 flex items-center justify-center overflow-hidden flex-shrink-0 relative">
-                    {banners[activeBannerIndex].preview ? (
-                      <img src={banners[activeBannerIndex].preview} alt={`Banner ${activeBannerIndex + 1} preview`} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="text-center p-2 text-slate-450 dark:text-zinc-650">
-                        <ImageIcon className="w-6 h-6 mx-auto mb-1 opacity-60" />
-                        <span className="text-[10px]">Sem banner (usará gradiente sólido)</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-slate-350 hover:border-rose-500 rounded-xl cursor-pointer text-[11px] font-bold hover:text-rose-500 transition-colors w-fit">
-                      <Upload className="w-3.5 h-3.5" /> Escolher Banner {activeBannerIndex + 1}
-                      <input type="file" accept="image/*" onChange={handleBannerFileChange} className="hidden" />
-                    </label>
-                    {banners[activeBannerIndex].preview && (
-                      <button 
-                        type="button" 
-                        onClick={handleRemoveBanner}
-                        className="text-[10px] text-rose-500 hover:underline text-left w-fit"
-                      >
-                        Remover Banner {activeBannerIndex + 1}
-                      </button>
-                    )}
+                {/* Campaign Banner Upload */}
+                <div className="col-span-2 space-y-2 pt-2">
+                  <label className="block text-slate-400 dark:text-zinc-500">Banner de Fundo da Campanha (Hero - Banner {activeBannerIndex + 1})</label>
+                  <div className="flex flex-col md:flex-row items-center gap-4">
+                    <div className="w-full md:w-64 h-24 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 flex items-center justify-center overflow-hidden flex-shrink-0 relative">
+                      {banners[activeBannerIndex].preview ? (
+                        <img src={banners[activeBannerIndex].preview} alt={`Banner ${activeBannerIndex + 1} preview`} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="text-center p-2 text-slate-450 dark:text-zinc-650">
+                          <ImageIcon className="w-6 h-6 mx-auto mb-1 opacity-60" />
+                          <span className="text-[10px]">Sem banner (usará gradiente sólido)</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-slate-350 hover:border-rose-500 rounded-xl cursor-pointer text-[11px] font-bold hover:text-rose-500 transition-colors w-fit">
+                        <Upload className="w-3.5 h-3.5" /> Escolher Banner {activeBannerIndex + 1}
+                        <input type="file" accept="image/*" onChange={handleBannerFileChange} className="hidden" />
+                      </label>
+                      {banners[activeBannerIndex].preview && (
+                        <button 
+                          type="button" 
+                          onClick={handleRemoveBanner}
+                          className="text-[10px] text-rose-500 hover:underline text-left w-fit"
+                        >
+                          Remover Banner {activeBannerIndex + 1}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Card 3: Custom Domain */}
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm space-y-4">
-            <h2 className="text-sm font-bold text-slate-700 dark:text-zinc-200 border-b border-slate-50 dark:border-zinc-800/60 pb-2 flex items-center gap-2">
-              <Globe className="w-4 h-4 text-rose-500" /> Domínio Personalizado
+            <h2 className="text-sm font-bold text-slate-700 dark:text-zinc-200 border-b border-slate-50 dark:border-zinc-800/60 pb-2 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-rose-500" /> Domínio Personalizado
+              </span>
+              {!isProUser && (
+                <span className="px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-600 dark:bg-rose-950/30 dark:text-rose-400 font-bold text-[9px] border border-rose-100 dark:border-rose-900/20">
+                  Recurso Pro
+                </span>
+              )}
             </h2>
             
             <div className="space-y-3 text-xs font-semibold">
@@ -647,16 +680,22 @@ interface BannerConfig {
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Ex: www.minhaloja.com.br"
-                    value={customDomain}
+                    disabled={!isProUser}
+                    placeholder={isProUser ? "Ex: www.minhaloja.com.br" : "Recurso exclusivo do Plano Pro"}
+                    value={isProUser ? customDomain : ''}
                     onChange={(e) => setCustomDomain(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 font-mono text-[11px]"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 font-mono text-[11px] disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
+                {!isProUser && (
+                  <p className="text-[10px] text-rose-550 mt-1 font-semibold text-rose-600">
+                    Para usar um domínio personalizado (ex: www.sualoja.com.br), faça o upgrade para o Plano Pro.
+                  </p>
+                )}
                 <p className="text-[10px] text-slate-400 dark:text-zinc-550 mt-1.5 font-normal">
                   Configure seu próprio domínio para a vitrine. Para ativar, crie um apontamento DNS no seu provedor:
                 </p>
-                <div className="bg-slate-50 dark:bg-zinc-950 p-3 rounded-lg border border-slate-100 dark:border-zinc-850 mt-2 font-mono text-[10px] space-y-1.5 font-medium text-slate-650 dark:text-zinc-350 leading-relaxed">
+                <div className="bg-slate-50 dark:bg-zinc-950 p-3 rounded-lg border border-slate-100 dark:border-zinc-850 mt-2 font-mono text-[10px] space-y-1.5 font-medium text-slate-650 dark:text-zinc-350 leading-relaxed opacity-75">
                   <div><strong>Tipo:</strong> CNAME</div>
                   <div><strong>Nome/Host:</strong> www (ou o subdomínio desejado)</div>
                   <div><strong>Destino/Valor:</strong> mimusapp.vercel.app</div>

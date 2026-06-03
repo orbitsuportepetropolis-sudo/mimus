@@ -187,10 +187,10 @@ export default function StockScreen() {
       return
     }
 
-    if (storePlan === 'free' && products.length >= 50) {
+    if (storePlan === 'free' && products.length >= 10) {
       Alert.alert(
         'Limite Excedido', 
-        'Você atingiu o limite de 50 produtos no Plano Free. Faça o upgrade para o Plano Pro no Painel Web.'
+        'Você atingiu o limite de 10 produtos no Plano Free. Faça o upgrade para o Plano Pro no Painel Web.'
       )
       return
     }
@@ -473,7 +473,7 @@ export default function StockScreen() {
           {storePlan === 'free' && (
             <View style={styles.limitBanner}>
               <Text style={styles.limitText}>
-                Plano Free: {products.length}/50 produtos cadastrados.
+                Plano Free: {products.length}/10 produtos cadastrados.
               </Text>
             </View>
           )}

@@ -82,8 +82,9 @@ export default function DashboardShell({ children, profile, store, lowStockCount
   const trialEnds = store?.trial_ends_at ? new Date(store.trial_ends_at).getTime() : 0
   const isTrialValid = status === 'trial' && trialEnds > Date.now()
   const isProValid = plan === 'pro' && (status === 'active' || status === 'pending')
-  const hasAccess = isTrialValid || isProValid
-  const showBlocker = !hasAccess && pathname !== '/dashboard/billing'
+  const isPro = isTrialValid || isProValid
+  const hasAccess = true
+  const showBlocker = false
 
   useEffect(() => {
     if (!store || !profile) return
@@ -110,11 +111,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
     }
 
     checkOnboardingDb()
-
-    if (!hasAccess && pathname !== '/dashboard/billing' && pathname !== '/onboarding') {
-      router.push('/dashboard/billing')
-    }
-  }, [store, profile, pathname, router, hasAccess])
+  }, [store, profile, pathname, router])
 
   async function loadAgentData() {
     try {
@@ -482,9 +479,9 @@ export default function DashboardShell({ children, profile, store, lowStockCount
           <span className="text-xs text-rose-500 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full font-medium flex items-center gap-1.5">
             {store?.name || 'Loja'}
             <span className={`px-1 rounded text-[8px] font-extrabold uppercase ${
-              store?.plan === 'pro' ? 'bg-rose-500 text-white' : 'bg-slate-200 text-slate-700'
+              isPro ? 'bg-rose-500 text-white' : 'bg-slate-200 text-slate-700'
             }`}>
-              {store?.plan === 'pro' ? 'Pro' : 'Free'}
+              {isPro ? 'Pro' : 'Free'}
             </span>
           </span>
         </div>
@@ -515,13 +512,13 @@ export default function DashboardShell({ children, profile, store, lowStockCount
             </span>
             <span className="text-[10px] text-slate-400 dark:text-zinc-500 tracking-wider uppercase font-semibold mt-1 flex items-center gap-1.5">
               {store?.name || 'Minha Loja'}
-              <span className={`px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase ${
-                store?.plan === 'pro' 
-                  ? 'bg-rose-500 text-white' 
-                  : 'bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-400'
-              }`}>
-                {store?.plan === 'pro' ? 'Pro' : 'Free'}
-              </span>
+            <span className={`px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase ${
+              isPro 
+                ? 'bg-rose-500 text-white' 
+                : 'bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-400'
+            }`}>
+              {isPro ? 'Pro' : 'Free'}
+            </span>
             </span>
           </div>
           <Sparkles className="w-5 h-5 text-rose-500 animate-pulse" />
@@ -663,9 +660,9 @@ export default function DashboardShell({ children, profile, store, lowStockCount
             <span className="text-xs text-rose-600 bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/30 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1.5">
               {store?.name || 'Loja de Beleza'}
               <span className={`px-1 rounded text-[8px] font-bold uppercase ${
-                store?.plan === 'pro' ? 'bg-rose-500 text-white' : 'bg-slate-200 text-slate-700'
+                isPro ? 'bg-rose-500 text-white' : 'bg-slate-200 text-slate-700'
               }`}>
-                {store?.plan === 'pro' ? 'Pro' : 'Free'}
+                {isPro ? 'Pro' : 'Free'}
               </span>
             </span>
           </div>

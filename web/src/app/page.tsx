@@ -26,6 +26,7 @@ export default function LandingPage() {
   const [darkMode, setDarkMode] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'sales' | 'stock' | 'catalog' | 'finance'>('sales')
+  const [showTestimonial, setShowTestimonial] = useState(false)
 
   // Sync theme with localStorage & document.documentElement class
   useEffect(() => {
@@ -36,6 +37,16 @@ export default function LandingPage() {
       document.documentElement.classList.add('dark')
     } else {
       document.documentElement.classList.remove('dark')
+    }
+
+    // Check if testimonial print exists in public folder
+    const img = new Image()
+    img.src = '/print.jpg'
+    img.onload = () => setShowTestimonial(true)
+    img.onerror = () => {
+      const img2 = new Image()
+      img2.src = '/depoimento.jpg'
+      img2.onload = () => setShowTestimonial(true)
     }
   }, [])
 
@@ -97,7 +108,7 @@ export default function LandingPage() {
               href="/register" 
               className="text-sm font-semibold text-white bg-rose-600 hover:bg-rose-500 px-5 py-2.5 rounded-xl transition-all duration-200 shadow-md shadow-rose-500/10 active:scale-[0.98]"
             >
-              Criar Conta Grátis
+              Criar minha loja grátis
             </Link>
           </div>
 
@@ -148,7 +159,7 @@ export default function LandingPage() {
               onClick={() => setMobileMenuOpen(false)}
               className="w-full py-3 text-center font-semibold text-white bg-rose-600 rounded-xl"
             >
-              Criar Conta Grátis
+              Criar minha loja grátis
             </Link>
           </div>
         </div>
@@ -168,11 +179,11 @@ export default function LandingPage() {
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight text-slate-900 dark:text-white">
-              Gestão inteligente para sua loja de <span className="bg-gradient-to-r from-rose-600 to-pink-500 bg-clip-text text-transparent">beleza</span>
+              Você sabe quanto sua loja <span className="bg-gradient-to-r from-rose-600 to-pink-500 bg-clip-text text-transparent">lucrou</span> esse mês?
             </h1>
             
             <p className="text-base sm:text-lg text-slate-600 dark:text-zinc-400 max-w-lg leading-relaxed">
-              O Mimus ajuda lojistas a controlarem o estoque de maquiagens, realizarem vendas rápidas via PDV moderno, controlarem o fluxo financeiro e exibirem seus produtos em uma vitrine virtual encantadora.
+              Mimus é o sistema simples de controle de estoque, vendas e finanças feito sob medida para pequenas lojistas de beleza e cosméticos.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
@@ -180,16 +191,20 @@ export default function LandingPage() {
                 href="/register" 
                 className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold rounded-xl transition-all duration-200 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/30 flex items-center justify-center gap-2 group active:scale-[0.98]"
               >
-                Começar Grátis
+                Criar minha loja grátis
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
               
-              <Link 
-                href="/login" 
+              <a 
+                href="#preview" 
                 className="w-full sm:w-auto px-8 py-4 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-white font-semibold rounded-xl transition-colors duration-200 flex items-center justify-center"
               >
-                Acessar Painel
-              </Link>
+                Ver como funciona
+              </a>
+            </div>
+
+            <div className="text-xs text-slate-500 dark:text-zinc-400 italic font-medium pt-1 text-center lg:text-left w-full">
+              ✨ Criado por um fundador para organizar a loja da própria esposa — e funcionou.
             </div>
 
             <div className="flex items-center gap-6 pt-4 border-t border-slate-100 dark:border-zinc-900 w-full justify-center lg:justify-start">
@@ -467,9 +482,9 @@ export default function LandingPage() {
               <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center font-bold mb-6 transition-all duration-300 group-hover:scale-110">
                 <ShoppingBag className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">PDV Frente de Caixa Rápido</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Registre vendas em segundos, pelo celular</h3>
               <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
-                Registre as vendas de cosméticos de forma rápida, aplique descontos, adicione clientes e imprima recibos em segundos pelo navegador ou tablet.
+                Esqueça a calculadora. Registre suas vendas pelo celular ou tablet em segundos, calcule o troco e envie o comprovante diretamente pelo WhatsApp da cliente.
               </p>
             </div>
 
@@ -478,9 +493,9 @@ export default function LandingPage() {
               <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center font-bold mb-6 transition-all duration-300 group-hover:scale-110">
                 <Package className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Estoque com Alerta de Validade</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Adeus caderno: controle seu estoque sem complicação</h3>
               <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
-                Controle o estoque de batons, bases e pincéis. Receba avisos inteligentes de produtos próximos à data de vencimento e evite perdas financeiras.
+                Saiba exatamente o que tem nas prateleiras. Cadastre seus produtos e o Mimus desconta a quantidade automaticamente a cada venda, avisando antes de acabar.
               </p>
             </div>
 
@@ -489,9 +504,9 @@ export default function LandingPage() {
               <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center font-bold mb-6 transition-all duration-300 group-hover:scale-110">
                 <Globe className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Vitrine Virtual Integrada</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Sua vitrine virtual no WhatsApp</h3>
               <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
-                Crie um catálogo online para sua loja e receba pedidos no WhatsApp. Altere banners, preços e destaque produtos de acordo com a campanha ativa.
+                Tenha uma vitrine linda com o seu catálogo de maquiagem e cosméticos. Suas clientes escolhem os produtos online e finalizam o pedido direto no seu WhatsApp.
               </p>
             </div>
 
@@ -500,9 +515,9 @@ export default function LandingPage() {
               <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center font-bold mb-6 transition-all duration-300 group-hover:scale-110">
                 <DollarSign className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Fluxo de Caixa e Custos</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Saiba exatamente quanto você lucrou</h3>
               <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
-                Visualize seus ganhos diários, lucros e custos de fornecedores em relatórios limpos que ajudam a entender a real margem de lucro da sua loja.
+                Saiba para onde está indo o dinheiro da sua loja. Controle o custo de fornecedores e veja o lucro líquido das suas vendas sem precisar de planilhas complicadas.
               </p>
             </div>
 
@@ -511,27 +526,67 @@ export default function LandingPage() {
               <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center font-bold mb-6 transition-all duration-300 group-hover:scale-110">
                 <Users className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Histórico de Clientes</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Ache qualquer cliente em um clique</h3>
               <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
-                Saiba quais maquiagens suas clientes compram com mais frequência, histórico de compras detalhado e gerencie dados de contato para ações de fidelidade.
+                Salve o histórico de compras de cada cliente. Saiba o que ela mais gosta e envie mensagens personalizadas no aniversário para vender mais.
               </p>
             </div>
 
-            {/* Feature 6: Integrations */}
-            <div className="group p-8 rounded-2xl border border-slate-100 dark:border-zinc-800/80 bg-slate-50/50 dark:bg-zinc-950/40 hover:bg-white dark:hover:bg-zinc-950 hover:border-rose-500/20 dark:hover:border-rose-500/20 transition-all duration-300 hover:shadow-xl hover:shadow-rose-500/[0.02]">
+            {/* Feature 6: Mimus AI Chat */}
+            <div className="group p-8 rounded-2xl border border-rose-500/20 dark:border-rose-500/25 bg-rose-500/[0.02] dark:bg-rose-500/[0.01] hover:bg-white dark:hover:bg-zinc-950 hover:border-rose-500/40 dark:hover:border-rose-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-rose-500/[0.04]">
               <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center font-bold mb-6 transition-all duration-300 group-hover:scale-110">
-                <Zap className="w-6 h-6" />
+                <Sparkles className="w-6 h-6 text-rose-500" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Simplicidade e Performance</h3>
-              <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
-                Feito em Next.js e Supabase para oferecer velocidade máxima, segurança ponta a ponta e zero lentidão, mesmo com milhares de registros.
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Mimus AI: Assistente por comandos</h3>
+              <p className="text-sm text-slate-550 dark:text-zinc-400 leading-relaxed">
+                Gerencie sua loja apenas conversando por texto ou áudio. Peça coisas como: <br />
+                <span className="font-semibold text-rose-650 dark:text-rose-400 font-mono text-xs">"IA: 'Quais produtos estão acabando?' ➔ Mimus responde na hora"</span>.
               </p>
             </div>
 
           </div>
 
+
         </div>
       </section>
+
+      {/* TESTIMONIAL SECTION */}
+      {showTestimonial && (
+        <section id="testimonials" className="py-20 md:py-28 px-6 bg-rose-500/[0.02] dark:bg-rose-500/[0.01] transition-colors duration-300 border-t border-slate-100 dark:border-zinc-900">
+          <div className="max-w-7xl mx-auto space-y-12">
+            <div className="text-center space-y-4 max-w-2xl mx-auto">
+              <h2 className="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest">Histórias Reais</h2>
+              <p className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">Quem usa o Mimus aprova</p>
+              <p className="text-slate-500 dark:text-zinc-400 text-sm">Veja a experiência de quem transformou a gestão da sua loja de beleza.</p>
+            </div>
+
+            <div className="max-w-2xl mx-auto bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-slate-100 dark:border-zinc-800/80 shadow-xl space-y-6 flex flex-col md:flex-row gap-8 items-center">
+              <div className="w-full md:w-1/2 rounded-2xl overflow-hidden border border-slate-100 dark:border-zinc-800 flex items-center justify-center bg-slate-50 dark:bg-zinc-950 max-h-[300px]">
+                <img 
+                  src="/print.jpg" 
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/depoimento.jpg'
+                  }}
+                  alt="Depoimento de cliente" 
+                  className="w-full h-full object-contain" 
+                />
+              </div>
+              <div className="w-full md:w-1/2 space-y-4 text-left">
+                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                  Caso de Sucesso 🏆
+                </span>
+                <p className="text-sm text-slate-650 dark:text-zinc-350 leading-relaxed italic">
+                  "O Mimus transformou a minha forma de vender. Antes eu anotava tudo no caderno e perdia o controle do estoque de maquiagens. Hoje eu vejo o meu lucro em segundos e sei exatamente quais produtos estão acabando!"
+                </p>
+                <div>
+                  <h4 className="font-bold text-slate-800 dark:text-white text-sm">Letícia França</h4>
+                  <p className="text-xs text-slate-400 font-medium">Loja Toque Delicado • Petrópolis - RJ</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* PRICING SECTION */}
       <section id="pricing" className="py-20 md:py-28 px-6 bg-slate-50 dark:bg-zinc-950 transition-colors duration-300">
@@ -552,16 +607,16 @@ export default function LandingPage() {
                 <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">Essencial para iniciar seu negócio</p>
                 <div className="my-6">
                   <span className="text-4xl font-extrabold text-slate-900 dark:text-white">R$ 0</span>
-                  <span className="text-sm text-slate-400 dark:text-zinc-500">/ sempre</span>
+                  <span className="text-sm text-slate-400 dark:text-zinc-500">/ sempre grátis</span>
                 </div>
                 <div className="border-t border-slate-100 dark:border-zinc-800 pt-6 space-y-4">
                   <div className="flex items-center gap-3">
                     <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-600 dark:text-zinc-300">Até 50 produtos cadastrados</span>
+                    <span className="text-xs text-slate-600 dark:text-zinc-300">Até 10 produtos cadastrados</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-600 dark:text-zinc-300">1 operador (Administrador)</span>
+                    <span className="text-xs text-slate-600 dark:text-zinc-300">1 usuária (você)</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
@@ -569,7 +624,7 @@ export default function LandingPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-600 dark:text-zinc-300">PDV moderno e registro de caixa</span>
+                    <span className="text-xs text-slate-600 dark:text-zinc-300">PDV e controle de estoque essenciais</span>
                   </div>
                 </div>
               </div>
@@ -600,19 +655,19 @@ export default function LandingPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-600 dark:text-zinc-300">Operadores e equipe ilimitados</span>
+                    <span className="text-xs text-slate-600 dark:text-zinc-300">Equipe e colaboradoras ilimitadas</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-600 dark:text-zinc-300">Vitrine virtual premium com subdomínio</span>
+                    <span className="text-xs text-slate-600 dark:text-zinc-300">Vitrine premium com banners personalizados</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-600 dark:text-zinc-300">Mapeamento de domínio próprio na vitrine</span>
+                    <span className="text-xs text-slate-600 dark:text-zinc-300">Domínio personalizado para a vitrine</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-600 dark:text-zinc-300">Relatórios avançados e exportações</span>
+                    <span className="text-xs text-slate-600 dark:text-zinc-300">Relatórios avançados de lucro e vendas</span>
                   </div>
                 </div>
               </div>
@@ -628,25 +683,24 @@ export default function LandingPage() {
 
         </div>
       </section>
-
-      {/* STATS SECTION */}
+       {/* STATS SECTION */}
       <section id="stats" className="py-20 md:py-24 bg-white dark:bg-zinc-900 border-y border-slate-100 dark:border-zinc-900 text-slate-800 dark:text-white transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           <div className="space-y-1">
-            <h4 className="text-4xl font-extrabold text-rose-600 dark:text-rose-400">99.9%</h4>
-            <p className="text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Uptime Garantido</p>
+            <h4 className="text-4xl font-extrabold text-rose-600 dark:text-rose-400">100%</h4>
+            <p className="text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Feito para Você</p>
           </div>
           <div className="space-y-1">
             <h4 className="text-4xl font-extrabold text-rose-600 dark:text-rose-400">R$ 0</h4>
-            <p className="text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Taxa de Adesão</p>
+            <p className="text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Para começar</p>
           </div>
           <div className="space-y-1">
-            <h4 className="text-4xl font-extrabold text-rose-600 dark:text-rose-400">10k+</h4>
-            <p className="text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Vendas Registradas</p>
+            <h4 className="text-4xl font-extrabold text-rose-600 dark:text-rose-400">+ Prático</h4>
+            <p className="text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Que o caderno</p>
           </div>
           <div className="space-y-1">
             <h4 className="text-4xl font-extrabold text-rose-600 dark:text-rose-400">10h</h4>
-            <p className="text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Economizados/semana</p>
+            <p className="text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Salvas por semana</p>
           </div>
         </div>
       </section>
@@ -656,14 +710,14 @@ export default function LandingPage() {
         <div className="max-w-3xl mx-auto space-y-8">
           <h2 className="text-3xl md:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight">Pronta para profissionalizar seu negócio de beleza?</h2>
           <p className="text-base md:text-lg text-slate-500 dark:text-zinc-400 max-w-xl mx-auto leading-relaxed">
-            Cadastre-se grátis e tenha o controle total da sua loja. Você não precisa configurar servidores, domínios ou códigos complexos.
+            Cadastre-se grátis e tenha o controle total da sua loja. É simples, rápido e feito para você organizar a sua rotina de vendas.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link 
               href="/register" 
               className="w-full sm:w-auto px-8 py-4 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl transition-all duration-200 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/30 flex items-center justify-center gap-2 group active:scale-[0.98]"
             >
-              Criar Minha Loja Agora
+              Criar minha loja grátis
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link 
@@ -675,6 +729,7 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
 
       {/* FOOTER */}
       <footer className="py-12 border-t border-slate-100 dark:border-zinc-900 bg-white dark:bg-zinc-950 text-slate-500 dark:text-zinc-500 transition-colors duration-300">

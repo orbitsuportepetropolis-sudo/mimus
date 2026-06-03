@@ -232,8 +232,8 @@ export default function ProductsPage() {
       const isTrialActive = planStatus === 'trial' && getTrialDaysLeft() > 0
       const isPro = storePlan === 'pro' || isTrialActive
 
-      if (!isPro && products.length + validRows.length > 50) {
-        throw new Error(`A importação excede o limite de 50 produtos do Plano Free. Total atual: ${products.length}. Você está tentando importar ${validRows.length}. Faça o upgrade para o Plano Pro!`)
+      if (!isPro && products.length + validRows.length > 10) {
+        throw new Error(`A importação excede o limite de 10 produtos do Plano Free. Total atual: ${products.length}. Você está tentando importar ${validRows.length}. Faça o upgrade para o Plano Pro!`)
       }
 
       const productsToInsert = validRows.map(row => ({
@@ -372,8 +372,8 @@ export default function ProductsPage() {
     const isTrialActive = planStatus === 'trial' && getTrialDaysLeft() > 0
     const isPro = storePlan === 'pro' || isTrialActive
 
-    if (!prod && !isPro && products.length >= 50) {
-      alert('Limite de 50 produtos atingido no Plano Free. Faça o upgrade para o Plano Pro por apenas R$39/mês para liberar cadastros ilimitados!')
+    if (!prod && !isPro && products.length >= 10) {
+      alert('Limite de 10 produtos atingido no Plano Free. Faça o upgrade para o Plano Pro por apenas R$ 49/mês para liberar cadastros ilimitados!')
       return
     }
 
@@ -612,7 +612,7 @@ export default function ProductsPage() {
             <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white">Cadastro de Produtos</h1>
             {storePlan === 'free' && (
               <span className="text-[10px] text-amber-650 bg-amber-50 dark:bg-amber-950/20 px-2.5 py-0.5 rounded-full font-bold border border-amber-100 dark:border-amber-905/30">
-                Plano Free ({products.length}/50 un.)
+                Plano Free ({products.length}/10 un.)
               </span>
             )}
           </div>

@@ -42,6 +42,9 @@ interface ProductItem {
 export default function DashboardPage() {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
+  const [storePlan, setStorePlan] = useState<'free' | 'pro'>('free')
+  const [planStatus, setPlanStatus] = useState<string>('trial')
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null)
   const [stats, setStats] = useState<DashboardStats>({
     todaySalesCount: 0,
     monthlyRevenue: 0,
@@ -54,6 +57,14 @@ export default function DashboardPage() {
   const [expiringProducts, setExpiringProducts] = useState<any[]>([])
   const [chartData, setChartData] = useState<any[]>([])
 
+  const getTrialDaysLeft = () => {
+    if (!trialEndsAt) return 0
+    const diff = new Date(trialEndsAt).getTime() - Date.now()
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+  }
+  const isTrialActive = planStatus === 'trial' && getTrialDaysLeft() > 0
+  const isProUser = storePlan === 'pro' || isTrialActive
+
   async function loadDashboardData(showSpinner = false) {
     try {
       if (showSpinner) setLoading(true)
@@ -63,12 +74,19 @@ export default function DashboardPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('store_id')
+        .select('store_id, stores(plan, plan_status, trial_ends_at)')
         .eq('id', user.id)
         .single()
 
       if (!profile) return
       const storeId = profile.store_id
+
+      if (profile.stores) {
+        const st = profile.stores as any
+        setStorePlan(st.plan || 'free')
+        setPlanStatus(st.plan_status || 'trial')
+        setTrialEndsAt(st.trial_ends_at)
+      }
 
       // 1. Get today's sales and monthly revenue
       const today = new Date()
@@ -308,31 +326,48 @@ export default function DashboardPage() {
             </div>
           </div>
           
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#E11D48" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#E11D48" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" className="dark:stroke-zinc-800/60" />
-                <XAxis dataKey="label" stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1E293B', 
-                    borderRadius: '8px', 
-                    color: '#FFF', 
-                    fontSize: '12px',
-                    border: 'none' 
-                  }}
-                  formatter={(value) => [`R$ ${Number(value).toFixed(2)}`, 'Faturamento']}
-                />
-                <Area type="monotone" dataKey="value" stroke="#E11D48" strokeWidth={2} fillOpacity={1} fill="url(#colorValue)" />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="h-72 w-full relative">
+            {!isProUser && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/70 dark:bg-zinc-900/80 backdrop-blur-md rounded-xl text-center p-4">
+                <TrendingUp className="w-8 h-8 text-rose-500 mb-2" />
+                <h4 className="text-sm font-bold text-slate-800 dark:text-white">Relatórios Avançados de Desempenho</h4>
+                <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-xs mt-1 leading-relaxed">
+                  Gráficos de faturamento e relatórios detalhados de lucro são exclusivos do **Plano Pro**.
+                </p>
+                <Link 
+                  href="/dashboard/billing"
+                  className="mt-4 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-md shadow-rose-500/10 transition-colors"
+                >
+                  Liberar Plano Pro (R$ 49/mês)
+                </Link>
+              </div>
+            )}
+            <div className={`w-full h-full ${!isProUser ? 'filter blur-sm select-none pointer-events-none' : ''}`}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#E11D48" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#E11D48" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" className="dark:stroke-zinc-800/60" />
+                  <XAxis dataKey="label" stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={false} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1E293B', 
+                      borderRadius: '8px', 
+                      color: '#FFF', 
+                      fontSize: '12px',
+                      border: 'none' 
+                    }}
+                    formatter={(value) => [`R$ ${Number(value).toFixed(2)}`, 'Faturamento']}
+                  />
+                  <Area type="monotone" dataKey="value" stroke="#E11D48" strokeWidth={2} fillOpacity={1} fill="url(#colorValue)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
 

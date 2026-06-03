@@ -240,7 +240,7 @@ export default function SettingsScreen() {
         <TouchableOpacity style={styles.upgradeBtn} onPress={handleUpgrade}>
           <Star size={14} color="#FFFFFF" style={styles.upgradeBtnIcon} />
           <Text style={styles.upgradeBtnText}>
-            {plan === 'pro' ? 'GERENCIAR ASSINATURA' : 'ASSINAR MIMUS PRO (R$ 29,90)'}
+            {plan === 'pro' ? 'GERENCIAR ASSINATURA' : 'ASSINAR MIMUS PRO (R$ 49,00)'}
           </Text>
         </TouchableOpacity>
       </View>
