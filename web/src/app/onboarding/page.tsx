@@ -175,6 +175,135 @@ export default function OnboardingPage() {
     router.push('/dashboard')
   }
 
+  // Load full demo data (Aura Glow Cosméticos)
+  async function handleLoadDemoData() {
+    if (!storeId) return
+    setLoading(true)
+    try {
+      // 1. Update store details
+      await supabase
+        .from('stores')
+        .update({ 
+          name: 'Aura Glow Cosméticos', 
+          plan: 'pro', 
+          plan_status: 'active',
+          primary_color: '#ec4899',
+          accent_color: '#14b8a6',
+          campaign_title: 'Coleção Pele Perfeita Glow ✨',
+          campaign_subtitle: 'Ganhe um pincel exclusivo nas compras acima de R$ 150',
+          campaign_cta: 'Ver produtos',
+          campaign_tag: 'Promoção de Outono'
+        })
+        .eq('id', storeId)
+
+      // 2. Insert Customers
+      const customersToInsert = [
+        { store_id: storeId, name: 'Beatriz Silva', phone: '(11) 98765-4321', instagram: 'beatriz.makeup', birthday: '1995-04-12' },
+        { store_id: storeId, name: 'Mariana Santos', phone: '(11) 99888-7766', instagram: 'mari.santos', birthday: '1998-09-22' },
+        { store_id: storeId, name: 'Gabriela Costa', phone: '(11) 97766-5544', instagram: 'gabi_costaa', birthday: '1990-12-05' },
+        { store_id: storeId, name: 'Amanda Ferreira', phone: '(11) 96655-4433', instagram: 'amanda.fer', birthday: '2001-07-18' },
+        { store_id: storeId, name: 'Carla Oliveira', phone: '(11) 95544-3322', instagram: 'carla.olive', birthday: '1988-02-28' }
+      ]
+      
+      const { data: insertedCustomers, error: custError } = await supabase
+        .from('customers')
+        .insert(customersToInsert)
+        .select()
+        
+      if (custError) throw custError
+
+      // 3. Insert Products
+      const productsToInsert = [
+        { store_id: storeId, name: 'Batom Velvet Matte Rose', brand: 'Bruna Tavares', category: 'Maquiagem', sku: 'BT-BVM-01', barcode: '7891011121314', cost_price: 24.90, sale_price: 49.90, quantity_in_stock: 15, min_stock_alert: 3, description: 'Batom líquido de alta pigmentação com efeito matte e textura aveludada.' },
+        { store_id: storeId, name: 'Corretivo Hyaluronic Peach', brand: 'Mimus Beauty', category: 'Maquiagem', sku: 'MM-CHP-02', barcode: '7891011121321', cost_price: 34.90, sale_price: 69.90, quantity_in_stock: 8, min_stock_alert: 3, description: 'Corretivo hidratante com ácido hialurônico de alta cobertura.' },
+        { store_id: storeId, name: 'Base Fluida Satin 03', brand: 'Macauba', category: 'Maquiagem', sku: 'MC-BFS-03', barcode: '7891011121338', cost_price: 45.00, sale_price: 89.90, quantity_in_stock: 12, min_stock_alert: 4, description: 'Base de acabamento acetinado com cobertura média construível.' },
+        { store_id: storeId, name: 'Rimel Extra Volume Black', brand: 'Maybelline', category: 'Olhos', sku: 'MB-REV-04', barcode: '7891011121345', cost_price: 29.90, sale_price: 59.90, quantity_in_stock: 20, min_stock_alert: 5, description: 'Máscara para cílios para volume extremo e definição perfeita.' },
+        { store_id: storeId, name: 'Blush Rosé Líquido', brand: 'Mari Maria', category: 'Maquiagem', sku: 'MM-BRL-07', barcode: '7891011121376', cost_price: 22.00, sale_price: 44.90, quantity_in_stock: 10, min_stock_alert: 3, description: 'Blush líquido cremoso de longa duração e acabamento natural.' },
+        { store_id: storeId, name: 'Delineador Holográfico Glow', brand: 'Aura Glow', category: 'Olhos', sku: 'AG-DHG-05', barcode: '7891011121352', cost_price: 19.90, sale_price: 39.90, quantity_in_stock: 0, min_stock_alert: 3, description: 'Delineador líquido holográfico com brilho intenso de secagem rápida.' },
+        { store_id: storeId, name: 'Sérum Renovador Vitamina C', brand: 'Simple Organic', category: 'Skincare', sku: 'SO-SRV-06', barcode: '7891011121369', cost_price: 59.90, sale_price: 119.90, quantity_in_stock: 5, min_stock_alert: 2, description: 'Sérum facial antioxidante de vitamina C 10% pura.' },
+        { store_id: storeId, name: 'Iluminador Pó Compacto Gold', brand: 'Bruna Tavares', category: 'Maquiagem', sku: 'BT-IPG-09', barcode: '7891011121390', cost_price: 29.90, sale_price: 59.90, quantity_in_stock: 4, min_stock_alert: 3, description: 'Iluminador facial compacto com partículas ultrafinas de brilho dourado.' }
+      ]
+
+      const { data: insertedProducts, error: prodError } = await supabase
+        .from('products')
+        .insert(productsToInsert)
+        .select()
+
+      if (prodError) throw prodError
+
+      // Get some IDs for sales references
+      const cust1 = insertedCustomers?.find(c => c.name === 'Beatriz Silva')?.id || null
+      const cust2 = insertedCustomers?.find(c => c.name === 'Mariana Santos')?.id || null
+      const cust3 = insertedCustomers?.find(c => c.name === 'Gabriela Costa')?.id || null
+
+      const prod1 = insertedProducts?.find(p => p.sku === 'BT-BVM-01')
+      const prod2 = insertedProducts?.find(p => p.sku === 'MM-CHP-02')
+      const prod3 = insertedProducts?.find(p => p.sku === 'MC-BFS-03')
+      const prod4 = insertedProducts?.find(p => p.sku === 'MB-REV-04')
+      const prod7 = insertedProducts?.find(p => p.sku === 'MM-BRL-07')
+
+      // 4. Insert Sales
+      // Sale 1
+      if (prod1 && prod2) {
+        const { data: sale1, error: sale1Err } = await supabase
+          .from('sales')
+          .insert({ store_id: storeId, customer_id: cust1, total_value: 119.80, discount: 0, payment_method: 'pix', created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() })
+          .select().single()
+        
+        if (!sale1Err && sale1) {
+          await supabase.from('sale_items').insert([
+            { sale_id: sale1.id, product_id: prod1.id, quantity: 1, unit_price: 49.90 },
+            { sale_id: sale1.id, product_id: prod2.id, quantity: 1, unit_price: 69.90 }
+          ])
+        }
+      }
+
+      // Sale 2
+      if (prod3 && prod4) {
+        const { data: sale2, error: sale2Err } = await supabase
+          .from('sales')
+          .insert({ store_id: storeId, customer_id: cust2, total_value: 149.80, discount: 0, payment_method: 'credit_card', created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() })
+          .select().single()
+
+        if (!sale2Err && sale2) {
+          await supabase.from('sale_items').insert([
+            { sale_id: sale2.id, product_id: prod3.id, quantity: 1, unit_price: 89.90 },
+            { sale_id: sale2.id, product_id: prod4.id, quantity: 1, unit_price: 59.90 }
+          ])
+        }
+      }
+
+      // Sale 3
+      if (prod7) {
+        const { data: sale3, error: sale3Err } = await supabase
+          .from('sales')
+          .insert({ store_id: storeId, customer_id: cust3, total_value: 89.80, discount: 0, payment_method: 'money', created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() })
+          .select().single()
+
+        if (!sale3Err && sale3) {
+          await supabase.from('sale_items').insert([
+            { sale_id: sale3.id, product_id: prod7.id, quantity: 2, unit_price: 44.90 }
+          ])
+        }
+      }
+
+      // 5. Insert Expenses
+      await supabase.from('financial_transactions').insert([
+        { store_id: storeId, type: 'expense', value: 150.00, category: 'supplier', description: 'Compra de embalagens personalizadas', date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
+        { store_id: storeId, type: 'expense', value: 49.00, category: 'other', description: 'Assinatura Mimus Software Pro', date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }
+      ])
+
+      // Complete onboarding
+      localStorage.setItem(`mimus_onboarding_completed_${storeId}`, 'true')
+      router.push('/dashboard')
+    } catch (err) {
+      alert('Erro ao carregar dados de teste. Tente novamente.')
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Progress calculations
   const isProductCreated = !!createdProduct
   const isSaleCreated = !!createdSale
@@ -219,12 +348,21 @@ export default function OnboardingPage() {
                   Controle vendas, estoque e finanças da sua loja em poucos minutos.
                 </p>
               </div>
-              <button
-                onClick={() => setStep(2)}
-                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 transition-all duration-200 shadow-xl shadow-rose-500/20 active:scale-[0.99]"
-              >
-                Começar configuração <ArrowRight className="w-4 h-4" />
-              </button>
+              <div className="space-y-3 pt-2">
+                <button
+                  onClick={() => setStep(2)}
+                  className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 transition-all duration-200 shadow-xl shadow-rose-500/20 active:scale-[0.99]"
+                >
+                  Começar configuração do zero <ArrowRight className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleLoadDemoData}
+                  disabled={loading || !storeId}
+                  className="w-full py-3.5 px-6 rounded-2xl border border-rose-500/35 hover:bg-rose-500/5 text-rose-650 dark:text-rose-400 font-extrabold text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-all"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Testar com dados fictícios prontos (Aura Glow)'}
+                </button>
+              </div>
             </div>
           )}
 

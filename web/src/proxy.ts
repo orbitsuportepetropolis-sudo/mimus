@@ -18,7 +18,9 @@ export async function proxy(request: NextRequest) {
     'mimus-59ej.vercel.app',
     'mimus.vercel.app',
     'mimusapp.com.br',
-    'mimus.com.br'
+    'mimus.com.br',
+    'appmimus.com.br',
+    'www.appmimus.com.br'
   ]
 
   const isPlatformHost = platformHosts.some(host => hostname.includes(host))
@@ -62,4 +64,3 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
-

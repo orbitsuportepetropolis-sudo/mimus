@@ -26,7 +26,7 @@ export default function LandingPage() {
   const [darkMode, setDarkMode] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'sales' | 'stock' | 'catalog' | 'finance'>('sales')
-  const [showTestimonial, setShowTestimonial] = useState(false)
+  const [showTestimonial, setShowTestimonial] = useState(true)
 
   // Sync theme with localStorage & document.documentElement class
   useEffect(() => {
@@ -37,16 +37,6 @@ export default function LandingPage() {
       document.documentElement.classList.add('dark')
     } else {
       document.documentElement.classList.remove('dark')
-    }
-
-    // Check if testimonial print exists in public folder
-    const img = new Image()
-    img.src = '/print.jpg'
-    img.onload = () => setShowTestimonial(true)
-    img.onerror = () => {
-      const img2 = new Image()
-      img2.src = '/depoimento.jpg'
-      img2.onload = () => setShowTestimonial(true)
     }
   }, [])
 
@@ -278,7 +268,7 @@ export default function LandingPage() {
                   <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
                 </div>
                 <div className="bg-slate-200/50 dark:bg-zinc-950 px-8 py-0.5 rounded-lg text-[10px] text-slate-500 dark:text-zinc-400 font-mono select-none">
-                  {activeTab === 'catalog' ? 'mimus.app/vitrine/sua-loja' : 'mimus.app/dashboard'}
+                  {activeTab === 'catalog' ? 'appmimus.com.br/vitrine/sua-loja' : 'appmimus.com.br/dashboard'}
                 </div>
                 <div className="w-8" />
               </div>
@@ -563,12 +553,21 @@ export default function LandingPage() {
             <div className="max-w-2xl mx-auto bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-slate-100 dark:border-zinc-800/80 shadow-xl space-y-6 flex flex-col md:flex-row gap-8 items-center">
               <div className="w-full md:w-1/2 rounded-2xl overflow-hidden border border-slate-100 dark:border-zinc-800 flex items-center justify-center bg-slate-50 dark:bg-zinc-950 max-h-[300px]">
                 <img 
-                  src="/print.jpg" 
+                  src="/depoimento.jpg" 
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/depoimento.jpg'
+                    // Fallback visual elegance if the generated image is not loaded
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent) {
+                      const fallbackDiv = document.createElement('div');
+                      fallbackDiv.className = 'w-full h-full min-h-[220px] bg-gradient-to-tr from-pink-500 to-rose-600 flex flex-col items-center justify-center text-white p-6 text-center';
+                      fallbackDiv.innerHTML = '<span class="text-3xl mb-2">✨</span><span class="text-sm font-bold">Aura Glow Cosméticos</span><span class="text-[10px] opacity-80">Sucesso com o Mimus</span>';
+                      parent.appendChild(fallbackDiv);
+                    }
                   }}
                   alt="Depoimento de cliente" 
-                  className="w-full h-full object-contain" 
+                  className="w-full h-full object-cover" 
                 />
               </div>
               <div className="w-full md:w-1/2 space-y-4 text-left">
@@ -576,11 +575,11 @@ export default function LandingPage() {
                   Caso de Sucesso 🏆
                 </span>
                 <p className="text-sm text-slate-650 dark:text-zinc-350 leading-relaxed italic">
-                  "O Mimus transformou a minha forma de vender. Antes eu anotava tudo no caderno e perdia o controle do estoque de maquiagens. Hoje eu vejo o meu lucro em segundos e sei exatamente quais produtos estão acabando!"
+                  "O Mimus mudou completamente a rotina da Aura Glow. Eu me perdia controlando o estoque de maquiagens no caderninho e nunca sabia o lucro real no fim do mês. Agora, registro as vendas em segundos pelo celular e sei exatamente quando repor cada batom e base. É o sistema que toda lojista de beleza precisava!"
                 </p>
                 <div>
-                  <h4 className="font-bold text-slate-800 dark:text-white text-sm">Letícia França</h4>
-                  <p className="text-xs text-slate-400 font-medium">Loja Toque Delicado • Petrópolis - RJ</p>
+                  <h4 className="font-bold text-slate-800 dark:text-white text-sm">Juliana Alencar</h4>
+                  <p className="text-xs text-slate-400 font-medium">Aura Glow Cosméticos • São Paulo - SP</p>
                 </div>
               </div>
             </div>
@@ -739,10 +738,10 @@ export default function LandingPage() {
             <span className="text-xs text-slate-400 dark:text-zinc-600">| Gestão para Cosméticos e Maquiagem</span>
           </div>
           
-          <div className="flex items-center gap-6 text-xs">
-            <a href="#" className="hover:text-slate-800 dark:hover:text-zinc-200">Termos de Uso</a>
-            <a href="#" className="hover:text-slate-800 dark:hover:text-zinc-200">Políticas de Privacidade</a>
-            <a href="#" className="hover:text-slate-800 dark:hover:text-zinc-200">Suporte</a>
+          <div className="flex items-center gap-6 text-xs font-semibold">
+            <Link href="/termos" className="hover:text-rose-600 dark:hover:text-rose-450 transition-colors">Termos de Uso</Link>
+            <Link href="/privacidade" className="hover:text-rose-600 dark:hover:text-rose-450 transition-colors">Políticas de Privacidade</Link>
+            <Link href="/suporte" className="hover:text-rose-600 dark:hover:text-rose-450 transition-colors">Suporte</Link>
           </div>
 
           <p className="text-[11px]">&copy; {new Date().getFullYear()} Mimus Software Ltda. Todos os direitos reservados.</p>
