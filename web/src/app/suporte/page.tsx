@@ -123,7 +123,7 @@ export default function SupportPage() {
               </p>
             </div>
             <a 
-              href="https://wa.me/5524999331168?text=Ol%C3%A1%20Mimus!%20Preciso%20de%20suporte%20com%20a%20minha%20loja."
+              href="https://wa.me/5524993173232?text=Ol%C3%A1%20Mimus!%20Preciso%20de%20suporte%20com%20a%20minha%20loja."
               target="_blank"
               rel="noopener noreferrer"
               className="w-full text-center font-bold text-xs py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-lg shadow-emerald-500/10 transition-colors flex items-center justify-center gap-2"
