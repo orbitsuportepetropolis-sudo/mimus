@@ -15,8 +15,17 @@ export async function POST(request: Request) {
     console.log('Received webhook payload:', body)
 
     // 1. CHECK IF IT IS AN ASAAS WEBHOOK
-    if (body.event && body.payment) {
+    if (body.event && (body.payment || body.subscription || body.event.startsWith('SUBSCRIPTION_'))) {
       console.log('Processing Asaas Webhook event...')
+      
+      // Validate webhook token if configured
+      const ASAAS_WEBHOOK_TOKEN = process.env.ASAAS_WEBHOOK_TOKEN
+      const requestToken = request.headers.get('asaas-access-token')
+      if (ASAAS_WEBHOOK_TOKEN && requestToken !== ASAAS_WEBHOOK_TOKEN) {
+        console.error('Asaas webhook token verification failed!')
+        return NextResponse.json({ error: 'Token de autenticação inválido' }, { status: 401 })
+      }
+
       const subscriptionId = body.payment?.subscription || body.subscription
 
       if (!subscriptionId) {
