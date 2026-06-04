@@ -2,10 +2,18 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-)
+let supabaseInstance: any = null
+function getSupabase() {
+  if (!supabaseInstance) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!url || !key) {
+      throw new Error('Supabase URL or Key is missing from environment variables.')
+    }
+    supabaseInstance = createClient(url, key)
+  }
+  return supabaseInstance
+}
 
 export async function proxy(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
@@ -28,7 +36,7 @@ export async function proxy(request: NextRequest) {
     const cleanHost = hostname.replace(/^www\./, '')
     
     try {
-      const { data: store } = await supabase
+      const { data: store } = await getSupabase()
         .from('stores')
         .select('id')
         .or(`custom_domain.eq.${cleanHost},custom_domain.eq.www.${cleanHost}`)

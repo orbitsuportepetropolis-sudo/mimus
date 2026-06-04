@@ -1,16 +1,46 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-)
+let supabaseAdminInstance: any = null
+function getSupabaseAdmin() {
+  if (!supabaseAdminInstance) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!url || !key) {
+      throw new Error('Supabase URL or Key is missing from environment variables.')
+    }
+    supabaseAdminInstance = createClient(url, key)
+  }
+  return supabaseAdminInstance
+}
 
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY || ''
 const ASAAS_ENV = process.env.NEXT_PUBLIC_ASAAS_ENV || 'sandbox'
 const ASAAS_BASE_URL = ASAAS_ENV === 'production'
   ? 'https://api.asaas.com/v3'
   : 'https://sandbox.asaas.com/v3'
+
+// Helper for robust Asaas API fetching and error parsing
+async function asaasFetch(url: string, apiKey: string, options: RequestInit = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      'access_token': apiKey
+    }
+  })
+  const text = await response.text()
+  let data: any
+  try {
+    data = JSON.parse(text)
+  } catch (err) {
+    throw new Error(`Asaas API returned non-JSON response (Status ${response.status}): ${text.substring(0, 200)}`)
+  }
+  if (!response.ok) {
+    throw new Error(data.errors?.[0]?.description || `Asaas API error (Status ${response.status})`)
+  }
+  return data
+}
 
 export async function POST(request: Request) {
   try {
@@ -21,6 +51,7 @@ export async function POST(request: Request) {
     }
 
     const price = 49.00
+    const supabaseAdmin = getSupabaseAdmin()
 
     // MOCK MODE: If no Asaas API Key is configured, run simulated checkout
     const isMock = !ASAAS_API_KEY || ASAAS_API_KEY === 'sua_chave_do_asaas_aqui' || ASAAS_API_KEY.startsWith('seu_')
@@ -80,19 +111,10 @@ export async function POST(request: Request) {
     const cleanCpfCnpj = cpfCnpj.replace(/\D/g, '')
     const searchUrl = `${ASAAS_BASE_URL}/customers?cpfCnpj=${cleanCpfCnpj}`
     
-    const searchResponse = await fetch(searchUrl, {
-      method: 'GET',
-      headers: {
-        'access_token': ASAAS_API_KEY
-      }
+    const searchData = await asaasFetch(searchUrl, ASAAS_API_KEY, {
+      method: 'GET'
     })
 
-    if (!searchResponse.ok) {
-      const searchError = await searchResponse.json()
-      throw new Error(searchError.errors?.[0]?.description || 'Erro ao buscar cliente no Asaas.')
-    }
-
-    const searchData = await searchResponse.json()
     if (searchData.data && searchData.data.length > 0) {
       customerId = searchData.data[0].id
       console.log(`Found existing Asaas customer: ${customerId}`)
@@ -107,19 +129,13 @@ export async function POST(request: Request) {
         mobilePhone: phone || undefined
       }
 
-      const createCustomerResponse = await fetch(createCustomerUrl, {
+      const customerData = await asaasFetch(createCustomerUrl, ASAAS_API_KEY, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'access_token': ASAAS_API_KEY
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(customerPayload)
       })
-
-      const customerData = await createCustomerResponse.json()
-      if (!createCustomerResponse.ok) {
-        throw new Error(customerData.errors?.[0]?.description || 'Erro ao cadastrar cliente no Asaas.')
-      }
 
       customerId = customerData.id
       console.log(`Created new Asaas customer: ${customerId}`)
@@ -161,19 +177,13 @@ export async function POST(request: Request) {
 
     console.log('Creating monthly subscription in Asaas...')
     const createSubUrl = `${ASAAS_BASE_URL}/subscriptions`
-    const createSubResponse = await fetch(createSubUrl, {
+    const subData = await asaasFetch(createSubUrl, ASAAS_API_KEY, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'access_token': ASAAS_API_KEY
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(subscriptionPayload)
     })
-
-    const subData = await createSubResponse.json()
-    if (!createSubResponse.ok) {
-      throw new Error(subData.errors?.[0]?.description || 'Erro ao criar assinatura no Asaas.')
-    }
 
     const subscriptionId = subData.id
     console.log(`Successfully created Asaas subscription: ${subscriptionId}`)
@@ -203,14 +213,9 @@ export async function POST(request: Request) {
       await new Promise(resolve => setTimeout(resolve, 1500))
 
       const paymentsUrl = `${ASAAS_BASE_URL}/payments?subscription=${subscriptionId}`
-      const paymentsResponse = await fetch(paymentsUrl, {
-        method: 'GET',
-        headers: {
-          'access_token': ASAAS_API_KEY
-        }
+      const paymentsData = await asaasFetch(paymentsUrl, ASAAS_API_KEY, {
+        method: 'GET'
       })
-
-      const paymentsData = await paymentsResponse.json()
       const firstPayment = paymentsData.data?.[0]
       if (!firstPayment) {
         throw new Error('Cobrança da assinatura não gerada pelo Asaas.')
@@ -220,17 +225,9 @@ export async function POST(request: Request) {
 
       // Get Pix QR Code
       const pixUrl = `${ASAAS_BASE_URL}/payments/${paymentId}/pixQrCode`
-      const pixResponse = await fetch(pixUrl, {
-        method: 'GET',
-        headers: {
-          'access_token': ASAAS_API_KEY
-        }
+      const pixData = await asaasFetch(pixUrl, ASAAS_API_KEY, {
+        method: 'GET'
       })
-
-      const pixData = await pixResponse.json()
-      if (!pixResponse.ok) {
-        throw new Error(pixData.errors?.[0]?.description || 'Erro ao gerar QR Code Pix no Asaas.')
-      }
 
       return NextResponse.json({
         success: true,
