@@ -26,7 +26,36 @@ export default function LandingPage() {
   const [darkMode, setDarkMode] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'sales' | 'stock' | 'catalog' | 'finance'>('sales')
-  const [showTestimonial, setShowTestimonial] = useState(false)
+  const [activeAICommand, setActiveAICommand] = useState(0)
+  const [isTyping, setIsTyping] = useState(false)
+  const [displayedResponse, setDisplayedResponse] = useState('')
+
+  const aiCommands = [
+    {
+      label: 'Cadastrar Produto',
+      command: 'cadastre o produto Gloss Labial Aura Glow por R$ 39,90',
+      response: '✨ **Gloss Labial Aura Glow** cadastrado com sucesso! Preço de venda: **R$ 39,90**. Ele já está ativo na sua vitrine virtual! 🌸',
+      type: 'success'
+    },
+    {
+      label: 'Registrar Venda',
+      command: 'vendi 2 @Gloss Labial Aura Glow para a cliente @Letícia Costa por Pix',
+      response: '✅ **Venda Registrada!**\n• Produto: *Gloss Labial Aura Glow* (2 un.)\n• Cliente: *Letícia Costa*\n• Total: *R$ 79,80* (Pix)\n📉 Estoque atualizado automaticamente no Mimus e na Loja Integrada!',
+      type: 'sale'
+    },
+    {
+      label: 'Consultar Estoque',
+      command: '🎙️ Áudio: "Mimus, quais cosméticos estão com estoque baixo?"',
+      response: '⚠️ **Alerta de Estoque Crítico:**\n• *Delineador Holográfico Glow* (0 un. restantes)\n• *Batom Velvet BT* (2 un. restantes)\nPeça: "IA, gere lista de compras de fornecedores"',
+      type: 'warning'
+    },
+    {
+      label: 'Ver Faturamento',
+      command: 'quanto a loja faturou hoje?',
+      response: '📊 **Resumo Financeiro de Hoje:**\n• Faturamento: *R$ 684,20*\n• Lucro Líquido: *R$ 312,45* (+15% em relação a ontem)\n💰 Todas as vendas do PDV e WhatsApp integradas.',
+      type: 'finance'
+    }
+  ]
 
   // Sync theme with localStorage & document.documentElement class
   useEffect(() => {
@@ -38,17 +67,31 @@ export default function LandingPage() {
     } else {
       document.documentElement.classList.remove('dark')
     }
-
-    // Check if testimonial print exists in public folder
-    const img = new Image()
-    img.src = '/print.jpg'
-    img.onload = () => setShowTestimonial(true)
-    img.onerror = () => {
-      const img2 = new Image()
-      img2.src = '/depoimento.jpg'
-      img2.onload = () => setShowTestimonial(true)
-    }
   }, [])
+
+  // Animate chat simulation on activeAICommand change
+  useEffect(() => {
+    setIsTyping(true)
+    setDisplayedResponse('')
+    const timer = setTimeout(() => {
+      setIsTyping(false)
+      setDisplayedResponse(aiCommands[activeAICommand].response)
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [activeAICommand])
+
+  // Autoplay chat commands simulation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveAICommand((prev) => (prev + 1) % aiCommands.length)
+    }, 7000)
+    return () => clearInterval(interval)
+  }, [activeAICommand])
+
+  const handleSelectAICommand = (index: number) => {
+    setActiveAICommand(index)
+  }
 
   const toggleTheme = () => {
     const nextDark = !darkMode
@@ -532,61 +575,227 @@ export default function LandingPage() {
               </p>
             </div>
 
-            {/* Feature 6: Mimus AI Chat */}
-            <div className="group p-8 rounded-2xl border border-rose-500/20 dark:border-rose-500/25 bg-rose-500/[0.02] dark:bg-rose-500/[0.01] hover:bg-white dark:hover:bg-zinc-950 hover:border-rose-500/40 dark:hover:border-rose-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-rose-500/[0.04]">
+            {/* Feature 6: Integrations */}
+            <div className="group p-8 rounded-2xl border border-slate-100 dark:border-zinc-800/80 bg-slate-50/50 dark:bg-zinc-950/40 hover:bg-white dark:hover:bg-zinc-950 hover:border-rose-500/20 dark:hover:border-rose-500/20 transition-all duration-300 hover:shadow-xl hover:shadow-rose-500/[0.02]">
               <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center font-bold mb-6 transition-all duration-300 group-hover:scale-110">
-                <Sparkles className="w-6 h-6 text-rose-500" />
+                <Globe className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Mimus AI: Assistente por comandos</h3>
-              <p className="text-sm text-slate-550 dark:text-zinc-400 leading-relaxed">
-                Gerencie sua loja apenas conversando por texto ou áudio. Peça coisas como: <br />
-                <span className="font-semibold text-rose-650 dark:text-rose-400 font-mono text-xs">"IA: 'Quais produtos estão acabando?' ➔ Mimus responde na hora"</span>.
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Sincronização com a Loja Integrada</h3>
+              <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
+                Conecte sua loja física à sua loja online. O Mimus sincroniza o estoque automaticamente e importa suas vendas via webhook da Loja Integrada em tempo real.
               </p>
             </div>
 
           </div>
 
+        </div>
+      </section>
+
+      {/* MIMUS AI SECTION */}
+      <section id="mimus-ai" className="py-20 md:py-28 px-6 bg-slate-50 dark:bg-zinc-950 transition-colors duration-300 relative overflow-hidden border-t border-slate-100 dark:border-zinc-900">
+        
+        {/* Glow decoration */}
+        <div className="absolute top-1/2 left-1/2 w-[40rem] h-[40rem] bg-rose-500/5 dark:bg-rose-500/10 rounded-full blur-[120px] pointer-events-none -translate-x-1/2 -translate-y-1/2" />
+
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+          
+          {/* Left details */}
+          <div className="lg:col-span-5 flex flex-col items-center lg:items-start text-center lg:text-left space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/25">
+              <Sparkles className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+              <span className="text-xs font-semibold text-rose-600 dark:text-rose-400 tracking-wide uppercase">Diferencial Exclusivo</span>
+            </div>
+
+            <h2 className="text-3xl sm:text-4.5xl font-extrabold tracking-tight leading-tight text-slate-900 dark:text-white">
+              Sua loja gerenciada apenas por <span className="bg-gradient-to-r from-rose-600 to-pink-500 bg-clip-text text-transparent">comando de voz ou texto</span>
+            </h2>
+            
+            <p className="text-base text-slate-600 dark:text-zinc-400 max-w-lg leading-relaxed">
+              O Mimus AI é a forma mais rápida de controlar sua loja no dia a dia corrido. Sem formulários longos ou tabelas confusas: basta enviar uma mensagem como se estivesse no WhatsApp.
+            </p>
+
+            <div className="space-y-4 w-full">
+              <div className="flex gap-3 text-left">
+                <div className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Check className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-zinc-200">🎙️ Suporte a Comandos de Voz</h4>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">Grave áudios rápidos registrando vendas ou entradas enquanto atende sua cliente.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 text-left">
+                <div className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Check className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-zinc-200">🏷️ Marcações Inteligentes</h4>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">Use @ para marcar produtos e clientes e associar transações de forma precisa.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 text-left">
+                <div className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Check className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-zinc-200">📊 Resumos de Negócios na Hora</h4>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">Pergunte quanto faturou, o lucro do mês ou quais produtos estão acabando.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <Link 
+                href="/register" 
+                className="inline-flex items-center gap-2 px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-[0.98]"
+              >
+                Experimentar Mimus AI Grátis <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+
+          {/* Right chat simulation */}
+          <div className="lg:col-span-7 w-full flex flex-col space-y-4">
+            
+            {/* Quick Action Tabs */}
+            <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
+              {aiCommands.map((cmd, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleSelectAICommand(idx)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                    activeAICommand === idx
+                      ? 'bg-rose-600 border-rose-650 text-white shadow-md shadow-rose-500/10'
+                      : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
+                  }`}
+                >
+                  {cmd.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Chatbot Window */}
+            <div className="w-full bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/60 dark:border-zinc-800 shadow-2xl overflow-hidden min-h-[380px] flex flex-col justify-between">
+              
+              {/* Window Header */}
+              <div className="px-6 py-4 bg-slate-50 dark:bg-zinc-900/60 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center relative">
+                    <Sparkles className="w-5 h-5 text-rose-650 dark:text-rose-450 text-rose-600 dark:text-rose-400" />
+                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-900 animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800 dark:text-white">Mimus AI</h4>
+                    <span className="text-[10px] text-slate-400 dark:text-zinc-500">Assistente Virtual da Loja</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-slate-200 dark:bg-zinc-800" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-slate-200 dark:bg-zinc-800" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-slate-200 dark:bg-zinc-800" />
+                </div>
+              </div>
+
+              {/* Chat Body */}
+              <div className="p-6 flex-1 bg-slate-50/20 dark:bg-zinc-950/20 flex flex-col justify-end space-y-4">
+                
+                {/* User Message Bubble */}
+                <div className="self-end max-w-[85%] bg-rose-600 text-white rounded-2xl rounded-tr-none px-4 py-3 shadow-md text-sm font-medium animate-in fade-in slide-in-from-right-4 duration-300">
+                  <p className="font-mono text-xs opacity-90 mb-0.5">Sua Mensagem</p>
+                  <p className="leading-relaxed">
+                    {aiCommands[activeAICommand].command}
+                  </p>
+                </div>
+
+                {/* AI Response Bubble */}
+                <div className="self-start max-w-[85%] bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 text-slate-800 dark:text-zinc-200 rounded-2xl rounded-tl-none px-4 py-3.5 shadow-md text-sm animate-in fade-in slide-in-from-left-4 duration-300 min-h-[140px] flex flex-col justify-center">
+                  <p className="font-bold text-xs text-rose-500 dark:text-rose-400 mb-1">Mimus AI</p>
+                  
+                  {isTyping ? (
+                    <div className="flex items-center gap-1 py-1">
+                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  ) : (
+                    <div className="leading-relaxed whitespace-pre-line text-xs md:text-sm font-medium">
+                      {displayedResponse.split('\n').map((line, lIdx) => {
+                        const isBullet = line.trim().startsWith('•')
+                        
+                        return (
+                          <div key={lIdx} className={isBullet ? 'pl-3' : ''}>
+                            {line.split('**').map((part, pIdx) => {
+                              if (pIdx % 2 === 1) {
+                                return <strong key={pIdx} className="font-extrabold text-slate-900 dark:text-white">{part}</strong>
+                              }
+                              return part.split('*').map((subpart, sIdx) => {
+                                if (sIdx % 2 === 1) {
+                                  return <em key={sIdx} className="font-semibold italic text-rose-600 dark:text-rose-455 font-mono text-xs">{subpart}</em>
+                                }
+                                return subpart
+                              })
+                            })}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+
+              {/* Chat Input Mockup */}
+              <div className="p-4 bg-slate-50 dark:bg-zinc-900/60 border-t border-slate-100 dark:border-zinc-800 flex items-center gap-3">
+                <div className="flex-1 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-850 px-4 py-2.5 rounded-2xl text-xs text-slate-400 dark:text-zinc-500 flex items-center justify-between">
+                  <span>Experimente digitar um comando...</span>
+                  <Sparkles className="w-4 h-4 text-slate-350 dark:text-zinc-700" />
+                </div>
+                <button className="w-10 h-10 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-500/10 active:scale-95 transition-all">
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              </div>
+
+            </div>
+
+          </div>
 
         </div>
       </section>
 
       {/* TESTIMONIAL SECTION */}
-      {showTestimonial && (
-        <section id="testimonials" className="py-20 md:py-28 px-6 bg-rose-500/[0.02] dark:bg-rose-500/[0.01] transition-colors duration-300 border-t border-slate-100 dark:border-zinc-900">
-          <div className="max-w-7xl mx-auto space-y-12">
-            <div className="text-center space-y-4 max-w-2xl mx-auto">
-              <h2 className="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest">Histórias Reais</h2>
-              <p className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">Quem usa o Mimus aprova</p>
-              <p className="text-slate-500 dark:text-zinc-400 text-sm">Veja a experiência de quem transformou a gestão da sua loja de beleza.</p>
-            </div>
+      <section id="testimonials" className="py-20 md:py-28 px-6 bg-rose-500/[0.02] dark:bg-rose-500/[0.01] transition-colors duration-300 border-t border-slate-100 dark:border-zinc-900">
+        <div className="max-w-7xl mx-auto space-y-12">
+          <div className="text-center space-y-4 max-w-2xl mx-auto">
+            <h2 className="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest">Histórias Reais</h2>
+            <p className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">Quem usa o Mimus aprova</p>
+            <p className="text-slate-500 dark:text-zinc-400 text-sm">Veja a experiência de quem transformou a gestão da sua loja de beleza.</p>
+          </div>
 
-            <div className="max-w-2xl mx-auto bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-slate-100 dark:border-zinc-800/80 shadow-xl space-y-6 flex flex-col md:flex-row gap-8 items-center">
-              <div className="w-full md:w-1/2 rounded-2xl overflow-hidden border border-slate-100 dark:border-zinc-800 flex items-center justify-center bg-slate-50 dark:bg-zinc-950 max-h-[300px]">
-                <img 
-                  src="/print.jpg" 
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/depoimento.jpg'
-                  }}
-                  alt="Depoimento de cliente" 
-                  className="w-full h-full object-contain" 
-                />
-              </div>
-              <div className="w-full md:w-1/2 space-y-4 text-left">
-                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                  Caso de Sucesso 🏆
-                </span>
-                <p className="text-sm text-slate-650 dark:text-zinc-350 leading-relaxed italic">
-                  "O Mimus transformou a minha forma de vender. Antes eu anotava tudo no caderno e perdia o controle do estoque de maquiagens. Hoje eu vejo o meu lucro em segundos e sei exatamente quais produtos estão acabando!"
-                </p>
-                <div>
-                  <h4 className="font-bold text-slate-800 dark:text-white text-sm">Letícia França</h4>
-                  <p className="text-xs text-slate-400 font-medium">Loja Toque Delicado • Petrópolis - RJ</p>
-                </div>
+          <div className="max-w-2xl mx-auto bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-slate-100 dark:border-zinc-800/80 shadow-xl space-y-6 flex flex-col md:flex-row gap-8 items-center">
+            <div className="w-full md:w-1/2 rounded-2xl overflow-hidden border border-slate-100 dark:border-zinc-800 flex items-center justify-center bg-slate-50 dark:bg-zinc-950 max-h-[300px] shadow-inner">
+              <img 
+                src="/leticia_aura_glow.png" 
+                alt="Letícia Costa - Aura Glow" 
+                className="w-full h-full object-cover aspect-square" 
+              />
+            </div>
+            <div className="w-full md:w-1/2 space-y-4 text-left">
+              <span className="text-[10px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                Caso de Sucesso 🏆
+              </span>
+              <p className="text-sm text-slate-650 dark:text-zinc-350 leading-relaxed italic">
+                "O Mimus salvou a minha rotina de vendas na Aura Glow. Antes eu perdia muito tempo anotando tudo em cadernos e esquecia de dar baixa no estoque. Agora eu controlo minhas vendas e finanças em segundos pelo celular, e minhas clientes amam comprar pela vitrine do WhatsApp! O assistente por inteligência artificial é surreal de prático."
+              </p>
+              <div>
+                <h4 className="font-bold text-slate-800 dark:text-white text-sm">Letícia Costa</h4>
+                <p className="text-xs text-slate-400 font-medium">Proprietária da Aura Glow • Petrópolis - RJ</p>
               </div>
             </div>
           </div>
-        </section>
-      )}
+        </div>
+      </section>
 
       {/* PRICING SECTION */}
       <section id="pricing" className="py-20 md:py-28 px-6 bg-slate-50 dark:bg-zinc-950 transition-colors duration-300">
@@ -740,9 +949,9 @@ export default function LandingPage() {
           </div>
           
           <div className="flex items-center gap-6 text-xs">
-            <a href="#" className="hover:text-slate-800 dark:hover:text-zinc-200">Termos de Uso</a>
-            <a href="#" className="hover:text-slate-800 dark:hover:text-zinc-200">Políticas de Privacidade</a>
-            <a href="#" className="hover:text-slate-800 dark:hover:text-zinc-200">Suporte</a>
+            <Link href="/terms" className="hover:text-slate-800 dark:hover:text-zinc-200">Termos de Uso</Link>
+            <Link href="/privacy" className="hover:text-slate-800 dark:hover:text-zinc-200">Políticas de Privacidade</Link>
+            <Link href="/suporte" className="hover:text-slate-800 dark:hover:text-zinc-200">Suporte</Link>
           </div>
 
           <p className="text-[11px]">&copy; {new Date().getFullYear()} Mimus Software Ltda. Todos os direitos reservados.</p>
