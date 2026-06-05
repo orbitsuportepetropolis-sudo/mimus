@@ -55,7 +55,7 @@ export default function TermosPage() {
           <section className="space-y-3">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">3. Planos, Cobrança e Cancelamento</h2>
             <ul className="list-disc pl-5 space-y-1">
-              <li><strong>Plano Grátis:</strong> Disponibiliza controle essencial de estoque e vendas limitado a 10 produtos e 1 operador, sendo gratuito por tempo ilimitado.</li>
+              <li><strong>Plano Grátis:</strong> Disponibiliza controle essencial de estoque e vendas limitado a 50 produtos e 1 operador, sendo gratuito por tempo ilimitado.</li>
               <li><strong>Plano Pro:</strong> Cobrança mensal recorrente no valor de R$ 49,00. Dá direito a produtos e operadores ilimitados, relatórios financeiros e vitrine customizada.</li>
               <li><strong>Cancelamento:</strong> O plano Pro pode ser cancelado a qualquer momento pelo painel de controle. Não há taxas de fidelidade ou multas de rescisão.</li>
             </ul>

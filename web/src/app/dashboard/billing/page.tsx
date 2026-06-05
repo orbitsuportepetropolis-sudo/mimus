@@ -259,7 +259,7 @@ export default function BillingPage() {
     }
   }
 
-  const productsPercentage = Math.min(100, (productCount / 10) * 100)
+  const productsPercentage = Math.min(100, (productCount / 50) * 100)
   const isTrialActive = planStatus === 'trial' && getTrialDaysLeft() > 0
   const price = 49.00
 
@@ -334,7 +334,7 @@ export default function BillingPage() {
         <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-100 dark:border-zinc-800 shadow-sm space-y-4">
           <div className="flex justify-between items-center text-xs">
             <span className="font-bold text-slate-700 dark:text-zinc-300">Uso do Plano Free (Limite de Cadastro)</span>
-            <span className="font-bold text-rose-600">{productCount} / 10 Produtos</span>
+            <span className="font-bold text-rose-600">{productCount} / 50 Produtos</span>
           </div>
           <div className="w-full bg-slate-100 dark:bg-zinc-950 h-3 rounded-full overflow-hidden">
             <div 
@@ -344,7 +344,7 @@ export default function BillingPage() {
           </div>
           <p className="text-[10px] text-slate-400 dark:text-zinc-500 leading-normal flex items-start gap-1">
             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-rose-500" />
-            No plano gratuito, você pode cadastrar até 10 produtos. Faça o upgrade para o Pro para cadastrar produtos ilimitados, liberar acesso para sua equipe e sincronizar com lojas online.
+            No plano gratuito, você pode cadastrar até 50 produtos. Faça o upgrade para o Pro para cadastrar produtos ilimitados, liberar acesso para sua equipe e sincronizar com lojas online.
           </p>
         </div>
       )}
@@ -372,7 +372,7 @@ export default function BillingPage() {
             </div>
             <div className="h-px bg-slate-50 dark:bg-zinc-800 my-4" />
             <ul className="space-y-2.5 text-xs text-slate-600 dark:text-zinc-300">
-              <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500 flex-shrink-0" /> Limite de 10 produtos</li>
+              <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500 flex-shrink-0" /> Limite de 50 produtos</li>
               <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500 flex-shrink-0" /> 1 usuário (Admin)</li>
               <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500 flex-shrink-0" /> Controle de vendas básico (PDV)</li>
               <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500 flex-shrink-0" /> Fluxo de caixa básico</li>

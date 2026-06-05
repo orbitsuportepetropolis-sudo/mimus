@@ -102,7 +102,7 @@ export default function TermsPage() {
             4. Planos, Assinaturas e Cancelamento
           </h2>
           <ul className="list-disc pl-6 space-y-2">
-            <li><strong>Plano Grátis:</strong> Permite cadastrar até 10 produtos e ter 1 usuária na conta, sem custo mensal, de forma vitalícia.</li>
+            <li><strong>Plano Grátis:</strong> Permite cadastrar até 50 produtos e ter 1 usuária na conta, sem custo mensal, de forma vitalícia.</li>
             <li><strong>Plano Pro:</strong> Oferece cadastro ilimitado de produtos, usuárias de equipe, relatórios financeiros avançados, vitrine virtual com banners premium e domínio personalizado mediante pagamento de assinatura mensal.</li>
             <li><strong>Cancelamento:</strong> A assinatura Pro pode ser cancelada a qualquer momento diretamente pelo painel financeiro, sem cobrança de multas rescisórias. O acesso às funcionalidades Pro será mantido até o final do período faturado corrente.</li>
           </ul>

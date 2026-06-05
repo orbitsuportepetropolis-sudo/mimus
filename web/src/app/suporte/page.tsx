@@ -12,7 +12,7 @@ interface FAQItem {
 const faqs: FAQItem[] = [
   {
     question: "O Mimus é realmente grátis?",
-    answer: "Sim! O plano essencial do Mimus é 100% gratuito e vitalício, permitindo que você cadastre até 10 produtos e registre vendas ilimitadas. Conforme a sua loja cresce, você pode migrar para o plano Pro para ter recursos adicionais."
+    answer: "Sim! O plano essencial do Mimus é 100% gratuito e vitalício, permitindo que você cadastre até 50 produtos e registre vendas ilimitadas. Conforme a sua loja cresce, você pode migrar para o plano Pro para ter recursos adicionais."
   },
   {
     question: "Como funciona a integração com a Loja Integrada?",
