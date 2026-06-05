@@ -13,7 +13,10 @@ import {
   AlertTriangle,
   Calendar,
   X,
-  Upload
+  Upload,
+  Save,
+  Eye,
+  History
 } from 'lucide-react'
 
 interface Product {
@@ -34,6 +37,32 @@ interface Product {
   has_free_shipping?: boolean
 }
 
+interface StockEntry {
+  id: string
+  date: string
+  supplier: string | null
+  observations: string | null
+  total_value: number
+  total_items: number
+  created_at: string
+}
+
+interface EntryItemDetails {
+  id: string
+  product_name: string
+  sku: string | null
+  quantity: number
+  unit_cost: number
+  total_cost: number
+}
+
+interface LocalEntryItem {
+  productId: string
+  productName: string
+  quantity: number
+  totalCost: number
+}
+
 export default function ProductsPage() {
   const supabase = createClient()
   const [products, setProducts] = useState<Product[]>([])
@@ -43,6 +72,39 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+
+  // Navigation
+  const [activeTab, setActiveTab] = useState<'list' | 'entry' | 'history'>('list')
+
+  // Stock Entry Form States
+  const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0])
+  const [entrySupplier, setEntrySupplier] = useState('')
+  const [entryObservations, setEntryObservations] = useState('')
+  
+  // Local list of items for the current stock entry
+  const [localEntryItems, setLocalEntryItems] = useState<LocalEntryItem[]>([])
+  
+  // Selection fields for current item being added
+  const [selectedProductId, setSelectedProductId] = useState('')
+  const [selectedQty, setSelectedQty] = useState('1')
+  const [selectedTotalCost, setSelectedTotalCost] = useState('0.00')
+  const [productSearchTerm, setProductSearchTerm] = useState('')
+  const [showProductDropdown, setShowProductDropdown] = useState(false)
+
+  // Save Entry loading/error states
+  const [entryLoading, setEntryLoading] = useState(false)
+  const [entryError, setEntryError] = useState<string | null>(null)
+
+  // History tab states
+  const [stockEntries, setStockEntries] = useState<StockEntry[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+  
+  // Details Modal states
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false)
+  const [selectedEntry, setSelectedEntry] = useState<StockEntry | null>(null)
+  const [entryDetailsItems, setEntryDetailsItems] = useState<EntryItemDetails[]>([])
+  const [detailsLoading, setDetailsLoading] = useState(false)
 
   // Batch import states
   const [batchModalOpen, setBatchModalOpen] = useState(false)
@@ -306,6 +368,223 @@ export default function ProductsPage() {
     window.addEventListener('dashboard-refresh', loadProducts)
     return () => window.removeEventListener('dashboard-refresh', loadProducts)
   }, [])
+
+  useEffect(() => {
+    if (activeTab === 'history') {
+      loadHistory()
+    }
+  }, [activeTab])
+
+  async function loadHistory() {
+    try {
+      setHistoryLoading(true)
+      setHistoryError(null)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('store_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) return
+      const storeId = profile.store_id
+
+      const { data, error } = await supabase
+        .from('stock_entries')
+        .select('*')
+        .eq('store_id', storeId)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        if (error.code === '42P01') {
+          throw new Error('A tabela stock_entries não existe. Por favor, execute o script SQL fornecido nas instruções no editor SQL do Supabase.')
+        }
+        throw error
+      }
+
+      if (data) {
+        setStockEntries(data)
+      }
+    } catch (err: any) {
+      console.error(err)
+      setHistoryError(err.message || 'Erro ao carregar histórico.')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  async function loadEntryDetails(entry: StockEntry) {
+    try {
+      setSelectedEntry(entry)
+      setDetailsLoading(true)
+      setDetailsModalOpen(true)
+      setEntryDetailsItems([])
+
+      const { data, error } = await supabase
+        .from('stock_entry_items')
+        .select(`
+          id,
+          quantity,
+          unit_cost,
+          total_cost,
+          products (
+            name,
+            sku
+          )
+        `)
+        .eq('entry_id', entry.id)
+
+      if (error) throw error
+
+      if (data) {
+        const formatted: EntryItemDetails[] = data.map((item: any) => ({
+          id: item.id,
+          product_name: item.products?.name || 'Produto Excluído',
+          sku: item.products?.sku || null,
+          quantity: item.quantity,
+          unit_cost: Number(item.unit_cost),
+          total_cost: Number(item.total_cost)
+        }))
+        setEntryDetailsItems(formatted)
+      }
+    } catch (err: any) {
+      console.error(err)
+      alert('Erro ao carregar detalhes da entrada: ' + err.message)
+    } finally {
+      setDetailsLoading(false)
+    }
+  }
+
+  async function handleSaveStockEntry() {
+    if (localEntryItems.length === 0) {
+      setEntryError('Adicione pelo menos um produto na lista.')
+      return
+    }
+
+    setEntryLoading(true)
+    setEntryError(null)
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Não autenticado')
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('store_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) throw new Error('Loja não encontrada')
+      const storeId = profile.store_id
+
+      const totalValue = localEntryItems.reduce((sum, item) => sum + item.totalCost, 0)
+      const totalItems = localEntryItems.reduce((sum, item) => sum + item.quantity, 0)
+
+      // 1. Insert header
+      const { data: newEntry, error: entryErr } = await supabase
+        .from('stock_entries')
+        .insert([{
+          store_id: storeId,
+          date: entryDate,
+          supplier: entrySupplier || null,
+          observations: entryObservations || null,
+          total_value: totalValue,
+          total_items: totalItems
+        }])
+        .select()
+        .single()
+
+      if (entryErr) {
+        if (entryErr.code === '42P01') {
+          throw new Error('A tabela stock_entries não existe. É necessário executar o script SQL no editor do Supabase primeiro.')
+        }
+        throw entryErr
+      }
+
+      const entryId = newEntry.id
+
+      // 2. Insert detailed items and stock movements, and update product cost
+      for (const item of localEntryItems) {
+        const unitCost = item.totalCost / item.quantity
+
+        // 2a. Insert stock_entry_items
+        const { error: itemErr } = await supabase
+          .from('stock_entry_items')
+          .insert([{
+            entry_id: entryId,
+            product_id: item.productId,
+            quantity: item.quantity,
+            unit_cost: unitCost,
+            total_cost: item.totalCost
+          }])
+
+        if (itemErr) throw itemErr
+
+        // 2b. Insert stock_movements (this automatically triggers public.update_product_stock() at DB level)
+        const { error: movementErr } = await supabase
+          .from('stock_movements')
+          .insert([{
+            store_id: storeId,
+            product_id: item.productId,
+            quantity: item.quantity,
+            type: 'entry',
+            reason: 'purchase'
+          }])
+
+        if (movementErr) throw movementErr
+
+        // 2c. Update cost price on products table
+        const { error: productUpdateErr } = await supabase
+          .from('products')
+          .update({ cost_price: unitCost })
+          .eq('id', item.productId)
+          .eq('store_id', storeId)
+
+        if (productUpdateErr) throw productUpdateErr
+      }
+
+      // 3. Insert financial transaction (expense)
+      const supplierLabel = entrySupplier ? ` - Fornecedor: ${entrySupplier}` : ''
+      const { error: financeErr } = await supabase
+        .from('financial_transactions')
+        .insert([{
+          store_id: storeId,
+          type: 'expense',
+          value: totalValue,
+          category: 'supplier',
+          description: `Compra de Mercadorias${supplierLabel}`,
+          date: entryDate
+        }])
+
+      if (financeErr) {
+        console.error('Erro ao integrar com financeiro:', financeErr)
+      }
+
+      // Reset form
+      setLocalEntryItems([])
+      setEntrySupplier('')
+      setEntryObservations('')
+      setEntryDate(new Date().toISOString().split('T')[0])
+      
+      // Reload lists
+      await loadProducts()
+      await loadHistory()
+
+      window.dispatchEvent(new CustomEvent('dashboard-refresh'))
+
+      setActiveTab('list')
+      alert('Entrada de mercadorias salva com sucesso!')
+
+    } catch (err: any) {
+      console.error(err)
+      setEntryError(err.message || 'Erro ao salvar a entrada de mercadorias.')
+    } finally {
+      setEntryLoading(false)
+    }
+  }
 
   async function loadProducts() {
     try {
@@ -634,168 +913,551 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400 dark:text-zinc-500" />
-            <input
-              type="text"
-              placeholder="Buscar por nome, SKU ou código de barras..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs transition-all duration-150"
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            {/* Category Select */}
-            <div className="flex items-center gap-2 border border-slate-200 dark:border-zinc-800 rounded-xl px-3 py-1 bg-slate-50/50 dark:bg-zinc-950/50">
-              <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Cat:</span>
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="bg-transparent border-0 text-xs font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none"
-              >
-                <option value="all">Todas</option>
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-
-            {/* Brand Select */}
-            <div className="flex items-center gap-2 border border-slate-200 dark:border-zinc-800 rounded-xl px-3 py-1 bg-slate-50/50 dark:bg-zinc-950/50">
-              <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Marca:</span>
-              <select
-                value={brandFilter}
-                onChange={(e) => setBrandFilter(e.target.value)}
-                className="bg-transparent border-0 text-xs font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none"
-              >
-                <option value="all">Todas</option>
-                {brands.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
-            </div>
-
-            {/* Alerts Filter */}
-            <div className="flex items-center gap-2 border border-slate-200 dark:border-zinc-800 rounded-xl px-3 py-1 bg-slate-50/50 dark:bg-zinc-950/50">
-              <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Status:</span>
-              <select
-                value={alertFilter}
-                onChange={(e) => setAlertFilter(e.target.value)}
-                className="bg-transparent border-0 text-xs font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none"
-              >
-                <option value="all">Normal</option>
-                <option value="low_stock">Estoque Baixo</option>
-                <option value="expiring">Vencimento Próximo</option>
-              </select>
-            </div>
-          </div>
-        </div>
+      {/* Sub navigation Tabs */}
+      <div className="flex border-b border-slate-200 dark:border-zinc-800 mb-6">
+        <button
+          onClick={() => setActiveTab('list')}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${
+            activeTab === 'list'
+              ? 'border-rose-600 text-rose-650 dark:text-white font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+          }`}
+        >
+          Lista de Produtos
+        </button>
+        <button
+          onClick={() => setActiveTab('entry')}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${
+            activeTab === 'entry'
+              ? 'border-rose-600 text-rose-650 dark:text-white font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+          }`}
+        >
+          Entrada de Mercadorias
+        </button>
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${
+            activeTab === 'history'
+              ? 'border-rose-600 text-rose-650 dark:text-white font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+          }`}
+        >
+          Histórico de Entradas
+        </button>
       </div>
 
-      {/* Products Table/Grid */}
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
-        </div>
-      ) : filteredProducts.length === 0 ? (
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-100 dark:border-zinc-800 p-12 text-center">
-          <p className="text-slate-400 dark:text-zinc-500 text-sm">Nenhum produto cadastrado ou correspondente aos filtros.</p>
-          <button 
-            onClick={() => openModal()}
-            className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-rose-600 hover:text-rose-500"
-          >
-            Adicionar o primeiro produto <Plus className="w-4 h-4" />
-          </button>
-        </div>
-      ) : (
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="border-b border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/30 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
-                  <th className="px-6 py-4">Produto</th>
-                  <th className="px-6 py-4">Categoria / Marca</th>
-                  <th className="px-6 py-4">Preço Venda</th>
-                  <th className="px-6 py-4">Estoque</th>
-                  <th className="px-6 py-4">Validade</th>
-                  <th className="px-6 py-4 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50 dark:divide-zinc-800/40 text-xs">
-                {filteredProducts.map((p) => {
-                  const isLowStock = p.quantity_in_stock <= p.min_stock_alert
-                  const isExpiring = p.expiration_date && (() => {
-                    const limit = new Date()
-                    limit.setDate(limit.getDate() + 30)
-                    return new Date(p.expiration_date) <= limit && new Date(p.expiration_date) >= new Date()
-                  })()
+      {/* Conditional rendering based on activeTab */}
+      {activeTab === 'list' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Filter and Search Bar */}
+          <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm space-y-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400 dark:text-zinc-500" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nome, SKU ou código de barras..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs transition-all duration-150"
+                />
+              </div>
 
-                  return (
-                    <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-zinc-950/10">
-                      <td className="px-6 py-4 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-zinc-800 overflow-hidden flex items-center justify-center flex-shrink-0 border border-slate-200/50 dark:border-zinc-800">
-                          {p.image_url ? (
-                            <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <ImageIcon className="w-5 h-5 text-slate-400" />
-                          )}
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-slate-700 dark:text-zinc-200">{p.name}</h4>
-                          <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">{p.sku || 'Sem SKU'}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-semibold text-slate-700 dark:text-zinc-300">{p.category || 'Outros'}</span>
-                        <p className="text-[10px] text-slate-400 dark:text-zinc-500">{p.brand || 'Sem marca'}</p>
-                      </td>
-                      <td className="px-6 py-4 font-bold text-slate-800 dark:text-zinc-200">
-                        R$ {p.sale_price.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`font-bold ${isLowStock ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-zinc-300'}`}>
-                            {p.quantity_in_stock} un.
-                          </span>
-                          {isLowStock && (
-                            <span title="Estoque abaixo do recomendado!"><AlertTriangle className="w-3.5 h-3.5 text-amber-500" /></span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {p.expiration_date ? (
-                          <div className="flex items-center gap-1">
-                            <span className={isExpiring ? 'text-pink-600 font-semibold' : 'text-slate-500 dark:text-zinc-400'}>
-                              {new Date(p.expiration_date).toLocaleDateString('pt-BR')}
-                            </span>
-                            {isExpiring && <span title="Maquiagem vencendo em menos de 30 dias!"><Calendar className="w-3.5 h-3.5 text-pink-500" /></span>}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right space-x-2">
-                        <button
-                          onClick={() => openModal(p)}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
-                          title="Editar"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(p.id)}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
-                          title="Excluir"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+              <div className="flex flex-wrap gap-3">
+                {/* Category Select */}
+                <div className="flex items-center gap-2 border border-slate-200 dark:border-zinc-800 rounded-xl px-3 py-1 bg-slate-50/50 dark:bg-zinc-950/50">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Cat:</span>
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="bg-transparent border-0 text-xs font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none"
+                  >
+                    <option value="all">Todas</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                {/* Brand Select */}
+                <div className="flex items-center gap-2 border border-slate-200 dark:border-zinc-800 rounded-xl px-3 py-1 bg-slate-50/50 dark:bg-zinc-950/50">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Marca:</span>
+                  <select
+                    value={brandFilter}
+                    onChange={(e) => setBrandFilter(e.target.value)}
+                    className="bg-transparent border-0 text-xs font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none"
+                  >
+                    <option value="all">Todas</option>
+                    {brands.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+
+                {/* Alerts Filter */}
+                <div className="flex items-center gap-2 border border-slate-200 dark:border-zinc-800 rounded-xl px-3 py-1 bg-slate-50/50 dark:bg-zinc-950/50">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Status:</span>
+                  <select
+                    value={alertFilter}
+                    onChange={(e) => setAlertFilter(e.target.value)}
+                    className="bg-transparent border-0 text-xs font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none"
+                  >
+                    <option value="all">Normal</option>
+                    <option value="low_stock">Estoque Baixo</option>
+                    <option value="expiring">Vencimento Próximo</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
+
+          {/* Products Table/Grid */}
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-100 dark:border-zinc-800 p-12 text-center">
+              <p className="text-slate-400 dark:text-zinc-500 text-sm">Nenhum produto cadastrado ou correspondente aos filtros.</p>
+              <button 
+                onClick={() => openModal()}
+                className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-rose-600 hover:text-rose-500"
+              >
+                Adicionar o primeiro produto <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/30 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
+                      <th className="px-6 py-4">Produto</th>
+                      <th className="px-6 py-4">Categoria / Marca</th>
+                      <th className="px-6 py-4">Preço Venda</th>
+                      <th className="px-6 py-4">Estoque</th>
+                      <th className="px-6 py-4">Validade</th>
+                      <th className="px-6 py-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 dark:divide-zinc-800/40 text-xs">
+                    {filteredProducts.map((p) => {
+                      const isLowStock = p.quantity_in_stock <= p.min_stock_alert
+                      const isExpiring = p.expiration_date && (() => {
+                        const limit = new Date()
+                        limit.setDate(limit.getDate() + 30)
+                        return new Date(p.expiration_date) <= limit && new Date(p.expiration_date) >= new Date()
+                      })()
+
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-zinc-950/10">
+                          <td className="px-6 py-4 flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-zinc-800 overflow-hidden flex items-center justify-center flex-shrink-0 border border-slate-200/50 dark:border-zinc-800">
+                              {p.image_url ? (
+                                <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <ImageIcon className="w-5 h-5 text-slate-400" />
+                              )}
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-slate-700 dark:text-zinc-200">{p.name}</h4>
+                              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">{p.sku || 'Sem SKU'}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="font-semibold text-slate-700 dark:text-zinc-300">{p.category || 'Outros'}</span>
+                            <p className="text-[10px] text-slate-400 dark:text-zinc-500">{p.brand || 'Sem marca'}</p>
+                          </td>
+                          <td className="px-6 py-4 font-bold text-slate-800 dark:text-zinc-200">
+                            R$ {p.sale_price.toFixed(2)}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`font-bold ${isLowStock ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-zinc-300'}`}>
+                                {p.quantity_in_stock} un.
+                              </span>
+                              {isLowStock && (
+                                <span title="Estoque abaixo do recomendado!"><AlertTriangle className="w-3.5 h-3.5 text-amber-500" /></span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            {p.expiration_date ? (
+                              <div className="flex items-center gap-1">
+                                <span className={isExpiring ? 'text-pink-600 font-semibold' : 'text-slate-500 dark:text-zinc-400'}>
+                                  {new Date(p.expiration_date).toLocaleDateString('pt-BR')}
+                                </span>
+                                {isExpiring && <span title="Maquiagem vencendo em menos de 30 dias!"><Calendar className="w-3.5 h-3.5 text-pink-500" /></span>}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-right space-x-2">
+                            <button
+                              onClick={() => openModal(p)}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                              title="Editar"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(p.id)}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                              title="Excluir"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Stock Entry View */}
+      {activeTab === 'entry' && (() => {
+        const filteredSearchProducts = products.filter(p => 
+          !productSearchTerm || p.name.toLowerCase().includes(productSearchTerm.toLowerCase()) || 
+          (p.sku && p.sku.toLowerCase().includes(productSearchTerm.toLowerCase()))
+        )
+
+        return (
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm space-y-6 animate-in fade-in duration-200">
+            <div className="border-b border-slate-100 dark:border-zinc-800/80 pb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-slate-800 dark:text-white">Registrar Entrada de Mercadorias</h3>
+                <p className="text-xs text-slate-400 dark:text-zinc-500">Insira a data, fornecedor e adicione os itens recebidos.</p>
+              </div>
+            </div>
+
+            {entryError && (
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs font-semibold rounded-xl border border-rose-100 dark:border-rose-900/30">
+                {entryError}
+              </div>
+            )}
+
+            {/* Grid Dados Gerais */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Data da Compra *</label>
+                <input
+                  type="date"
+                  required
+                  value={entryDate}
+                  onChange={(e) => setEntryDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Fornecedor (Opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Distribuidora Beleza ou Fabricante"
+                  value={entrySupplier}
+                  onChange={(e) => setEntrySupplier(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Observações (Opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Compra de lote promocional de batons"
+                  value={entryObservations}
+                  onChange={(e) => setEntryObservations(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 dark:border-zinc-800/80 pt-6">
+              <h4 className="text-xs font-bold text-slate-700 dark:text-zinc-300 uppercase tracking-wider mb-4">Adicionar Itens</h4>
+              
+              {/* Form para adicionar item individual à lista local */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end bg-slate-50/40 dark:bg-zinc-950/20 p-4 rounded-2xl border border-slate-100 dark:border-zinc-800/40">
+                <div className="md:col-span-6 relative">
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Produto *</label>
+                  <input
+                    type="text"
+                    placeholder="Digite o nome do produto cadastrado..."
+                    value={productSearchTerm}
+                    onChange={(e) => {
+                      setProductSearchTerm(e.target.value)
+                      setShowProductDropdown(true)
+                    }}
+                    onFocus={() => setShowProductDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowProductDropdown(false), 200)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs"
+                  />
+                  {showProductDropdown && (
+                    <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl max-h-48 overflow-y-auto z-50 divide-y divide-slate-100 dark:divide-zinc-800/60 text-xs">
+                      {filteredSearchProducts.length === 0 ? (
+                        <div className="p-3 text-slate-400 dark:text-zinc-500 text-center">Nenhum produto cadastrado com este nome.</div>
+                      ) : (
+                        filteredSearchProducts.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedProductId(p.id)
+                              setProductSearchTerm(p.name)
+                              setShowProductDropdown(false)
+                            }}
+                            className="w-full text-left px-3 py-2.5 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-slate-700 dark:text-zinc-200 flex items-center justify-between"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-semibold truncate">🛍️ {p.name}</span>
+                              {p.sku && <span className="text-[9px] text-slate-400 font-mono">{p.sku}</span>}
+                            </div>
+                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 ml-2 flex-shrink-0 font-mono">Estoque: {p.quantity_in_stock} un. • Custo: R$ {p.cost_price.toFixed(2)}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Qtd Comprada *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={selectedQty}
+                    onChange={(e) => setSelectedQty(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Valor Pago Lote (R$) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={selectedTotalCost}
+                    onChange={(e) => setSelectedTotalCost(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const qty = parseInt(selectedQty)
+                      const cost = parseFloat(selectedTotalCost)
+                      if (!selectedProductId) {
+                        alert('Selecione um produto cadastrado.')
+                        return
+                      }
+                      if (isNaN(qty) || qty <= 0) {
+                        alert('A quantidade deve ser maior que 0.')
+                        return
+                      }
+                      if (isNaN(cost) || cost <= 0) {
+                        alert('O valor total pago deve ser maior que 0.')
+                        return
+                      }
+
+                      if (localEntryItems.some(i => i.productId === selectedProductId)) {
+                        alert('Este produto já foi adicionado na lista de entrada.')
+                        return
+                      }
+
+                      const prod = products.find(p => p.id === selectedProductId)
+                      if (prod) {
+                        setLocalEntryItems([
+                          ...localEntryItems,
+                          {
+                            productId: selectedProductId,
+                            productName: prod.name,
+                            quantity: qty,
+                            totalCost: cost
+                          }
+                        ])
+                        setSelectedProductId('')
+                        setProductSearchTerm('')
+                        setSelectedQty('1')
+                        setSelectedTotalCost('0.00')
+                      }
+                    }}
+                    className="w-full py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all"
+                  >
+                    Adicionar Item
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Grade de Itens Temporários */}
+            <div className="border-t border-slate-100 dark:border-zinc-800/80 pt-6 space-y-4">
+              <h4 className="text-xs font-bold text-slate-700 dark:text-zinc-300 uppercase tracking-wider">Itens da Entrada</h4>
+              
+              {localEntryItems.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50/40 dark:bg-zinc-950/20 border border-dashed border-slate-200 dark:border-zinc-800 rounded-2xl">
+                  <p className="text-xs text-slate-400 dark:text-zinc-500">Nenhum produto adicionado para esta entrada.</p>
+                </div>
+              ) : (
+                <div className="border border-slate-100 dark:border-zinc-800/80 rounded-2xl overflow-hidden shadow-sm">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/30 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
+                        <th className="px-4 py-3">Produto</th>
+                        <th className="px-4 py-3">Quantidade</th>
+                        <th className="px-4 py-3">Valor do Lote</th>
+                        <th className="px-4 py-3">Custo Unitário</th>
+                        <th className="px-4 py-3 text-right">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50 dark:divide-zinc-800/40">
+                      {localEntryItems.map((item, idx) => {
+                        const unitCost = item.totalCost / item.quantity
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50/40 dark:hover:bg-zinc-950/10">
+                            <td className="px-4 py-3 font-semibold text-slate-800 dark:text-zinc-200">{item.productName}</td>
+                            <td className="px-4 py-3 font-mono">{item.quantity} un.</td>
+                            <td className="px-4 py-3 font-bold text-slate-850 dark:text-zinc-200">R$ {item.totalCost.toFixed(2)}</td>
+                            <td className="px-4 py-3 font-mono text-emerald-600 dark:text-emerald-400">R$ {unitCost.toFixed(2)}</td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setLocalEntryItems(localEntryItems.filter((_, i) => i !== idx))}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                                title="Remover item"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Resumo Financeiro & Salvar */}
+            <div className="border-t border-slate-100 dark:border-zinc-800/80 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="p-4 rounded-xl bg-slate-50/60 dark:bg-zinc-950/40 border border-slate-100 dark:border-zinc-800/60 flex gap-6 text-xs w-full sm:w-auto">
+                <div>
+                  <span className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase tracking-wider font-semibold">Total de Itens</span>
+                  <p className="text-base font-bold text-slate-800 dark:text-zinc-200 mt-0.5 font-mono">
+                    {localEntryItems.reduce((sum, item) => sum + item.quantity, 0)} un.
+                  </p>
+                </div>
+                <div className="w-px bg-slate-200 dark:bg-zinc-800" />
+                <div>
+                  <span className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase tracking-wider font-semibold">Valor Total Pago</span>
+                  <p className="text-base font-extrabold text-rose-650 dark:text-rose-450 mt-0.5 font-mono">
+                    R$ {localEntryItems.reduce((sum, item) => sum + item.totalCost, 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLocalEntryItems([])
+                    setActiveTab('list')
+                  }}
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors w-full sm:w-auto"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveStockEntry}
+                  disabled={entryLoading || localEntryItems.length === 0}
+                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-500/10 flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-[0.98] transition-all w-full sm:w-auto"
+                >
+                  {entryLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <Save className="w-4 h-4" /> Salvar Entrada
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Stock Entries History View */}
+      {activeTab === 'history' && (
+        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm space-y-4 animate-in fade-in duration-200">
+          <div className="border-b border-slate-100 dark:border-zinc-800/80 pb-3">
+            <h3 className="text-base font-bold text-slate-800 dark:text-white">Histórico de Entradas de Mercadorias</h3>
+            <p className="text-xs text-slate-400 dark:text-zinc-500">Consulte todas as compras e entradas de lote registradas.</p>
+          </div>
+
+          {historyError && (
+            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 text-xs font-medium rounded-xl border border-amber-100 dark:border-amber-900/30 flex flex-col gap-2">
+              <p>{historyError}</p>
+            </div>
+          )}
+
+          {historyLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
+            </div>
+          ) : stockEntries.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-xs text-slate-450 dark:text-zinc-500">Nenhuma entrada de estoque registrada no histórico.</p>
+              <button
+                onClick={() => setActiveTab('entry')}
+                className="mt-3 text-xs font-bold text-rose-600 hover:text-rose-500 flex items-center gap-1 mx-auto"
+              >
+                Lançar primeira entrada <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div className="border border-slate-100 dark:border-zinc-800/80 rounded-2xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/30 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
+                      <th className="px-6 py-4">Data da Compra</th>
+                      <th className="px-6 py-4">Fornecedor</th>
+                      <th className="px-6 py-4">Qtd total Itens</th>
+                      <th className="px-6 py-4">Valor Pago Total</th>
+                      <th className="px-6 py-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 dark:divide-zinc-800/40">
+                    {stockEntries.map((entry) => (
+                      <tr key={entry.id} className="hover:bg-slate-50/40 dark:hover:bg-zinc-950/10">
+                        <td className="px-6 py-4 font-mono text-slate-700 dark:text-zinc-350">
+                          {new Date(entry.date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="px-6 py-4 font-semibold text-slate-800 dark:text-zinc-200">
+                          {entry.supplier || 'Sem fornecedor'}
+                        </td>
+                        <td className="px-6 py-4 text-slate-500 dark:text-zinc-400 font-mono">
+                          {entry.total_items} un.
+                        </td>
+                        <td className="px-6 py-4 font-bold text-slate-900 dark:text-zinc-100 font-mono">
+                          R$ {Number(entry.total_value).toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => loadEntryDetails(entry)}
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-rose-650 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-semibold flex items-center justify-center gap-1.5 ml-auto active:scale-95 transition-all shadow-sm bg-white dark:bg-zinc-900"
+                          >
+                            <Eye className="w-4 h-4" /> Detalhes
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1285,6 +1947,142 @@ export default function ProductsPage() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Details Modal */}
+      {detailsModalOpen && selectedEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto p-6 space-y-4 animate-in zoom-in-95 duration-200">
+            
+            <div className="flex items-center justify-between border-b border-slate-50 dark:border-zinc-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-800 dark:text-white">Detalhes da Entrada</h3>
+                <p className="text-[10px] text-slate-400 dark:text-zinc-500 font-normal">Informações detalhadas sobre a compra de mercadorias.</p>
+              </div>
+              <button 
+                onClick={() => setDetailsModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {detailsLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-3">
+                <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
+                <p className="text-xs text-slate-400 dark:text-zinc-500">Carregando itens da entrada...</p>
+              </div>
+            ) : (
+              <div className="space-y-6 text-xs">
+                {/* Informações Gerais */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50/50 dark:bg-zinc-950/20 p-4 rounded-xl border border-slate-100 dark:border-zinc-800/40">
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Data da Compra</span>
+                      <p className="font-semibold text-slate-700 dark:text-zinc-300 mt-0.5">
+                        {new Date(selectedEntry.date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Fornecedor</span>
+                      <p className="font-semibold text-slate-750 dark:text-zinc-200 mt-0.5">
+                        {selectedEntry.supplier || 'Não informado'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Observações</span>
+                      <p className="font-semibold text-slate-700 dark:text-zinc-300 mt-0.5">
+                        {selectedEntry.observations || 'Nenhuma observação'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Data de Registro</span>
+                      <p className="font-semibold text-slate-700 dark:text-zinc-350 mt-0.5">
+                        {new Date(selectedEntry.created_at).toLocaleString('pt-BR')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabela de Itens */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-slate-700 dark:text-zinc-300 uppercase text-[10px] tracking-wider">Produtos Recebidos</h4>
+                  
+                  {entryDetailsItems.length === 0 ? (
+                    <div className="p-6 text-center border border-dashed border-slate-200 dark:border-zinc-800 rounded-xl">
+                      <p className="text-slate-400 dark:text-zinc-500">Nenhum item encontrado nesta entrada.</p>
+                    </div>
+                  ) : (
+                    <div className="border border-slate-100 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/30 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
+                              <th className="px-4 py-3">Produto</th>
+                              <th className="px-4 py-3">Quantidade</th>
+                              <th className="px-4 py-3">Custo Unitário</th>
+                              <th className="px-4 py-3 text-right">Valor Pago</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50 dark:divide-zinc-800/40">
+                            {entryDetailsItems.map((item) => (
+                              <tr key={item.id} className="hover:bg-slate-50/20 dark:hover:bg-zinc-950/5">
+                                <td className="px-4 py-3">
+                                  <span className="font-semibold text-slate-800 dark:text-zinc-200">{item.product_name}</span>
+                                  {item.sku && (
+                                    <p className="text-[9px] text-slate-400 font-mono mt-0.5">{item.sku}</p>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 font-mono text-slate-700 dark:text-zinc-400">
+                                  {item.quantity} un.
+                                </td>
+                                <td className="px-4 py-3 font-mono text-emerald-600 dark:text-emerald-400">
+                                  R$ {item.unit_cost.toFixed(2)}
+                                </td>
+                                <td className="px-4 py-3 font-mono font-bold text-slate-900 dark:text-zinc-100 text-right">
+                                  R$ {item.total_cost.toFixed(2)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Resumo Financeiro */}
+                <div className="border-t border-slate-100 dark:border-zinc-800 pt-4 flex justify-between items-center">
+                  <div className="flex gap-4">
+                    <div>
+                      <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">Total de itens</span>
+                      <p className="text-sm font-bold text-slate-700 dark:text-zinc-300 font-mono">
+                        {selectedEntry.total_items} un.
+                      </p>
+                    </div>
+                    <div className="w-px bg-slate-200 dark:bg-zinc-800" />
+                    <div>
+                      <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">Valor Total Pago</span>
+                      <p className="text-sm font-bold text-rose-600 dark:text-rose-400 font-mono">
+                        R$ {Number(selectedEntry.total_value).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setDetailsModalOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 font-semibold transition-colors"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
