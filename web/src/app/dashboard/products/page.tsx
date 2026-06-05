@@ -45,13 +45,18 @@ interface StockEntry {
   total_value: number
   total_items: number
   created_at: string
+  status: 'created' | 'awaiting' | 'delivered'
+  expected_delivery_date: string | null
+  delivery_date: string | null
 }
 
 interface EntryItemDetails {
   id: string
   product_name: string
   sku: string | null
+  product_id: string
   quantity: number
+  quantity_received: number | null
   unit_cost: number
   total_cost: number
 }
@@ -80,6 +85,8 @@ export default function ProductsPage() {
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0])
   const [entrySupplier, setEntrySupplier] = useState('')
   const [entryObservations, setEntryObservations] = useState('')
+  const [entryStatus, setEntryStatus] = useState<'created' | 'awaiting' | 'delivered'>('created')
+  const [expectedDeliveryDate, setExpectedDeliveryDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
   
   // Local list of items for the current stock entry
   const [localEntryItems, setLocalEntryItems] = useState<LocalEntryItem[]>([])
@@ -105,6 +112,9 @@ export default function ProductsPage() {
   const [selectedEntry, setSelectedEntry] = useState<StockEntry | null>(null)
   const [entryDetailsItems, setEntryDetailsItems] = useState<EntryItemDetails[]>([])
   const [detailsLoading, setDetailsLoading] = useState(false)
+  const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false)
+  const [receivedItems, setReceivedItems] = useState<{ id: string; quantity: number; total_cost: number }[]>([])
+  const [actualDeliveryDate, setActualDeliveryDate] = useState(new Date().toISOString().split('T')[0])
 
   // Batch import states
   const [batchModalOpen, setBatchModalOpen] = useState(false)
@@ -422,12 +432,16 @@ export default function ProductsPage() {
       setDetailsLoading(true)
       setDetailsModalOpen(true)
       setEntryDetailsItems([])
+      setIsConfirmingDelivery(false)
+      setActualDeliveryDate(new Date().toISOString().split('T')[0])
 
       const { data, error } = await supabase
         .from('stock_entry_items')
         .select(`
           id,
+          product_id,
           quantity,
+          quantity_received,
           unit_cost,
           total_cost,
           products (
@@ -444,15 +458,179 @@ export default function ProductsPage() {
           id: item.id,
           product_name: item.products?.name || 'Produto Excluído',
           sku: item.products?.sku || null,
+          product_id: item.product_id,
           quantity: item.quantity,
+          quantity_received: item.quantity_received !== null ? Number(item.quantity_received) : null,
           unit_cost: Number(item.unit_cost),
           total_cost: Number(item.total_cost)
         }))
         setEntryDetailsItems(formatted)
+        
+        // Pre-populate receivedItems state with default values (ordered values)
+        setReceivedItems(formatted.map(item => ({
+          id: item.id,
+          quantity: item.quantity_received !== null ? item.quantity_received : item.quantity,
+          total_cost: item.total_cost
+        })))
       }
     } catch (err: any) {
       console.error(err)
       alert('Erro ao carregar detalhes da entrada: ' + err.message)
+    } finally {
+      setDetailsLoading(false)
+    }
+  }
+
+  async function handleUpdateStatus(newStatus: 'created' | 'awaiting') {
+    if (!selectedEntry) return
+    try {
+      setDetailsLoading(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Não autenticado')
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('store_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) throw new Error('Loja não encontrada')
+      const storeId = profile.store_id
+
+      const { error } = await supabase
+        .from('stock_entries')
+        .update({ status: newStatus })
+        .eq('id', selectedEntry.id)
+        .eq('store_id', storeId)
+
+      if (error) throw error
+
+      const updatedEntry = { ...selectedEntry, status: newStatus }
+      setSelectedEntry(updatedEntry)
+      await loadHistory()
+      alert('Status do pedido atualizado com sucesso!')
+    } catch (err: any) {
+      console.error(err)
+      alert('Erro ao atualizar status: ' + err.message)
+    } finally {
+      setDetailsLoading(false)
+    }
+  }
+
+  async function handleConfirmDelivery() {
+    if (!selectedEntry) return
+    
+    // Validate that all quantities and costs are non-negative
+    const invalid = receivedItems.some(item => isNaN(item.quantity) || item.quantity < 0 || isNaN(item.total_cost) || item.total_cost < 0)
+    if (invalid) {
+      alert('Por favor, insira valores válidos de quantidade (>= 0) e valor do lote (>= 0).')
+      return
+    }
+
+    setDetailsLoading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Não autenticado')
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('store_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) throw new Error('Loja não encontrada')
+      const storeId = profile.store_id
+
+      const finalTotalValue = receivedItems.reduce((sum, item) => sum + item.total_cost, 0)
+      const finalTotalItems = receivedItems.reduce((sum, item) => sum + item.quantity, 0)
+
+      // 1. Update each item
+      for (const item of receivedItems) {
+        const originalItem = entryDetailsItems.find(od => od.id === item.id)
+        if (!originalItem) continue
+
+        const unitCost = item.quantity > 0 ? item.total_cost / item.quantity : 0
+
+        // 1a. Update quantity_received and unit_cost and total_cost in stock_entry_items
+        const { error: itemUpdateErr } = await supabase
+          .from('stock_entry_items')
+          .update({
+            quantity_received: item.quantity,
+            unit_cost: unitCost,
+            total_cost: item.total_cost
+          })
+          .eq('id', item.id)
+
+        if (itemUpdateErr) throw itemUpdateErr
+
+        // Only insert stock movements and update cost if quantity received > 0
+        if (item.quantity > 0) {
+          // 1b. Insert stock movement
+          const { error: movementErr } = await supabase
+            .from('stock_movements')
+            .insert([{
+              store_id: storeId,
+              product_id: originalItem.product_id,
+              quantity: item.quantity,
+              type: 'entry',
+              reason: 'purchase'
+            }])
+
+          if (movementErr) throw movementErr
+
+          // 1c. Update product cost price
+          const { error: productUpdateErr } = await supabase
+            .from('products')
+            .update({ cost_price: unitCost })
+            .eq('id', originalItem.product_id)
+            .eq('store_id', storeId)
+
+          if (productUpdateErr) throw productUpdateErr
+        }
+      }
+
+      // 2. Update stock entry header
+      const { error: entryUpdateErr } = await supabase
+        .from('stock_entries')
+        .update({
+          status: 'delivered',
+          delivery_date: actualDeliveryDate,
+          total_value: finalTotalValue,
+          total_items: finalTotalItems
+        })
+        .eq('id', selectedEntry.id)
+        .eq('store_id', storeId)
+
+      if (entryUpdateErr) throw entryUpdateErr
+
+      // 3. Create financial transaction (expense)
+      const supplierLabel = selectedEntry.supplier ? ` - Fornecedor: ${selectedEntry.supplier}` : ''
+      const { error: financeErr } = await supabase
+        .from('financial_transactions')
+        .insert([{
+          store_id: storeId,
+          type: 'expense',
+          value: finalTotalValue,
+          category: 'supplier',
+          description: `Compra de Mercadorias (Entregue)${supplierLabel}`,
+          date: actualDeliveryDate
+        }])
+
+      if (financeErr) {
+        console.error('Erro ao integrar com financeiro:', financeErr)
+      }
+
+      // Reset details modal states and reload
+      setIsConfirmingDelivery(false)
+      setDetailsModalOpen(false)
+      await loadProducts()
+      await loadHistory()
+
+      window.dispatchEvent(new CustomEvent('dashboard-refresh'))
+      alert('Recebimento e contagem de mercadorias confirmados com sucesso!')
+    } catch (err: any) {
+      console.error(err)
+      alert('Erro ao confirmar entrega: ' + err.message)
     } finally {
       setDetailsLoading(false)
     }
@@ -492,7 +670,10 @@ export default function ProductsPage() {
           supplier: entrySupplier || null,
           observations: entryObservations || null,
           total_value: totalValue,
-          total_items: totalItems
+          total_items: totalItems,
+          status: entryStatus,
+          expected_delivery_date: entryStatus !== 'delivered' ? expectedDeliveryDate : null,
+          delivery_date: entryStatus === 'delivered' ? entryDate : null
         }])
         .select()
         .single()
@@ -506,7 +687,7 @@ export default function ProductsPage() {
 
       const entryId = newEntry.id
 
-      // 2. Insert detailed items and stock movements, and update product cost
+      // 2. Insert detailed items
       for (const item of localEntryItems) {
         const unitCost = item.totalCost / item.quantity
 
@@ -517,50 +698,56 @@ export default function ProductsPage() {
             entry_id: entryId,
             product_id: item.productId,
             quantity: item.quantity,
+            quantity_received: entryStatus === 'delivered' ? item.quantity : null,
             unit_cost: unitCost,
             total_cost: item.totalCost
           }])
 
         if (itemErr) throw itemErr
 
-        // 2b. Insert stock_movements (this automatically triggers public.update_product_stock() at DB level)
-        const { error: movementErr } = await supabase
-          .from('stock_movements')
-          .insert([{
-            store_id: storeId,
-            product_id: item.productId,
-            quantity: item.quantity,
-            type: 'entry',
-            reason: 'purchase'
-          }])
+        // Only perform stock updates if the order is already marked as delivered
+        if (entryStatus === 'delivered') {
+          // 2b. Insert stock_movements (this automatically triggers public.update_product_stock() at DB level)
+          const { error: movementErr } = await supabase
+            .from('stock_movements')
+            .insert([{
+              store_id: storeId,
+              product_id: item.productId,
+              quantity: item.quantity,
+              type: 'entry',
+              reason: 'purchase'
+            }])
 
-        if (movementErr) throw movementErr
+          if (movementErr) throw movementErr
 
-        // 2c. Update cost price on products table
-        const { error: productUpdateErr } = await supabase
-          .from('products')
-          .update({ cost_price: unitCost })
-          .eq('id', item.productId)
-          .eq('store_id', storeId)
+          // 2c. Update cost price on products table
+          const { error: productUpdateErr } = await supabase
+            .from('products')
+            .update({ cost_price: unitCost })
+            .eq('id', item.productId)
+            .eq('store_id', storeId)
 
-        if (productUpdateErr) throw productUpdateErr
+          if (productUpdateErr) throw productUpdateErr
+        }
       }
 
-      // 3. Insert financial transaction (expense)
-      const supplierLabel = entrySupplier ? ` - Fornecedor: ${entrySupplier}` : ''
-      const { error: financeErr } = await supabase
-        .from('financial_transactions')
-        .insert([{
-          store_id: storeId,
-          type: 'expense',
-          value: totalValue,
-          category: 'supplier',
-          description: `Compra de Mercadorias${supplierLabel}`,
-          date: entryDate
-        }])
+      // 3. Insert financial transaction (expense) - only if delivered
+      if (entryStatus === 'delivered') {
+        const supplierLabel = entrySupplier ? ` - Fornecedor: ${entrySupplier}` : ''
+        const { error: financeErr } = await supabase
+          .from('financial_transactions')
+          .insert([{
+            store_id: storeId,
+            type: 'expense',
+            value: totalValue,
+            category: 'supplier',
+            description: `Compra de Mercadorias${supplierLabel}`,
+            date: entryDate
+          }])
 
-      if (financeErr) {
-        console.error('Erro ao integrar com financeiro:', financeErr)
+        if (financeErr) {
+          console.error('Erro ao integrar com financeiro:', financeErr)
+        }
       }
 
       // Reset form
@@ -568,6 +755,8 @@ export default function ProductsPage() {
       setEntrySupplier('')
       setEntryObservations('')
       setEntryDate(new Date().toISOString().split('T')[0])
+      setEntryStatus('created')
+      setExpectedDeliveryDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
       
       // Reload lists
       await loadProducts()
@@ -1140,9 +1329,9 @@ export default function ProductsPage() {
             )}
 
             {/* Grid Dados Gerais */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Data da Compra *</label>
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+              <div className="md:col-span-3">
+                <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Data do Pedido *</label>
                 <input
                   type="date"
                   required
@@ -1152,7 +1341,7 @@ export default function ProductsPage() {
                 />
               </div>
 
-              <div>
+              <div className="md:col-span-3">
                 <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Fornecedor (Opcional)</label>
                 <input
                   type="text"
@@ -1163,16 +1352,55 @@ export default function ProductsPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Observações (Opcional)</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Compra de lote promocional de batons"
-                  value={entryObservations}
-                  onChange={(e) => setEntryObservations(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs"
-                />
+              <div className="md:col-span-3">
+                <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Status do Pedido *</label>
+                <select
+                  value={entryStatus}
+                  onChange={(e) => setEntryStatus(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs font-semibold text-slate-700 dark:text-zinc-350"
+                >
+                  <option value="created">🔵 PEDIDO CRIADO</option>
+                  <option value="awaiting">🟡 AGUARDANDO ENTREGA</option>
+                  <option value="delivered">🟢 PEDIDO ENTREGUE</option>
+                </select>
               </div>
+
+              {entryStatus !== 'delivered' ? (
+                <div className="md:col-span-3 animate-in fade-in slide-in-from-top-2 duration-150">
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Previsão de Entrega *</label>
+                  <input
+                    type="date"
+                    required
+                    value={expectedDeliveryDate}
+                    onChange={(e) => setExpectedDeliveryDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs font-medium"
+                  />
+                </div>
+              ) : (
+                <div className="md:col-span-3">
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Observações (Opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Compra de lote promocional de batons"
+                    value={entryObservations}
+                    onChange={(e) => setEntryObservations(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs"
+                  />
+                </div>
+              )}
+
+              {entryStatus !== 'delivered' && (
+                <div className="col-span-12 animate-in fade-in duration-150">
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Observações (Opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Compra de lote promocional de batons"
+                    value={entryObservations}
+                    onChange={(e) => setEntryObservations(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="border-t border-slate-100 dark:border-zinc-800/80 pt-6">
@@ -1420,39 +1648,91 @@ export default function ProductsPage() {
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/30 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
-                      <th className="px-6 py-4">Data da Compra</th>
+                      <th className="px-6 py-4">Data do Pedido</th>
                       <th className="px-6 py-4">Fornecedor</th>
+                      <th className="px-6 py-4">Status</th>
+                      <th className="px-6 py-4">Prazo / Entrega</th>
                       <th className="px-6 py-4">Qtd total Itens</th>
                       <th className="px-6 py-4">Valor Pago Total</th>
                       <th className="px-6 py-4 text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50 dark:divide-zinc-800/40">
-                    {stockEntries.map((entry) => (
-                      <tr key={entry.id} className="hover:bg-slate-50/40 dark:hover:bg-zinc-950/10">
-                        <td className="px-6 py-4 font-mono text-slate-700 dark:text-zinc-350">
-                          {new Date(entry.date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                        </td>
-                        <td className="px-6 py-4 font-semibold text-slate-800 dark:text-zinc-200">
-                          {entry.supplier || 'Sem fornecedor'}
-                        </td>
-                        <td className="px-6 py-4 text-slate-500 dark:text-zinc-400 font-mono">
-                          {entry.total_items} un.
-                        </td>
-                        <td className="px-6 py-4 font-bold text-slate-900 dark:text-zinc-100 font-mono">
-                          R$ {Number(entry.total_value).toFixed(2)}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => loadEntryDetails(entry)}
-                            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-rose-650 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-semibold flex items-center justify-center gap-1.5 ml-auto active:scale-95 transition-all shadow-sm bg-white dark:bg-zinc-900"
-                          >
-                            <Eye className="w-4 h-4" /> Detalhes
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {stockEntries.map((entry) => {
+                      // Status mapping
+                      let statusBadge = null
+                      if (entry.status === 'created' || !entry.status) {
+                        statusBadge = <span className="bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200 dark:border-zinc-700">PEDIDO CRIADO</span>
+                      } else if (entry.status === 'awaiting') {
+                        statusBadge = <span className="bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-100 dark:border-amber-900/30">AGUARDANDO</span>
+                      } else {
+                        statusBadge = <span className="bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-450 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">ENTREGUE</span>
+                      }
+
+                      // Check for delay
+                      let delayLabel = null
+                      const isPending = entry.status !== 'delivered'
+                      if (isPending && entry.expected_delivery_date) {
+                        const today = new Date()
+                        today.setHours(0, 0, 0, 0)
+                        const expected = new Date(entry.expected_delivery_date + 'T00:00:00')
+                        if (today > expected) {
+                          const diffTime = Math.abs(today.getTime() - expected.getTime())
+                          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                          delayLabel = (
+                            <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-900/20 px-2 py-0.5 rounded-md flex items-center gap-1 w-max">
+                              ⚠️ ATRASADO {diffDays} {diffDays === 1 ? 'dia' : 'dias'}
+                            </span>
+                          )
+                        } else {
+                          delayLabel = (
+                            <span className="text-slate-500 dark:text-zinc-450 font-mono text-[10px]">
+                              Previsto: {expected.toLocaleDateString('pt-BR')}
+                            </span>
+                          )
+                        }
+                      } else if (entry.delivery_date) {
+                        delayLabel = (
+                          <span className="text-slate-500 dark:text-zinc-400 font-mono text-[10px]">
+                            Entregue em: {new Date(entry.delivery_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                          </span>
+                        )
+                      } else {
+                        delayLabel = <span className="text-slate-400">-</span>
+                      }
+
+                      return (
+                        <tr key={entry.id} className="hover:bg-slate-50/40 dark:hover:bg-zinc-950/10">
+                          <td className="px-6 py-4 font-mono text-slate-700 dark:text-zinc-350">
+                            {new Date(entry.date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-slate-800 dark:text-zinc-200">
+                            {entry.supplier || 'Sem fornecedor'}
+                          </td>
+                          <td className="px-6 py-4">
+                            {statusBadge}
+                          </td>
+                          <td className="px-6 py-4">
+                            {delayLabel}
+                          </td>
+                          <td className="px-6 py-4 text-slate-500 dark:text-zinc-400 font-mono">
+                            {entry.total_items} un.
+                          </td>
+                          <td className="px-6 py-4 font-bold text-slate-900 dark:text-zinc-100 font-mono">
+                            R$ {Number(entry.total_value).toFixed(2)}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => loadEntryDetails(entry)}
+                              className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-rose-650 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-semibold flex items-center justify-center gap-1.5 ml-auto active:scale-95 transition-all shadow-sm bg-white dark:bg-zinc-900"
+                            >
+                              <Eye className="w-4 h-4" /> Detalhes
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1958,8 +2238,33 @@ export default function ProductsPage() {
             
             <div className="flex items-center justify-between border-b border-slate-50 dark:border-zinc-800 pb-3">
               <div>
-                <h3 className="text-base font-bold text-slate-800 dark:text-white">Detalhes da Entrada</h3>
-                <p className="text-[10px] text-slate-400 dark:text-zinc-500 font-normal">Informações detalhadas sobre a compra de mercadorias.</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-base font-bold text-slate-800 dark:text-white">Detalhes da Entrada</h3>
+                  {selectedEntry.status === 'created' || !selectedEntry.status ? (
+                    <span className="bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-350 text-[9px] font-bold px-2 py-0.5 rounded-full border border-slate-200 dark:border-zinc-700">PEDIDO CRIADO</span>
+                  ) : selectedEntry.status === 'awaiting' ? (
+                    <span className="bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 text-[9px] font-bold px-2 py-0.5 rounded-full border border-amber-100 dark:border-amber-900/30">AGUARDANDO ENTREGA</span>
+                  ) : (
+                    <span className="bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-455 text-[9px] font-bold px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">PEDIDO ENTREGUE</span>
+                  )}
+
+                  {selectedEntry.status !== 'delivered' && selectedEntry.expected_delivery_date && (() => {
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    const expected = new Date(selectedEntry.expected_delivery_date + 'T00:00:00')
+                    if (today > expected) {
+                      const diffTime = Math.abs(today.getTime() - expected.getTime())
+                      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                      return (
+                        <span className="bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-450 text-[9px] font-bold px-2 py-0.5 rounded-full border border-rose-105/30">
+                          ⚠️ ATRASADO {diffDays} {diffDays === 1 ? 'DIA' : 'DIAS'}
+                        </span>
+                      )
+                    }
+                    return null
+                  })()}
+                </div>
+                <p className="text-[10px] text-slate-400 dark:text-zinc-500 font-normal mt-0.5">Informações detalhadas sobre a compra de mercadorias.</p>
               </div>
               <button 
                 onClick={() => setDetailsModalOpen(false)}
@@ -1972,7 +2277,7 @@ export default function ProductsPage() {
             {detailsLoading ? (
               <div className="flex flex-col items-center justify-center py-12 gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
-                <p className="text-xs text-slate-400 dark:text-zinc-500">Carregando itens da entrada...</p>
+                <p className="text-xs text-slate-400 dark:text-zinc-500">Processando...</p>
               </div>
             ) : (
               <div className="space-y-6 text-xs">
@@ -1980,7 +2285,7 @@ export default function ProductsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50/50 dark:bg-zinc-950/20 p-4 rounded-xl border border-slate-100 dark:border-zinc-800/40">
                   <div className="space-y-2">
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Data da Compra</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Data do Pedido</span>
                       <p className="font-semibold text-slate-700 dark:text-zinc-300 mt-0.5">
                         {new Date(selectedEntry.date + 'T00:00:00').toLocaleDateString('pt-BR')}
                       </p>
@@ -1991,6 +2296,24 @@ export default function ProductsPage() {
                         {selectedEntry.supplier || 'Não informado'}
                       </p>
                     </div>
+                    {selectedEntry.status !== 'delivered' && selectedEntry.expected_delivery_date && (
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Previsão de Entrega</span>
+                        <p className={`font-semibold mt-0.5 ${
+                          new Date() > new Date(selectedEntry.expected_delivery_date + 'T00:00:00') ? 'text-rose-600 font-bold' : 'text-slate-700 dark:text-zinc-350'
+                        }`}>
+                          {new Date(selectedEntry.expected_delivery_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                    )}
+                    {selectedEntry.status === 'delivered' && selectedEntry.delivery_date && (
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Data de Entrega Efetiva</span>
+                        <p className="font-semibold text-emerald-600 dark:text-emerald-450 mt-0.5">
+                          {new Date(selectedEntry.delivery_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <div>
@@ -2008,22 +2331,144 @@ export default function ProductsPage() {
                   </div>
                 </div>
 
-                {/* Tabela de Itens */}
+                {/* Quick actions for created/awaiting status */}
+                {selectedEntry.status !== 'delivered' && !isConfirmingDelivery && (
+                  <div className="flex gap-2 flex-wrap bg-slate-50/50 dark:bg-zinc-950/20 p-3.5 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800 items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-slate-750 dark:text-zinc-200">Acompanhamento do Pedido</h4>
+                      <p className="text-[10px] text-slate-400 dark:text-zinc-500 mt-0.5">Mude a etapa do frete ou registre o recebimento do estoque.</p>
+                    </div>
+                    <div className="flex gap-2">
+                      {(selectedEntry.status === 'created' || !selectedEntry.status) && (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateStatus('awaiting')}
+                          className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-850 font-bold transition-all text-[11px]"
+                        >
+                          🚚 A caminho (Despachado)
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setIsConfirmingDelivery(true)}
+                        className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold transition-all text-[11px] flex items-center gap-1.5 shadow-sm active:scale-95"
+                      >
+                        ✅ Contar e Confirmar Entrega
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tabela de Itens ou Form de Contagem */}
                 <div className="space-y-2">
-                  <h4 className="font-bold text-slate-700 dark:text-zinc-300 uppercase text-[10px] tracking-wider">Produtos Recebidos</h4>
+                  <h4 className="font-bold text-slate-700 dark:text-zinc-300 uppercase text-[10px] tracking-wider">
+                    {isConfirmingDelivery ? 'Contagem e Conferência de Mercadoria' : 'Produtos do Pedido'}
+                  </h4>
                   
                   {entryDetailsItems.length === 0 ? (
                     <div className="p-6 text-center border border-dashed border-slate-200 dark:border-zinc-800 rounded-xl">
                       <p className="text-slate-400 dark:text-zinc-500">Nenhum item encontrado nesta entrada.</p>
                     </div>
+                  ) : isConfirmingDelivery ? (
+                    /* CONTAGEM FORM */
+                    <div className="border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm bg-slate-50/20 dark:bg-zinc-950/10">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/30 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
+                              <th className="px-4 py-3">Produto</th>
+                              <th className="px-4 py-3 w-[110px]">Qtd Pedida</th>
+                              <th className="px-4 py-3 w-[120px]">Qtd Entregue *</th>
+                              <th className="px-4 py-3 w-[150px]">Valor Total Pago *</th>
+                              <th className="px-4 py-3 text-right">Custo Unitário</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/40 bg-white dark:bg-zinc-900/40">
+                            {entryDetailsItems.map((item) => {
+                              const rItem = receivedItems.find(ri => ri.id === item.id) || { quantity: item.quantity, total_cost: item.total_cost }
+                              const unitCost = rItem.quantity > 0 ? rItem.total_cost / rItem.quantity : 0
+                              
+                              return (
+                                <tr key={item.id} className="hover:bg-slate-50/20 dark:hover:bg-zinc-950/5">
+                                  <td className="px-4 py-3">
+                                    <span className="font-semibold text-slate-800 dark:text-zinc-200">{item.product_name}</span>
+                                    {item.sku && (
+                                      <p className="text-[9px] text-slate-400 font-mono mt-0.5">{item.sku}</p>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 text-slate-500 font-mono">
+                                    {item.quantity} un.
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      required
+                                      value={rItem.quantity}
+                                      onChange={(e) => {
+                                        const qty = parseInt(e.target.value) || 0
+                                        const originalQty = item.quantity
+                                        const originalTotalCost = item.total_cost
+                                        const proportionalCost = originalQty > 0 ? (originalTotalCost / originalQty) * qty : 0
+                                        setReceivedItems(receivedItems.map(ri => {
+                                          if (ri.id === item.id) {
+                                            return {
+                                              ...ri,
+                                              quantity: qty,
+                                              total_cost: Number(proportionalCost.toFixed(2))
+                                            }
+                                          }
+                                          return ri
+                                        }))
+                                      }}
+                                      className="w-20 px-2 py-1 rounded border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-mono text-center font-bold"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-slate-400 text-[10px] font-mono">R$</span>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        required
+                                        value={rItem.total_cost}
+                                        onChange={(e) => {
+                                          const cost = parseFloat(e.target.value) || 0
+                                          setReceivedItems(receivedItems.map(ri => {
+                                            if (ri.id === item.id) {
+                                              return {
+                                                ...ri,
+                                                total_cost: cost
+                                              }
+                                            }
+                                            return ri
+                                          }))
+                                        }}
+                                        className="w-24 px-2 py-1 rounded border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-mono font-bold text-slate-800 dark:text-zinc-200 text-right"
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 font-mono text-emerald-600 dark:text-emerald-450 text-right font-bold">
+                                    R$ {unitCost.toFixed(2)}
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   ) : (
+                    /* STATIC DETAILS VIEW */
                     <div className="border border-slate-100 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
                       <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-xs">
                           <thead>
                             <tr className="border-b border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/30 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
                               <th className="px-4 py-3">Produto</th>
-                              <th className="px-4 py-3">Quantidade</th>
+                              <th className="px-4 py-3">Quantidade Pedida</th>
+                              <th className="px-4 py-3">Quantidade Entregue</th>
                               <th className="px-4 py-3">Custo Unitário</th>
                               <th className="px-4 py-3 text-right">Valor Pago</th>
                             </tr>
@@ -2037,8 +2482,11 @@ export default function ProductsPage() {
                                     <p className="text-[9px] text-slate-400 font-mono mt-0.5">{item.sku}</p>
                                   )}
                                 </td>
-                                <td className="px-4 py-3 font-mono text-slate-700 dark:text-zinc-400">
+                                <td className="px-4 py-3 font-mono text-slate-500">
                                   {item.quantity} un.
+                                </td>
+                                <td className="px-4 py-3 font-mono text-slate-700 dark:text-zinc-400 font-extrabold">
+                                  {item.quantity_received !== null ? `${item.quantity_received} un.` : 'Aguardando...'}
                                 </td>
                                 <td className="px-4 py-3 font-mono text-emerald-600 dark:text-emerald-400">
                                   R$ {item.unit_cost.toFixed(2)}
@@ -2055,31 +2503,74 @@ export default function ProductsPage() {
                   )}
                 </div>
 
+                {/* Confirming Delivery Extra Fields (Date of receipt) */}
+                {isConfirmingDelivery && (
+                  <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-zinc-950/20 border border-slate-200 dark:border-zinc-800/60 max-w-sm space-y-1">
+                    <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1">Data da Entrega Efetiva *</label>
+                    <input
+                      type="date"
+                      required
+                      value={actualDeliveryDate}
+                      onChange={(e) => setActualDeliveryDate(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-850 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs font-mono font-medium"
+                    />
+                  </div>
+                )}
+
                 {/* Resumo Financeiro */}
-                <div className="border-t border-slate-100 dark:border-zinc-800 pt-4 flex justify-between items-center">
+                <div className="border-t border-slate-100 dark:border-zinc-800 pt-4 flex justify-between items-center flex-wrap gap-4">
                   <div className="flex gap-4">
                     <div>
-                      <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">Total de itens</span>
+                      <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">
+                        {isConfirmingDelivery ? 'Total Contado' : 'Total de itens'}
+                      </span>
                       <p className="text-sm font-bold text-slate-700 dark:text-zinc-300 font-mono">
-                        {selectedEntry.total_items} un.
+                        {isConfirmingDelivery 
+                          ? `${receivedItems.reduce((sum, item) => sum + item.quantity, 0)} un.` 
+                          : `${selectedEntry.total_items} un.`}
                       </p>
                     </div>
                     <div className="w-px bg-slate-200 dark:bg-zinc-800" />
                     <div>
-                      <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">Valor Total Pago</span>
-                      <p className="text-sm font-bold text-rose-600 dark:text-rose-400 font-mono">
-                        R$ {Number(selectedEntry.total_value).toFixed(2)}
+                      <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">
+                        {isConfirmingDelivery ? 'Total Final Pago' : 'Valor Total Pago'}
+                      </span>
+                      <p className="text-sm font-bold text-rose-600 dark:text-rose-450 font-mono">
+                        R$ {isConfirmingDelivery 
+                          ? receivedItems.reduce((sum, item) => sum + item.total_cost, 0).toFixed(2)
+                          : Number(selectedEntry.total_value).toFixed(2)}
                       </p>
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setDetailsModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 font-semibold transition-colors"
-                  >
-                    Fechar
-                  </button>
+                  <div className="flex gap-2">
+                    {isConfirmingDelivery ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setIsConfirmingDelivery(false)}
+                          className="px-4 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 text-slate-650 dark:text-zinc-400 font-semibold hover:bg-slate-50 dark:hover:bg-zinc-850 transition-colors"
+                        >
+                          Voltar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleConfirmDelivery}
+                          className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold shadow-md shadow-rose-500/10 active:scale-95 transition-all flex items-center gap-1.5"
+                        >
+                          <Save className="w-4 h-4" /> Confirmar e Dar Entrada no Estoque
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setDetailsModalOpen(false)}
+                        className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-slate-700 dark:text-zinc-200 font-semibold transition-colors"
+                      >
+                        Fechar
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
