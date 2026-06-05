@@ -3,7 +3,7 @@ kind: agent
 name: CFO
 role: CFO Virtual
 slug: cfo
-model: deepseek-chat
+model: gemini-2.5-flash
 ---
 
 # CFO Virtual

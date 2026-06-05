@@ -3,7 +3,7 @@ kind: agent
 name: Support Agent
 role: Assistente Virtual do Suporte N1
 slug: support
-model: deepseek-chat
+model: gemini-2.5-flash
 ---
 
 # Assistente de Suporte N1

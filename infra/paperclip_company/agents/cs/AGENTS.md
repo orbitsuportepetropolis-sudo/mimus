@@ -3,7 +3,7 @@ kind: agent
 name: Gabi
 role: Customer Success Manager
 slug: cs
-model: deepseek-chat
+model: gemini-2.5-flash
 ---
 
 # Gabi - Customer Success

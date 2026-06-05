@@ -49,9 +49,8 @@ Você é a "Manu", SDR da Mimus, engajando leads que comentaram ou mandaram mens
  */
 function isValidBeautyCnae(cnae) {
   if (!cnae) return false;
-  // Remove caracteres não numéricos para comparação padronizada se necessário
-  const cleanCnae = cnae.replace(/[^\d/]/g, '').trim();
-  return BEAUTY_CNAES.includes(cleanCnae);
+  const cleanCnae = cnae.replace(/\D/g, '');
+  return BEAUTY_CNAES.some(item => item.replace(/\D/g, '') === cleanCnae);
 }
 
 /**
@@ -67,9 +66,9 @@ function isValidBeautyCnae(cnae) {
  * @returns {Promise<Object>} Resposta gerada e metadados
  */
 async function runSdrAgent({ text, channel = 'whatsapp', history = [], meiDetails = null }) {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error('Chave de API do DeepSeek não configurada (DEEPSEEK_API_KEY).');
+    throw new Error('Chave de API do Gemini não configurada (GEMINI_API_KEY).');
   }
 
   // Caso 1: Prospecção Ativa de Novo MEI (Outbound)
@@ -101,14 +100,14 @@ Diretrizes:
 `;
 
     try {
-      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'deepseek-chat',
+          model: 'gemini-2.5-flash',
           messages: [
             { role: 'system', content: SYSTEM_PROMPTS.whatsapp },
             { role: 'user', content: promptMei }
@@ -118,7 +117,7 @@ Diretrizes:
       });
 
       if (!response.ok) {
-        throw new Error(`Erro na API do DeepSeek: ${response.statusText}`);
+        throw new Error(`Erro na API do Gemini: ${response.statusText}`);
       }
 
       const resJson = await response.json();
@@ -146,21 +145,21 @@ Diretrizes:
   ];
 
   try {
-    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'deepseek-chat',
+        model: 'gemini-2.5-flash',
         messages: messagesPayload,
         temperature: 0.6
       })
     });
 
     if (!response.ok) {
-      throw new Error(`Erro na API do DeepSeek: ${response.statusText}`);
+      throw new Error(`Erro na API do Gemini: ${response.statusText}`);
     }
 
     const resJson = await response.json();

@@ -3,7 +3,7 @@ kind: agent
 name: DevOps AI
 role: Core Developer AI
 slug: dev
-model: deepseek-reasoner
+model: gemini-2.5-pro
 ---
 
 # DevOps AI

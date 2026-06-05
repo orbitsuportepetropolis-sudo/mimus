@@ -3,7 +3,7 @@ kind: agent
 name: Manu
 role: SDR / Inside Sales
 slug: sdr
-model: deepseek-chat
+model: gemini-2.5-flash
 ---
 
 # Manu - SDR / Pré-vendas

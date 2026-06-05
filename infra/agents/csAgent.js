@@ -26,9 +26,9 @@ Você é a "Gabi", Customer Success Manager da Mimus. Seu objetivo é reconectar
  * @returns {Promise<Object>} Resposta gerada para envio via WhatsApp
  */
 async function runCsAgent(customer) {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error('Chave de API do DeepSeek não configurada (DEEPSEEK_API_KEY).');
+    throw new Error('Chave de API do Gemini não configurada (GEMINI_API_KEY).');
   }
 
   if (!customer || !customer.name) {
@@ -46,14 +46,14 @@ Lembre-se de ser empática, dar uma dica valiosa para o negócio dela e chamá-l
 `;
 
   try {
-    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'deepseek-chat',
+        model: 'gemini-2.5-flash',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: promptContent }
@@ -63,7 +63,7 @@ Lembre-se de ser empática, dar uma dica valiosa para o negócio dela e chamá-l
     });
 
     if (!response.ok) {
-      throw new Error(`Erro na API do DeepSeek: ${response.statusText}`);
+      throw new Error(`Erro na API do Gemini: ${response.statusText}`);
     }
 
     const resJson = await response.json();

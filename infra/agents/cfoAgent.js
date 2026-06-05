@@ -31,9 +31,9 @@ Você é o CFO Virtual da Mimus. Sua função é analisar friamente os dados fin
  * @returns {Promise<Object>} Relatório gerado em Markdown e metadados
  */
 async function runCfoAgent(metrics) {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error('Chave de API do DeepSeek não configurada (DEEPSEEK_API_KEY).');
+    throw new Error('Chave de API do Gemini não configurada (GEMINI_API_KEY).');
   }
 
   if (!metrics) {
@@ -54,14 +54,14 @@ Gere o diagnóstico completo do CFO Virtual na tabela Markdown padronizada.
 `;
 
   try {
-    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'deepseek-chat',
+        model: 'gemini-2.5-flash',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: promptContent }
@@ -71,7 +71,7 @@ Gere o diagnóstico completo do CFO Virtual na tabela Markdown padronizada.
     });
 
     if (!response.ok) {
-      throw new Error(`Erro na API do DeepSeek: ${response.statusText}`);
+      throw new Error(`Erro na API do Gemini: ${response.statusText}`);
     }
 
     const resJson = await response.json();

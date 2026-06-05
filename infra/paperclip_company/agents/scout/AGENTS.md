@@ -3,7 +3,7 @@ kind: agent
 name: Bianca
 role: Pesquisadora de Leads / Prospecção Instagram
 slug: scout
-model: deepseek-chat
+model: gemini-2.5-flash
 ---
 
 # Bianca - Pesquisadora de Leads
