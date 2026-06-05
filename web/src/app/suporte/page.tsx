@@ -1,10 +1,44 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, MessageSquare, Send, CheckCircle2, HelpCircle, Mail, PhoneCall } from 'lucide-react'
+import { ArrowLeft, MessageSquare, Send, CheckCircle2, HelpCircle, Mail, Sun, Moon, ChevronDown, Phone } from 'lucide-react'
+
+interface FAQItem {
+  question: string
+  answer: string
+}
+
+const faqs: FAQItem[] = [
+  {
+    question: "O Mimus é realmente grátis?",
+    answer: "Sim! O plano essencial do Mimus é 100% gratuito e vitalício, permitindo que você cadastre até 10 produtos e registre vendas ilimitadas. Conforme a sua loja cresce, você pode migrar para o plano Pro para ter recursos adicionais."
+  },
+  {
+    question: "Como funciona a integração com a Loja Integrada?",
+    answer: "A integração é extremamente simples: basta acessar a página de Configurações no seu Painel, inserir a Chave API gerada na Loja Integrada e ativar. A partir disso, o Mimus passará a sincronizar o estoque de produtos físicos e digitais automaticamente e a receber seus pedidos via webhook instantaneamente."
+  },
+  {
+    question: "Posso usar no celular e no computador?",
+    answer: "Com certeza! A plataforma Mimus é totalmente responsiva e baseada em nuvem. Você pode acessar do computador, tablet ou celular (Android e iOS) de forma totalmente sincronizada e instantânea."
+  },
+  {
+    question: "O que é o Mimus AI?",
+    answer: "É o nosso assistente inteligente por comando de voz e texto. Em vez de preencher formulários complicados, você pode gerenciar sua loja apenas digitando ou gravando um áudio (por exemplo: 'cadastre o produto batom matte por R$ 35'). O Mimus AI processa a informação e realiza a ação na hora."
+  },
+  {
+    question: "Como funciona a vitrine virtual para WhatsApp?",
+    answer: "Ao cadastrar seus produtos no Mimus, você ganha automaticamente um link de vitrine virtual customizado (ex: mimus.app/vitrine/sua-loja). Suas clientes acessam o catálogo, selecionam os produtos desejados e a sacola de compras é enviada diretamente ao seu número do WhatsApp configurado, simplificando a finalização."
+  },
+  {
+    question: "O Mimus calcula o lucro das minhas vendas automaticamente?",
+    answer: "Sim. Ao cadastrar um produto, você pode colocar o preço de custo e o preço de venda. Quando registrar uma venda no PDV celular, o sistema calcula o lucro bruto e líquido automaticamente, exibindo no seu painel financeiro para que você saiba exatamente o quanto está lucrando no mês."
+  }
+]
 
 export default function SuportePage() {
+  const [darkMode, setDarkMode] = useState(false)
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null)
   const [formName, setFormName] = useState('')
   const [formEmail, setFormEmail] = useState('')
   const [formSubject, setFormSubject] = useState('')
@@ -12,31 +46,36 @@ export default function SuportePage() {
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  // FAQ state toggle
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null)
-
-  const faqs = [
-    {
-      q: "O plano grátis realmente dura para sempre?",
-      a: "Sim! O plano básico é gratuito vitalício. Você pode cadastrar até 10 produtos, registrar vendas ilimitadas, cadastrar clientes e usar a vitrine virtual básica sem custo nenhum e sem precisar cadastrar cartão de crédito."
-    },
-    {
-      q: "Posso acessar pelo computador e celular ao mesmo tempo?",
-      a: "Com certeza. O Mimus é baseado em nuvem. Você pode vender pelo celular enquanto atualiza o estoque no computador de forma totalmente sincronizada e instantânea."
-    },
-    {
-      q: "Como minhas clientes compram na Vitrine Virtual?",
-      a: "É super simples! O Mimus gera um link exclusivo para a sua loja (ex: appmimus.com.br/vitrine/sualoja). Você envia esse link para suas clientes ou coloca na bio do Instagram. Elas escolhem os batons, maquiagens e produtos que desejam, clicam em finalizar e a lista do pedido vai direto para o seu WhatsApp prontinha para você fechar a venda!"
-    },
-    {
-      q: "O Mimus calcula o lucro das minhas vendas automaticamente?",
-      a: "Sim. Ao cadastrar um produto, você pode colocar o preço de custo e o preço de venda. Quando registrar uma venda no PDV celular, o sistema calcula o lucro bruto e líquido automaticamente, exibindo no seu painel financeiro para que você saiba exatamente o quanto está lucrando no mês."
-    },
-    {
-      q: "Como funciona a assistente de IA por comandos?",
-      a: "A Mimus IA é a sua ajudante inteligente. Você pode enviar mensagens de texto ou áudio (no plano Pro) perguntando sobre estoque baixo, vendas do dia ou resumo financeiro (ex: 'IA: quais batons estão com estoque abaixo do mínimo?') e ela responderá listando as informações na hora."
+  useEffect(() => {
+    const isDark = localStorage.getItem('theme') === 'dark' || 
+      (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    setDarkMode(isDark)
+    if (isDark) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
     }
-  ]
+  }, [])
+
+  const toggleTheme = () => {
+    const nextDark = !darkMode
+    setDarkMode(nextDark)
+    if (nextDark) {
+      document.documentElement.classList.add('dark')
+      localStorage.setItem('theme', 'dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      localStorage.setItem('theme', 'light')
+    }
+  }
+
+  const toggleFaq = (index: number) => {
+    if (openFaqIndex === index) {
+      setOpenFaqIndex(null)
+    } else {
+      setOpenFaqIndex(index)
+    }
+  }
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -56,20 +95,37 @@ export default function SuportePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 dark:bg-zinc-950 dark:text-zinc-100 font-sans transition-colors duration-300 overflow-x-hidden selection:bg-rose-500 selection:text-white">
-      {/* Background decoration */}
+      {/* Background decorations */}
       <div className="absolute top-0 right-0 w-[50rem] h-[50rem] bg-gradient-to-b from-rose-200/10 via-pink-300/5 to-transparent dark:from-rose-950/10 dark:via-zinc-950/0 rounded-full blur-[100px] pointer-events-none -z-10" />
-      
-      <div className="max-w-6xl mx-auto px-6 py-12 md:py-20">
-        {/* Back Link */}
-        <Link 
-          href="/" 
-          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-650 hover:text-rose-600 dark:text-zinc-400 dark:hover:text-rose-400 transition-colors mb-10 group"
-        >
-          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-          Voltar para a página inicial
-        </Link>
+      <div className="absolute top-[35rem] left-0 w-[35rem] h-[35rem] bg-gradient-to-t from-violet-200/10 via-rose-300/5 to-transparent dark:from-purple-950/5 dark:via-zinc-950/0 rounded-full blur-[120px] pointer-events-none -z-10" />
 
-        {/* Header */}
+      {/* Header */}
+      <header className="sticky top-0 z-50 w-full bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md border-b border-slate-100 dark:border-zinc-900 transition-colors duration-300">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+            <span>Mimus</span><span className="text-rose-600">.</span>
+          </Link>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={toggleTheme}
+              className="p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 transition-all duration-200"
+              aria-label="Alternar tema"
+            >
+              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+            <Link 
+              href="/" 
+              className="text-xs font-bold text-slate-700 dark:text-zinc-200 hover:text-rose-600 dark:hover:text-rose-450 border border-slate-200 dark:border-zinc-800 px-4 py-2 rounded-xl flex items-center gap-1.5 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" /> Voltar para o início
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-6xl mx-auto px-6 py-12 md:py-20">
+        {/* Header Title */}
         <div className="flex items-center gap-3 mb-12">
           <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center border border-rose-500/10">
             <MessageSquare className="w-6 h-6" />
@@ -83,11 +139,10 @@ export default function SuportePage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
           {/* Left Column: FAQ & Contact channels */}
           <div className="lg:col-span-7 space-y-8">
             
-            {/* FAQ Card */}
+            {/* FAQ Accordion */}
             <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-100 dark:border-zinc-800/80 p-6 md:p-8 shadow-xl shadow-slate-200/20 dark:shadow-none space-y-6">
               <div className="flex items-center gap-2 pb-4 border-b border-slate-50 dark:border-zinc-800/40">
                 <HelpCircle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
@@ -95,35 +150,43 @@ export default function SuportePage() {
               </div>
 
               <div className="space-y-4">
-                {faqs.map((faq, idx) => (
-                  <div key={idx} className="border-b border-slate-50 dark:border-zinc-800/20 pb-4 last:border-b-0 last:pb-0">
-                    <button
-                      onClick={() => setOpenFaqIndex(openFaqIndex === idx ? null : idx)}
-                      className="w-full flex items-center justify-between text-left font-bold text-sm md:text-base text-slate-850 dark:text-zinc-200 hover:text-rose-650 dark:hover:text-rose-400 transition-colors"
+                {faqs.map((faq, index) => {
+                  const isOpen = openFaqIndex === index
+                  return (
+                    <div 
+                      key={index} 
+                      className="bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800/80 rounded-2xl overflow-hidden shadow-sm transition-all"
                     >
-                      <span>{faq.q}</span>
-                      <span className="text-lg font-mono text-rose-600">{openFaqIndex === idx ? '−' : '+'}</span>
-                    </button>
-                    {openFaqIndex === idx && (
-                      <p className="mt-3 text-xs md:text-sm text-slate-500 dark:text-zinc-450 leading-relaxed animate-in fade-in duration-200">
-                        {faq.a}
-                      </p>
-                    )}
-                  </div>
-                ))}
+                      <button 
+                        onClick={() => toggleFaq(index)}
+                        className="w-full px-6 py-5 flex items-center justify-between text-left font-bold text-slate-850 dark:text-zinc-200 hover:text-rose-650 dark:hover:text-rose-450 transition-colors"
+                      >
+                        <span>{faq.question}</span>
+                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      <div 
+                        className={`transition-all duration-300 overflow-hidden ${isOpen ? 'max-h-[300px] border-t border-slate-50 dark:border-zinc-800/50' : 'max-h-0'}`}
+                      >
+                        <p className="p-6 text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
+                          {faq.answer}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
             {/* Quick Contacts */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-gradient-to-r from-emerald-500/5 to-teal-500/5 hover:from-emerald-500/10 hover:to-teal-500/10 border border-emerald-500/15 p-6 rounded-2xl flex flex-col justify-between h-40 transition-all">
-                <PhoneCall className="w-6 h-6 text-emerald-500" />
+                <Phone className="w-6 h-6 text-emerald-500" />
                 <div>
                   <h3 className="font-bold text-sm text-slate-800 dark:text-zinc-200">WhatsApp de Suporte</h3>
                   <p className="text-[11px] text-slate-400 mt-0.5">Seg. a Sex. das 9h às 18h</p>
                 </div>
                 <a
-                  href="https://wa.me/5524999999999?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20com%20o%20Mimus%20App"
+                  href="https://wa.me/5524993173232?text=Ol%C3%A1%20Mimus!%20Preciso%20de%20suporte%20com%20a%20minha%20loja."
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-max px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
@@ -139,10 +202,10 @@ export default function SuportePage() {
                   <p className="text-[11px] text-slate-400 mt-0.5">Respondemos em até 2 horas úteis</p>
                 </div>
                 <a
-                  href="mailto:suporte@appmimus.com.br"
+                  href="mailto:suporte@mimus.app"
                   className="w-max px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
                 >
-                  suporte@appmimus.com.br
+                  suporte@mimus.app
                 </a>
               </div>
             </div>
@@ -235,9 +298,15 @@ export default function SuportePage() {
               )}
             </div>
           </div>
-
         </div>
-      </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="py-8 border-t border-slate-100 dark:border-zinc-900 bg-white dark:bg-zinc-950 text-slate-500 dark:text-zinc-500 text-center text-xs transition-colors duration-300">
+        <p className="max-w-4xl mx-auto px-6">
+          © {new Date().getFullYear()} Mimus Software Ltda. CNPJ 00.000.000/0001-00. Petrópolis - RJ. Todos os direitos reservados.
+        </p>
+      </footer>
     </div>
   )
 }
