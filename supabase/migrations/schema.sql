@@ -252,8 +252,10 @@ ALTER TABLE public.integrations ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Permitir visualização da própria loja" ON public.stores
     FOR SELECT TO authenticated USING (id = public.get_user_store_id());
 
+-- Acesso público de lojas APENAS para anon (vitrine pública).
+-- Usuários autenticados usam a política de isolamento acima (store_id filter).
 CREATE POLICY "Permitir visualização pública de lojas" ON public.stores
-    FOR SELECT TO anon, authenticated USING (true);
+    FOR SELECT TO anon USING (true);
 
 CREATE POLICY "Permitir atualização da própria loja por administradores" ON public.stores
     FOR UPDATE TO authenticated USING (id = public.get_user_store_id() AND EXISTS (
@@ -274,8 +276,10 @@ CREATE POLICY "Permitir atualização do próprio perfil" ON public.profiles
 CREATE POLICY "Isolamento de loja para produtos (SELECT)" ON public.products
     FOR SELECT TO authenticated USING (store_id = public.get_user_store_id());
 
+-- Acesso público de produtos APENAS para anon (vitrine pública).
+-- Usuários autenticados usam a política de isolamento acima (store_id filter).
 CREATE POLICY "Permitir visualização pública de produtos" ON public.products
-    FOR SELECT TO anon, authenticated USING (true);
+    FOR SELECT TO anon USING (true);
 
 CREATE POLICY "Isolamento de loja para produtos (INSERT)" ON public.products
     FOR INSERT TO authenticated WITH CHECK (store_id = public.get_user_store_id());
