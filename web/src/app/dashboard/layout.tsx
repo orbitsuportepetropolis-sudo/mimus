@@ -31,26 +31,15 @@ export default async function DashboardLayout({
   }
 
   // --- ONBOARDING GUARD (first-access only) ---
-  // Check if store has any products. If not, this is a brand-new user and they
-  // must complete onboarding before accessing the dashboard.
-  let productCount = 0
-  const prodQuery = await supabase
+  // Check if store has EVER had any products registered (regardless of active status).
+  // Only redirect brand-new stores with zero products to onboarding.
+  // Users who soft-deleted all products must still access the dashboard normally.
+  const { count: totalProductCount } = await supabase
     .from('products')
     .select('*', { count: 'exact', head: true })
     .eq('store_id', profile.store_id)
-    .eq('active', true)
 
-  if (prodQuery.error && prodQuery.error.code === '42703') {
-    const fallback = await supabase
-      .from('products')
-      .select('*', { count: 'exact', head: true })
-      .eq('store_id', profile.store_id)
-    productCount = fallback.count || 0
-  } else {
-    productCount = prodQuery.count || 0
-  }
-
-  if (productCount === 0) {
+  if ((totalProductCount ?? 0) === 0) {
     redirect('/onboarding')
   }
   // --- END ONBOARDING GUARD ---
@@ -71,7 +60,7 @@ export default async function DashboardLayout({
     .eq('active', true)
     .lte('quantity_in_stock', 5)
 
-  if (lowStockQuery.error && lowStockQuery.error.code === '42703') {
+  if (lowStockQuery.error) {
     const fallback = await supabase
       .from('products')
       .select('*', { count: 'exact', head: true })
