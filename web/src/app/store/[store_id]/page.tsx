@@ -31,10 +31,13 @@ interface Product {
   description: string | null
   promotional_price: number | null
   has_free_shipping: boolean
+  images?: string[] | null
+  variations?: { name: string; options: string[] }[] | null
 }
 
 interface CartItem extends Product {
   qty: number
+  selected_variations?: { [key: string]: string }
 }
 
 interface Banner {
@@ -71,6 +74,8 @@ export default function StorefrontPage() {
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [activeImageIndex, setActiveImageIndex] = useState(0)
+  const [selectedOptions, setSelectedOptions] = useState<{ [key: string]: string }>({})
   
   // Cart State
   const [cart, setCart] = useState<CartItem[]>([])
@@ -252,21 +257,43 @@ export default function StorefrontPage() {
     }
   }
 
-  function addToCart(prod: Product) {
+  function addToCart(prod: Product, selectedOpts: { [key: string]: string } = {}) {
     if (prod.quantity_in_stock <= 0) {
       alert('Desculpe, este produto está esgotado.')
       return
     }
+
+    const parsedVars = prod.variations ? (typeof prod.variations === 'string' ? JSON.parse(prod.variations) : prod.variations) : [];
+    if (parsedVars && Array.isArray(parsedVars) && parsedVars.length > 0) {
+      const missing = parsedVars.filter((v: any) => !selectedOpts[v.name]);
+      if (missing.length > 0) {
+        alert(`Por favor, selecione as seguintes opções: ${missing.map((m: any) => m.name).join(', ')}`);
+        return;
+      }
+    }
+
     const finalPrice = (prod.promotional_price && prod.promotional_price > 0) ? prod.promotional_price : prod.sale_price
-    const prodWithPrice = { ...prod, sale_price: finalPrice }
+    const prodWithPrice = { 
+      ...prod, 
+      sale_price: finalPrice,
+      selected_variations: selectedOpts 
+    }
     
-    const existing = cart.find(item => item.id === prod.id)
+    const varsStr = JSON.stringify(selectedOpts)
+    const existing = cart.find(item => 
+      item.id === prod.id && 
+      JSON.stringify(item.selected_variations || {}) === varsStr
+    )
     if (existing) {
       if (existing.qty >= prod.quantity_in_stock) {
         alert('Desculpe, quantidade máxima em estoque atingida.')
         return
       }
-      setCart(cart.map(item => item.id === prod.id ? { ...item, qty: item.qty + 1 } : item))
+      setCart(cart.map(item => 
+        (item.id === prod.id && JSON.stringify(item.selected_variations || {}) === varsStr)
+          ? { ...item, qty: item.qty + 1 }
+          : item
+      ))
     } else {
       setCart([...cart, { ...prodWithPrice, qty: 1 }])
     }
@@ -275,6 +302,8 @@ export default function StorefrontPage() {
   // URL state management helpers for Product Details Drawer
   function openProductDetails(prod: Product) {
     setSelectedProduct(prod)
+    setActiveImageIndex(0)
+    setSelectedOptions({})
     const url = new URL(window.location.href)
     url.searchParams.set('product', prod.id)
     window.history.pushState({}, '', url.toString())
@@ -282,25 +311,32 @@ export default function StorefrontPage() {
 
   function closeProductDetails() {
     setSelectedProduct(null)
+    setActiveImageIndex(0)
+    setSelectedOptions({})
     const url = new URL(window.location.href)
     url.searchParams.delete('product')
     window.history.pushState({}, '', url.toString())
   }
 
-  function updateQty(id: string, delta: number) {
-    const item = cart.find(i => i.id === id)
+  function updateQty(id: string, selectedVars: { [key: string]: string } = {}, delta: number) {
+    const varsStr = JSON.stringify(selectedVars || {})
+    const item = cart.find(i => i.id === id && JSON.stringify(i.selected_variations || {}) === varsStr)
     if (!item) return
 
     const newQty = item.qty + delta
     if (newQty <= 0) {
-      setCart(cart.filter(i => i.id !== id))
+      setCart(cart.filter(i => !(i.id === id && JSON.stringify(i.selected_variations || {}) === varsStr)))
     } else {
       const prod = products.find(p => p.id === id)
       if (prod && newQty > prod.quantity_in_stock) {
         alert('Desculpe, limite de estoque atingido.')
         return
       }
-      setCart(cart.map(i => i.id === id ? { ...i, qty: newQty } : i))
+      setCart(cart.map(i => 
+        (i.id === id && JSON.stringify(i.selected_variations || {}) === varsStr)
+          ? { ...i, qty: newQty }
+          : i
+      ))
     }
   }
 
@@ -353,7 +389,10 @@ export default function StorefrontPage() {
     message += `\n🛍️ *PRODUTOS SELECIONADOS:*\n`
 
     cart.forEach(item => {
-      message += `- *${item.qty}x* ${item.name} (${item.brand || 'Geral'}) — R$ ${(item.sale_price * item.qty).toFixed(2)}\n`
+      const varsText = item.selected_variations && Object.keys(item.selected_variations).length > 0
+        ? ' (' + Object.entries(item.selected_variations).map(([k, v]) => `${k}: ${v}`).join(', ') + ')'
+        : '';
+      message += `- *${item.qty}x* ${item.name}${varsText} (${item.brand || 'Geral'}) — R$ ${(item.sale_price * item.qty).toFixed(2)}\n`
     })
 
     message += `\n💰 *VALOR TOTAL DO PEDIDO:* R$ ${cartTotal.toFixed(2)}\n\n`
@@ -679,7 +718,10 @@ export default function StorefrontPage() {
                           )}
                         </div>
                         <button
-                          onClick={(e) => { e.stopPropagation(); addToCart(prod); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openProductDetails(prod);
+                          }}
                           className="w-full py-2.5 rounded-xl bg-[var(--accent-color)] hover:opacity-95 text-white font-extrabold text-[10px] uppercase transition-all active:scale-[0.97] shadow-sm shadow-[var(--accent-color)]/10"
                         >
                           COMPRAR AGORA
@@ -756,7 +798,6 @@ export default function StorefrontPage() {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {filteredProducts.map(prod => {
-                const originalPrice = prod.sale_price * 1.2 // 20% fake original price
                 return (
                   <div 
                     key={prod.id} 
@@ -771,7 +812,7 @@ export default function StorefrontPage() {
                         </div>
                       )}
                       {prod.promotional_price && prod.promotional_price > 0 && (
-                        <div className="bg-emerald-505/10 text-emerald-600 bg-emerald-55 bg-emerald-500/10 text-[8px] font-black tracking-widest px-2.5 py-0.5 rounded-full">
+                        <div className="bg-emerald-500/10 text-emerald-600 text-[8px] font-black tracking-widest px-2.5 py-0.5 rounded-full">
                           PROMO
                         </div>
                       )}
@@ -819,7 +860,10 @@ export default function StorefrontPage() {
                           )}
                         </div>
                         <button
-                          onClick={(e) => { e.stopPropagation(); addToCart(prod); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openProductDetails(prod);
+                          }}
                           className="w-full mt-3 py-2 rounded-xl bg-[var(--accent-color)] hover:opacity-95 text-white font-extrabold text-[10px] uppercase transition-all active:scale-[0.97]"
                         >
                           ADICIONAR
@@ -877,7 +921,7 @@ export default function StorefrontPage() {
           </div>
           
           <div className="flex flex-col items-center md:items-end gap-1.5 text-slate-600 dark:text-zinc-300">
-            <div className="flex items-center gap-1.5 text-emerald-650 dark:text-emerald-450 text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
+            <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
               🛡️ Compra Segura
             </div>
             <p className="text-[10px] opacity-70">Seus dados pessoais e de pagamento estão 100% protegidos.</p>
@@ -940,25 +984,34 @@ export default function StorefrontPage() {
                   <div className="space-y-3">
                     {cart.map(item => (
                       <div 
-                        key={item.id} 
+                        key={`${item.id}-${JSON.stringify(item.selected_variations || {})}`} 
                         className="flex items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-zinc-800/80 bg-slate-50/50 dark:bg-zinc-950/40 text-xs"
                       >
                         <div className="flex-1 pr-3">
                           <h4 className="font-bold text-slate-700 dark:text-zinc-200 line-clamp-1">{item.name}</h4>
                           <span className="text-[10px] text-slate-400">{item.brand || 'Geral'}</span>
+                          {item.selected_variations && Object.keys(item.selected_variations).length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {Object.entries(item.selected_variations).map(([key, val]) => (
+                                <span key={key} className="text-[9px] bg-pink-100/20 text-[var(--primary-color)] dark:text-zinc-300 px-1.5 py-0.2 rounded font-bold border border-pink-100/30">
+                                  {key}: {val}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           <p className="font-extrabold text-slate-800 dark:text-white mt-1">R$ {item.sale_price.toFixed(2)}</p>
                         </div>
 
                         <div className="flex items-center gap-2">
                           <button 
-                            onClick={() => updateQty(item.id, -1)}
+                            onClick={() => updateQty(item.id, item.selected_variations, -1)}
                             className="w-6 h-6 rounded-lg bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 flex items-center justify-center font-bold text-slate-700 dark:text-zinc-300"
                           >
                             -
                           </button>
                           <span className="font-bold w-4 text-center">{item.qty}</span>
                           <button 
-                            onClick={() => updateQty(item.id, 1)}
+                            onClick={() => updateQty(item.id, item.selected_variations, 1)}
                             className="w-6 h-6 rounded-lg bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 flex items-center justify-center font-bold text-slate-700 dark:text-zinc-300"
                           >
                             +
@@ -1076,35 +1129,66 @@ export default function StorefrontPage() {
             {/* Drawer Body (Product details) */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               
-              {/* Product Large Image */}
-              <div className="aspect-square bg-slate-50 dark:bg-zinc-950 rounded-3xl overflow-hidden border border-slate-100 dark:border-zinc-850/85 relative flex items-center justify-center text-slate-350 shadow-inner group">
-                {/* Badges */}
-                <div className="absolute top-4 left-4 z-10 flex flex-col gap-1.5">
-                  {selectedProduct.promotional_price && selectedProduct.promotional_price > 0 && (
-                    <div className="bg-[var(--primary-color)] text-white text-[10px] font-extrabold px-3 py-1 rounded-full shadow-md">
-                      {Math.round((1 - selectedProduct.promotional_price / selectedProduct.sale_price) * 100)}% OFF
-                    </div>
-                  )}
-                  {selectedProduct.has_free_shipping && (
-                    <div className="bg-emerald-600 text-white text-[10px] font-extrabold px-3 py-1 rounded-full shadow-md">
-                      FRETE GRÁTIS
-                    </div>
-                  )}
-                </div>
+              {/* Product Image Gallery / Carousel */}
+              {(() => {
+                const prodImages = selectedProduct.images && Array.isArray(selectedProduct.images) && selectedProduct.images.length > 0
+                  ? selectedProduct.images
+                  : (selectedProduct.image_url ? [selectedProduct.image_url] : []);
+                
+                const activeImg = prodImages[activeImageIndex] || null;
 
-                {selectedProduct.image_url ? (
-                  <img 
-                    src={selectedProduct.image_url} 
-                    alt={selectedProduct.name} 
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <ShoppingBag className="w-12 h-12 text-slate-250 dark:text-zinc-800" />
-                    <span className="text-[10px] font-extrabold text-slate-400 dark:text-zinc-550 uppercase tracking-widest">{selectedProduct.name.slice(0, 3)}</span>
+                return (
+                  <div className="space-y-3">
+                    <div className="aspect-square bg-slate-50 dark:bg-zinc-950 rounded-3xl overflow-hidden border border-slate-100 dark:border-zinc-850/85 relative flex items-center justify-center text-slate-355 shadow-inner group">
+                      {/* Badges */}
+                      <div className="absolute top-4 left-4 z-10 flex flex-col gap-1.5">
+                        {selectedProduct.promotional_price && selectedProduct.promotional_price > 0 && (
+                          <div className="bg-[var(--primary-color)] text-white text-[10px] font-extrabold px-3 py-1 rounded-full shadow-md">
+                            {Math.round((1 - selectedProduct.promotional_price / selectedProduct.sale_price) * 100)}% OFF
+                          </div>
+                        )}
+                        {selectedProduct.has_free_shipping && (
+                          <div className="bg-emerald-600 text-white text-[10px] font-extrabold px-3 py-1 rounded-full shadow-md">
+                            FRETE GRÁTIS
+                          </div>
+                        )}
+                      </div>
+
+                      {activeImg ? (
+                        <img 
+                          src={activeImg} 
+                          alt={selectedProduct.name} 
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <ShoppingBag className="w-12 h-12 text-slate-250 dark:text-zinc-800" />
+                          <span className="text-[10px] font-extrabold text-slate-400 dark:text-zinc-550 uppercase tracking-widest">{selectedProduct.name.slice(0, 3)}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Thumbnail slider */}
+                    {prodImages.length > 1 && (
+                      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                        {prodImages.map((img, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setActiveImageIndex(idx)}
+                            className={`aspect-square w-14 rounded-xl overflow-hidden border-2 flex-shrink-0 transition-all ${
+                              activeImageIndex === idx 
+                                ? 'border-[var(--primary-color)] scale-95 shadow-md' 
+                                : 'border-slate-100 dark:border-zinc-800 opacity-60 hover:opacity-100'
+                            }`}
+                          >
+                            <img src={img} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })()}
 
               {/* Title & Brand */}
               <div className="space-y-1">
@@ -1145,6 +1229,47 @@ export default function StorefrontPage() {
                 </div>
               </div>
 
+              {/* Seletor de Variações */}
+              {selectedProduct.variations && (() => {
+                const parsed = typeof selectedProduct.variations === 'string' 
+                  ? JSON.parse(selectedProduct.variations) 
+                  : selectedProduct.variations;
+                
+                return Array.isArray(parsed) && parsed.length > 0 ? (
+                  <div className="space-y-4 border-t border-slate-100 dark:border-zinc-850 pt-5">
+                    {parsed.map((v: any, vIdx: number) => (
+                      <div key={vIdx} className="space-y-2">
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-zinc-500">
+                          Selecione o(a) {v.name} *
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {v.options.map((opt: string, optIdx: number) => {
+                            const isSelected = selectedOptions[v.name] === opt;
+                            return (
+                              <button
+                                key={optIdx}
+                                type="button"
+                                onClick={() => setSelectedOptions({
+                                  ...selectedOptions,
+                                  [v.name]: opt
+                                })}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                                  isSelected
+                                    ? 'bg-[var(--primary-color)] border-[var(--primary-color)] text-white shadow-md'
+                                    : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-650 dark:text-zinc-350 hover:bg-slate-50 dark:hover:bg-zinc-850'
+                                }`}
+                              >
+                                {opt}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
+
               {/* Description section */}
               <div className="space-y-2 border-t border-slate-100 dark:border-zinc-850 pt-5">
                 <h3 className="text-xs font-black uppercase text-slate-800 dark:text-white tracking-wider flex items-center gap-1.5">
@@ -1180,14 +1305,26 @@ export default function StorefrontPage() {
               ) : (
                 <button 
                   onClick={() => {
-                    addToCart(selectedProduct)
+                    const parsedVars = selectedProduct.variations 
+                      ? (typeof selectedProduct.variations === 'string' ? JSON.parse(selectedProduct.variations) : selectedProduct.variations) 
+                      : [];
+                    
+                    if (parsedVars && Array.isArray(parsedVars) && parsedVars.length > 0) {
+                      const missing = parsedVars.filter((v: any) => !selectedOptions[v.name]);
+                      if (missing.length > 0) {
+                        alert(`Por favor, selecione as seguintes opções: ${missing.map((m: any) => m.name).join(', ')}`);
+                        return;
+                      }
+                    }
+
+                    addToCart(selectedProduct, selectedOptions)
                     closeProductDetails()
                     setCartOpen(true)
                   }}
                   style={{ backgroundColor: accentColor }}
                   className="w-full py-4 px-4 rounded-xl text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg hover:opacity-95 active:scale-[0.98] transition-all"
                 >
-                  ADICIONAR À SACOLA — R$ {selectedProduct.sale_price.toFixed(2)}
+                  ADICIONAR À SACOLA — R$ {((selectedProduct.promotional_price && selectedProduct.promotional_price > 0) ? selectedProduct.promotional_price : selectedProduct.sale_price).toFixed(2)}
                 </button>
               )}
             </div>

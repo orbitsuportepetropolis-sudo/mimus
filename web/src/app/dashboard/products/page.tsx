@@ -35,6 +35,8 @@ interface Product {
   description: string | null
   promotional_price?: number | null
   has_free_shipping?: boolean
+  images?: string[] | null
+  variations?: { name: string; options: string[] }[] | null
 }
 
 interface StockEntry {
@@ -150,6 +152,11 @@ export default function ProductsPage() {
   const [formHasFreeShipping, setFormHasFreeShipping] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [imageFiles, setImageFiles] = useState<(File | null)[]>([null, null, null, null, null])
+  const [imagePreviews, setImagePreviews] = useState<(string | null)[]>([null, null, null, null, null])
+  const [formVariations, setFormVariations] = useState<{ name: string; options: string[] }[]>([])
+  const [newVarName, setNewVarName] = useState('')
+  const [newVarOptions, setNewVarOptions] = useState('')
   const [formLoading, setFormLoading] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -827,10 +834,61 @@ export default function ProductsPage() {
   }
 
   // Opens form for adding or editing
+  // Helper to manage variations
+  function addVariation() {
+    if (!newVarName.trim() || !newVarOptions.trim()) return
+    const options = newVarOptions
+      .split(',')
+      .map(opt => opt.trim())
+      .filter(Boolean)
+    if (options.length === 0) return
+
+    setFormVariations([
+      ...formVariations,
+      { name: newVarName.trim(), options }
+    ])
+    setNewVarName('')
+    setNewVarOptions('')
+  }
+
+  function removeVariation(index: number) {
+    setFormVariations(formVariations.filter((_, i) => i !== index))
+  }
+
+  // Helper to manage multi-images
+  function handleSlotImageChange(index: number, e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0]
+      const newFiles = [...imageFiles]
+      newFiles[index] = file
+      setImageFiles(newFiles)
+
+      const newPreviews = [...imagePreviews]
+      newPreviews[index] = URL.createObjectURL(file)
+      setImagePreviews(newPreviews)
+    }
+  }
+
+  function handleRemoveSlotImage(index: number) {
+    const newFiles = [...imageFiles]
+    newFiles[index] = null
+    setImageFiles(newFiles)
+
+    const newPreviews = [...imagePreviews]
+    newPreviews[index] = null
+    setImagePreviews(newPreviews)
+  }
+
+  // Opens form for adding or editing
   function openModal(prod: Product | null = null) {
     setFormError(null)
     setImageFile(null)
     setImagePreview(null)
+    setImagePreviews([null, null, null, null, null])
+    setImageFiles([null, null, null, null, null])
+    setFormVariations([])
+    setNewVarName('')
+    setNewVarOptions('')
 
     // Enforce 50 products limit for Free Plan users when registering a NEW product
     const getTrialDaysLeft = () => {
@@ -861,7 +919,22 @@ export default function ProductsPage() {
       setFormDescription(prod.description || '')
       setFormPromotionalPrice(prod.promotional_price ? prod.promotional_price.toFixed(2) : '')
       setFormHasFreeShipping(!!prod.has_free_shipping)
-      setImagePreview(prod.image_url)
+      
+      const initialPreviews = [null, null, null, null, null] as (string | null)[]
+      if (prod.images && Array.isArray(prod.images) && prod.images.length > 0) {
+        prod.images.forEach((img, idx) => {
+          if (idx < 5) initialPreviews[idx] = img
+        })
+      } else if (prod.image_url) {
+        initialPreviews[0] = prod.image_url
+      }
+      setImagePreviews(initialPreviews)
+
+      let parsedVariations = [] as any[]
+      if (prod.variations) {
+        parsedVariations = typeof prod.variations === 'string' ? JSON.parse(prod.variations) : prod.variations
+      }
+      setFormVariations(Array.isArray(parsedVariations) ? parsedVariations : [])
     } else {
       setEditingProduct(null)
       setFormName('')
@@ -899,6 +972,11 @@ export default function ProductsPage() {
     setFormError(null)
     setImageFile(null)
     setImagePreview(null)
+    setImagePreviews([null, null, null, null, null])
+    setImageFiles([null, null, null, null, null])
+    setFormVariations([])
+    setNewVarName('')
+    setNewVarOptions('')
     setEditingProduct(null)
     
     setFormName(searchTerm)
@@ -925,38 +1003,24 @@ export default function ProductsPage() {
   }
 
 
-  // Image Selection Handle
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      setImageFile(file)
-      setImagePreview(URL.createObjectURL(file))
-    }
-  }
-
-  // Upload image file to Supabase Storage
-  async function uploadProductImage(storeId: string): Promise<string | null> {
-    if (!imageFile) return null
-
+  // Upload single image file to Supabase Storage
+  async function uploadProductImage(file: File, storeId: string): Promise<string | null> {
     try {
-      const fileExt = imageFile.name.split('.').pop()
-      const fileName = `${storeId}/${Date.now()}.${fileExt}`
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${storeId}/${Date.now()}-${Math.floor(Math.random() * 1000)}.${fileExt}`
       
-      // Upload using Supabase storage client
       const { data, error } = await supabase.storage
         .from('product-photos')
-        .upload(fileName, imageFile, {
+        .upload(fileName, file, {
           cacheControl: '3600',
           upsert: true
         })
 
       if (error) {
-        // If bucket doesn't exist, log it and return public fallback
-        console.error('Erro storage upload (tentando criar bucket):', error)
+        console.error('Erro storage upload:', error)
         return null
       }
 
-      // Get public URL
       const { data: publicUrlData } = supabase.storage
         .from('product-photos')
         .getPublicUrl(fileName)
@@ -988,15 +1052,21 @@ export default function ProductsPage() {
       if (!profile) throw new Error('Loja não encontrada')
       const store_id = profile.store_id
 
-      let finalImageUrl = imagePreview
+      let finalImages = [...imagePreviews]
 
-      // Upload if new file selected
-      if (imageFile) {
-        const uploadedUrl = await uploadProductImage(store_id)
-        if (uploadedUrl) {
-          finalImageUrl = uploadedUrl
+      // Upload if new file selected for any slot
+      for (let i = 0; i < 5; i++) {
+        const file = imageFiles[i]
+        if (file) {
+          const uploadedUrl = await uploadProductImage(file, store_id)
+          if (uploadedUrl) {
+            finalImages[i] = uploadedUrl
+          }
         }
       }
+
+      const cleanedImages = finalImages.filter(Boolean) as string[]
+      const finalImageUrl = cleanedImages[0] || null
 
       const productPayload: any = {
         store_id,
@@ -1013,6 +1083,8 @@ export default function ProductsPage() {
         min_stock_alert: parseInt(formMinStock) || 5,
         expiration_date: formExpDate || null,
         image_url: finalImageUrl,
+        images: cleanedImages,
+        variations: formVariations,
         description: formDescription || null
       }
 
@@ -1066,8 +1138,8 @@ export default function ProductsPage() {
       }
 
     } catch (err: any) {
-      if (err.code === '42703') {
-        setFormError('Colunas necessárias não existem na tabela de produtos. Por favor, execute a seguinte query no SQL Editor do Supabase:\n\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS promotional_price numeric(10,2);\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS has_free_shipping boolean NOT NULL DEFAULT false;')
+      if (err.code === '42703' || err.message?.includes('column')) {
+        setFormError('Colunas necessárias não existem na tabela de produtos. Por favor, execute a seguinte query no SQL Editor do Supabase:\n\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS images jsonb DEFAULT \'[]\'::jsonb NOT NULL;\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS variations jsonb DEFAULT \'[]\'::jsonb NOT NULL;')
       } else {
         setFormError(err.message || 'Erro ao salvar produto. Preencha todos os campos corretamente.')
       }
@@ -1310,6 +1382,18 @@ export default function ProductsPage() {
                             <div>
                               <h4 className="font-bold text-slate-700 dark:text-zinc-200">{p.name}</h4>
                               <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">{p.sku || 'Sem SKU'}</span>
+                              {p.variations && (() => {
+                                const parsed = typeof p.variations === 'string' ? JSON.parse(p.variations) : p.variations;
+                                return Array.isArray(parsed) && parsed.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {parsed.map((v: any, index: number) => (
+                                      <span key={index} className="text-[9px] px-1.5 py-0.5 bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 rounded font-semibold border border-slate-200/20">
+                                        {v.name}: {v.options.join(', ')}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : null;
+                              })()}
                             </div>
                           </td>
                           <td className="px-6 py-4">
@@ -1991,21 +2075,114 @@ export default function ProductsPage() {
                   />
                 </div>
 
-                {/* Photo Upload */}
-                <div className="col-span-2 space-y-2">
-                  <label className="block text-slate-400 dark:text-zinc-500">Foto do Produto</label>
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 flex items-center justify-center overflow-hidden flex-shrink-0">
-                      {imagePreview ? (
-                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                      ) : (
-                        <ImageIcon className="w-6 h-6 text-slate-300" />
-                      )}
+                {/* Galeria de Fotos (Até 5) */}
+                <div className="col-span-2 space-y-3 border-t border-slate-100 dark:border-zinc-800/50 pt-4">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Fotos do Produto (Até 5)</label>
+                  <p className="text-[10px] text-slate-400 dark:text-zinc-500">A primeira foto será a principal. Formatos aceitos: PNG, JPG, JPEG.</p>
+                  
+                  <div className="grid grid-cols-5 gap-3">
+                    {[0, 1, 2, 3, 4].map((index) => (
+                      <div key={index} className="flex flex-col items-center gap-1.5">
+                        <div className="relative aspect-square w-full rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 flex items-center justify-center overflow-hidden group shadow-sm">
+                          {imagePreviews[index] ? (
+                            <>
+                              <img src={imagePreviews[index]!} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSlotImage(index)}
+                                className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-md"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          ) : (
+                            <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-slate-100/50 dark:hover:bg-zinc-900/50 transition-colors">
+                              <Upload className="w-5 h-5 text-slate-300 dark:text-zinc-700" />
+                              <span className="text-[9px] text-slate-400 dark:text-zinc-550 mt-1 font-semibold">Upload</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => handleSlotImageChange(index, e)}
+                                className="hidden"
+                              />
+                            </label>
+                          )}
+                        </div>
+                        <span className="text-[9px] font-semibold text-slate-400 dark:text-zinc-500">
+                          {index === 0 ? 'Principal *' : `Foto ${index + 1}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Variações do Produto */}
+                <div className="col-span-2 space-y-4 border-t border-slate-100 dark:border-zinc-800/50 pt-4">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Variações (Cor, Tamanho, etc.)</label>
+                    <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Opcional</span>
+                  </div>
+
+                  {/* List of active variations */}
+                  {formVariations.length > 0 && (
+                    <div className="space-y-2">
+                      {formVariations.map((v, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/30">
+                          <div>
+                            <span className="text-xs font-bold text-slate-700 dark:text-zinc-200">{v.name}:</span>
+                            <div className="flex flex-wrap gap-1.5 mt-1">
+                              {v.options.map((opt, optIdx) => (
+                                <span key={optIdx} className="text-[10px] bg-rose-50 dark:bg-rose-955/20 text-rose-650 dark:text-rose-400 px-2 py-0.5 rounded-full font-bold border border-rose-100/30 dark:border-rose-900/10">
+                                  {opt}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeVariation(idx)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-rose-650 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all"
+                            title="Remover variação"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                    <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-slate-300 hover:border-rose-500 rounded-xl cursor-pointer text-xs font-semibold hover:text-rose-500 transition-colors">
-                      <Upload className="w-4 h-4" /> Selecionar Foto
-                      <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-                    </label>
+                  )}
+
+                  {/* Add new variation row */}
+                  <div className="p-3.5 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800 bg-slate-50/20 dark:bg-zinc-950/10 space-y-3">
+                    <p className="text-[10px] text-slate-400 dark:text-zinc-500">Adicione um grupo de variação e digite os valores separados por vírgula.</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="Nome (Ex: Cor, Tamanho)"
+                          value={newVarName}
+                          onChange={(e) => setNewVarName(e.target.value)}
+                          className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-slate-750 dark:text-zinc-200"
+                        />
+                      </div>
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="Opções (Ex: Rosa, Azul, Vermelho)"
+                          value={newVarOptions}
+                          onChange={(e) => setNewVarOptions(e.target.value)}
+                          className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-slate-750 dark:text-zinc-200"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={addVariation}
+                        className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-bold text-[10px] uppercase transition-all shadow-sm shadow-rose-600/10"
+                      >
+                        + Adicionar Variação
+                      </button>
+                    </div>
                   </div>
                 </div>
 
