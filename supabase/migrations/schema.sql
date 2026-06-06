@@ -392,6 +392,7 @@ ALTER TABLE public.products ADD COLUMN IF NOT EXISTS promotional_price numeric(1
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS has_free_shipping boolean NOT NULL DEFAULT false;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS images jsonb DEFAULT '[]'::jsonb NOT NULL;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS variations jsonb DEFAULT '[]'::jsonb NOT NULL;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
 
 -- Adição de colunas para gerenciamento de clientes e vendas no mobile
 ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS tags text;

@@ -264,6 +264,7 @@ export default function IntegrationsPage() {
           .from('products')
           .select('id, sale_price')
           .eq('store_id', profile.store_id)
+          .eq('active', true)
           .limit(1)
 
         if (product && product[0]) {

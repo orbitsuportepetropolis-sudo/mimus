@@ -77,6 +77,7 @@ export default function StockPage() {
         .from('products')
         .select('id, name, quantity_in_stock')
         .eq('store_id', storeId)
+        .eq('active', true)
         .order('name', { ascending: true })
 
       // Fetch stock movements history

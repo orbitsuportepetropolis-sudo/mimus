@@ -104,6 +104,7 @@ export default function DashboardScreen({ navigation }: any) {
             .from('products')
             .select('name')
             .eq('store_id', profile.store_id)
+            .eq('active', true)
             .lte('quantity_in_stock', 5)
 
           fireSmartAlerts({

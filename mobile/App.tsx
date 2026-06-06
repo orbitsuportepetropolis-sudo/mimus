@@ -100,6 +100,7 @@ export default function App() {
           .from('products')
           .select('*', { count: 'exact', head: true })
           .eq('store_id', profile.store_id)
+          .eq('active', true)
 
         if (productCount && productCount > 0) {
           // Set flag in local storage for future fast checks

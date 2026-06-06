@@ -81,8 +81,50 @@ export default function StorefrontPage() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [cartOpen, setCartOpen] = useState(false)
   const [clientName, setClientName] = useState('')
+  const [clientPhone, setClientPhone] = useState('')
+  const [isFirstPurchase, setIsFirstPurchase] = useState<boolean | null>(null)
+  const [phoneChecking, setPhoneChecking] = useState(false)
   const [deliveryType, setDeliveryType] = useState<'delivery' | 'pickup'>('pickup')
   const [address, setAddress] = useState('')
+
+  // Verify first purchase on phone number change
+  useEffect(() => {
+    const checkPhone = async () => {
+      const cleanedInput = clientPhone.replace(/\D/g, '')
+      if (cleanedInput.length < 10) {
+        setIsFirstPurchase(null)
+        return
+      }
+
+      setPhoneChecking(true)
+      try {
+        const { data } = await supabase
+          .from('customers')
+          .select('phone')
+          .eq('store_id', storeId)
+
+        if (data) {
+          const exists = data.some(cust => {
+            if (!cust.phone) return false
+            const cleanedDb = cust.phone.replace(/\D/g, '')
+            const p1 = cleanedInput.startsWith('55') ? cleanedInput.slice(2) : cleanedInput
+            const p2 = cleanedDb.startsWith('55') ? cleanedDb.slice(2) : cleanedDb
+            return p1 === p2 || p1.endsWith(p2) || p2.endsWith(p1)
+          })
+          setIsFirstPurchase(!exists)
+        } else {
+          setIsFirstPurchase(true)
+        }
+      } catch (err) {
+        console.error('Erro ao verificar telefone:', err)
+      } finally {
+        setPhoneChecking(false)
+      }
+    }
+
+    const timer = setTimeout(checkPhone, 600)
+    return () => clearTimeout(timer)
+  }, [clientPhone, storeId, supabase])
   const [whatsappNumber, setWhatsappNumber] = useState('')
 
   // Load Custom Font Family from Google Fonts
@@ -203,6 +245,7 @@ export default function StorefrontPage() {
         .from('products')
         .select('*')
         .eq('store_id', storeId)
+        .eq('active', true)
         .gt('quantity_in_stock', 0)
         .order('name', { ascending: true })
 
@@ -367,10 +410,17 @@ export default function StorefrontPage() {
 
   const cartTotal = cart.reduce((acc, item) => acc + (item.sale_price * item.qty), 0)
   const cartItemsCount = cart.reduce((acc, item) => acc + item.qty, 0)
+  const discountAmount = isFirstPurchase ? Math.round(cartTotal * 0.1 * 100) / 100 : 0
+  const finalTotal = Math.max(0, cartTotal - discountAmount)
 
   function handleSendOrder() {
     if (!clientName) {
       alert('Por favor, informe seu nome para o pedido.')
+      return
+    }
+
+    if (!clientPhone || clientPhone.replace(/\D/g, '').length < 10) {
+      alert('Por favor, informe um número de WhatsApp válido.')
       return
     }
 
@@ -382,6 +432,7 @@ export default function StorefrontPage() {
     // Format WhatsApp message
     let message = `🌸 *NOVO PEDIDO - ${storeName.toUpperCase()}* 🌸\n\n`
     message += `👤 *Cliente:* ${clientName}\n`
+    message += `📞 *WhatsApp:* ${clientPhone}\n`
     message += `🚚 *Método:* ${deliveryType === 'delivery' ? 'Entrega em Domicílio 🛵' : 'Retirar na Loja 🏪'}\n`
     if (deliveryType === 'delivery') {
       message += `📍 *Endereço:* ${address}\n`
@@ -395,7 +446,12 @@ export default function StorefrontPage() {
       message += `- *${item.qty}x* ${item.name}${varsText} (${item.brand || 'Geral'}) — R$ ${(item.sale_price * item.qty).toFixed(2)}\n`
     })
 
-    message += `\n💰 *VALOR TOTAL DO PEDIDO:* R$ ${cartTotal.toFixed(2)}\n\n`
+    if (isFirstPurchase) {
+      message += `\n🎟️ *Desconto Primeira Compra (10%):* - R$ ${discountAmount.toFixed(2)}\n`
+      message += `💰 *VALOR TOTAL DO PEDIDO:* R$ ${finalTotal.toFixed(2)}\n\n`
+    } else {
+      message += `\n💰 *VALOR TOTAL DO PEDIDO:* R$ ${cartTotal.toFixed(2)}\n\n`
+    }
     message += `Olá! Gostaria de confirmar o meu pedido e combinar a forma de pagamento.`
 
     const phoneNum = whatsappNumber.replace(/\D/g, '') || '5500000000000'
@@ -1041,6 +1097,37 @@ export default function StorefrontPage() {
                       </div>
 
                       <div>
+                        <label className="block text-slate-400 mb-1">Seu WhatsApp / Telefone *</label>
+                        <div className="relative">
+                          <input 
+                            type="tel" 
+                            required
+                            value={clientPhone}
+                            onChange={(e) => setClientPhone(e.target.value)}
+                            placeholder="DDD + Número (ex: 11999999999)"
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/20 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+                          />
+                          {phoneChecking && (
+                            <span className="absolute right-3 top-3 text-[10px] text-slate-400 flex items-center gap-1">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--primary-color)]" /> Verificando...
+                            </span>
+                          )}
+                        </div>
+                        {isFirstPurchase === true && (
+                          <div className="mt-1.5 p-2.5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-xl text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                            <Percent className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>Parabéns! Identificamos que este é o seu primeiro pedido. <strong>Desconto de 10% aplicado automaticamente!</strong> 🎉</span>
+                          </div>
+                        )}
+                        {isFirstPurchase === false && (
+                          <div className="mt-1.5 p-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-[10px] text-slate-500 dark:text-zinc-400 font-medium">
+                            Ficamos felizes em ver você de volta! 💕
+                          </div>
+                        )}
+                      </div>
+
+
+                      <div>
                         <label className="block text-slate-400 mb-1">Opção de Entrega</label>
                         <div className="grid grid-cols-2 gap-2">
                           <button 
@@ -1089,10 +1176,22 @@ export default function StorefrontPage() {
 
             {/* Drawer Footer (Total and WhatsApp send) */}
             {cart.length > 0 && (
-              <div className="p-5 border-t border-slate-100 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 space-y-4">
+              <div className="p-5 border-t border-slate-100 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 space-y-3">
+                {isFirstPurchase && (
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400 font-medium">Subtotal:</span>
+                    <span className="font-bold text-slate-700 dark:text-zinc-300">R$ {cartTotal.toFixed(2)}</span>
+                  </div>
+                )}
+                {isFirstPurchase && (
+                  <div className="flex justify-between items-center text-xs text-emerald-600 dark:text-emerald-400 font-bold">
+                    <span>Desconto Primeira Compra (10%):</span>
+                    <span>- R$ {discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center text-slate-800 dark:text-white">
                   <span className="text-xs font-semibold text-slate-400">Total do pedido:</span>
-                  <span className="text-lg font-black">R$ {cartTotal.toFixed(2)}</span>
+                  <span className="text-lg font-black">R$ {isFirstPurchase ? finalTotal.toFixed(2) : cartTotal.toFixed(2)}</span>
                 </div>
                 
                 <button 

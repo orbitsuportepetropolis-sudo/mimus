@@ -37,6 +37,7 @@ export default async function DashboardLayout({
     .from('products')
     .select('*', { count: 'exact', head: true })
     .eq('store_id', profile.store_id)
+    .eq('active', true)
 
   if (productCount === 0) {
     redirect('/onboarding')
@@ -55,6 +56,7 @@ export default async function DashboardLayout({
     .from('products')
     .select('*', { count: 'exact', head: true })
     .eq('store_id', profile.store_id)
+    .eq('active', true)
     .lte('quantity_in_stock', 5)
 
   return (

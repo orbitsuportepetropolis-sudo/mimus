@@ -132,6 +132,7 @@ export default function DashboardPage() {
         .from('products')
         .select('id, name, brand, sale_price, quantity_in_stock, min_stock_alert, expiration_date')
         .eq('store_id', storeId)
+        .eq('active', true)
 
       let lowStock = 0
       let expiring = 0

@@ -97,6 +97,7 @@ export default function SalesPage() {
         .from('products')
         .select('id, name, brand, sale_price, quantity_in_stock, image_url')
         .eq('store_id', storeId)
+        .eq('active', true)
         .gt('quantity_in_stock', 0)
         .order('name', { ascending: true })
 

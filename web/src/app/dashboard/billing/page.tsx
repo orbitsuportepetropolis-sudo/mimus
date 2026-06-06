@@ -135,6 +135,7 @@ export default function BillingPage() {
           .from('products')
           .select('*', { count: 'exact', head: true })
           .eq('store_id', profile.store_id)
+          .eq('active', true)
 
         setProductCount(count || 0)
       }

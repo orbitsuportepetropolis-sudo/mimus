@@ -65,6 +65,7 @@ export default function AIChatModal({ onClose, storeId, onRefresh }: AIChatModal
         .from('products')
         .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock')
         .eq('store_id', storeId)
+        .eq('active', true)
         .order('name', { ascending: true })
 
       const { data: custs } = await supabase
@@ -132,6 +133,7 @@ export default function AIChatModal({ onClose, storeId, onRefresh }: AIChatModal
         .from('products')
         .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock')
         .eq('store_id', storeId)
+        .eq('active', true)
 
       const { data: custs } = await supabase
         .from('customers')
@@ -282,38 +284,13 @@ export default function AIChatModal({ onClose, storeId, onRefresh }: AIChatModal
           if (itemsErr) throw itemsErr
           actionsExecuted = true
         } else if (action.type === 'delete_product') {
-          const { data: saleItems, error: salesErr } = await supabase
-            .from('sale_items')
-            .select('product_id')
-            .eq('product_id', action.productId)
+          const { error: delErr } = await supabase
+            .from('products')
+            .update({ active: false })
+            .eq('id', action.productId)
+            .eq('store_id', storeId)
 
-          if (salesErr) throw salesErr
-
-          if (saleItems && saleItems.length > 0) {
-            const { data: pData } = await supabase
-              .from('products')
-              .select('quantity_in_stock')
-              .eq('id', action.productId)
-              .single()
-
-            if (pData && pData.quantity_in_stock > 0) {
-              await supabase.from('stock_movements').insert([{
-                store_id: storeId,
-                product_id: action.productId,
-                quantity: -pData.quantity_in_stock,
-                type: 'exit',
-                reason: 'manual_adjustment'
-              }])
-            }
-          } else {
-            const { error: delErr } = await supabase
-              .from('products')
-              .delete()
-              .eq('id', action.productId)
-              .eq('store_id', storeId)
-
-            if (delErr) throw delErr
-          }
+          if (delErr) throw delErr
           actionsExecuted = true
         } else if (action.type === 'delete_customer') {
           const { error: delErr } = await supabase

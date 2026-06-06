@@ -809,6 +809,7 @@ export default function ProductsPage() {
         .from('products')
         .select('*')
         .eq('store_id', storeId)
+        .eq('active', true)
         .order('name', { ascending: true })
 
       if (error) throw error
@@ -1166,14 +1167,15 @@ export default function ProductsPage() {
 
         const { error } = await supabase
           .from('products')
-          .delete()
+          .update({ active: false })
           .eq('id', id)
           .eq('store_id', store_id)
 
         if (error) throw error
         await loadProducts()
+        window.dispatchEvent(new CustomEvent('dashboard-refresh'))
       } catch (err: any) {
-        alert('Não foi possível excluir o produto. Certifique-se de que ele não possui registros de vendas vinculados.')
+        alert('Não foi possível excluir o produto.')
       }
     }
   }

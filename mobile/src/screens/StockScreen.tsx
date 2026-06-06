@@ -169,6 +169,7 @@ export default function StockScreen() {
           .from('products')
           .select('*')
           .eq('store_id', profile.store_id)
+          .eq('active', true)
           .order('name', { ascending: true })
 
         if (error) throw error
@@ -385,7 +386,7 @@ export default function StockScreen() {
             try {
               const { error } = await supabase
                 .from('products')
-                .delete()
+                .update({ active: false })
                 .eq('id', selectedProduct.id)
 
               if (error) throw error
@@ -394,7 +395,7 @@ export default function StockScreen() {
               setModalVisible(false)
               fetchStock()
             } catch (err: any) {
-              Alert.alert('Erro', 'Não foi possível excluir. Verifique se o produto não possui vendas associadas.')
+              Alert.alert('Erro', 'Não foi possível excluir o produto.')
             }
           }
         }
