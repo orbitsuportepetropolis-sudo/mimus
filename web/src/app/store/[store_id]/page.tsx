@@ -248,18 +248,25 @@ export default function StorefrontPage() {
         setBanners(loadedBanners)
       }
 
-      // Fetch Products with stock > 0
+      // Fetch all Products (in-stock and sold-out)
       const { data: prods, error: prodsErr } = await supabase
         .from('products')
         .select('*')
         .eq('store_id', storeId)
-        .gt('quantity_in_stock', 0)
         .order('name', { ascending: true })
 
       if (prodsErr) throw prodsErr
       if (prods) {
-        const inStockProds = prods.filter(p => p.quantity_in_stock > 0 && p.active !== false)
-        setProducts(inStockProds)
+        const activeProds = prods.filter(p => p.active !== false)
+        // Sort products: in-stock first, sold-out at the end. Keep name alphabetical within groups.
+        const sortedProds = activeProds.sort((a, b) => {
+          const aInStock = (a.quantity_in_stock || 0) > 0;
+          const bInStock = (b.quantity_in_stock || 0) > 0;
+          if (aInStock && !bInStock) return -1;
+          if (!aInStock && bInStock) return 1;
+          return a.name.localeCompare(b.name, 'pt', { sensitivity: 'base' });
+        });
+        setProducts(sortedProds)
         
         console.log('DEBUG STOREFRONT:', {
           storeName: store?.name,
@@ -744,12 +751,19 @@ export default function StorefrontPage() {
                         <img 
                           src={prod.image_url} 
                           alt={prod.name} 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${prod.quantity_in_stock <= 0 ? 'opacity-40 grayscale' : ''}`}
                         />
                       ) : (
                         <span className="text-[10px] text-slate-400 font-extrabold uppercase bg-rose-50 dark:bg-zinc-900 w-full h-full flex items-center justify-center">
                           {prod.name.slice(0, 3)}
                         </span>
+                      )}
+                      {prod.quantity_in_stock <= 0 && (
+                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center">
+                          <span className="bg-white/95 dark:bg-zinc-900/95 text-slate-800 dark:text-white text-[10px] font-black tracking-widest px-3.5 py-1.5 rounded-full shadow-md uppercase">
+                            Esgotado
+                          </span>
+                        </div>
                       )}
                     </div>
 
@@ -780,15 +794,24 @@ export default function StorefrontPage() {
                             </span>
                           )}
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openProductDetails(prod);
-                          }}
-                          className="w-full py-2.5 rounded-xl bg-[var(--accent-color)] hover:opacity-95 text-white font-extrabold text-[10px] uppercase transition-all active:scale-[0.97] shadow-sm shadow-[var(--accent-color)]/10"
-                        >
-                          COMPRAR AGORA
-                        </button>
+                        {prod.quantity_in_stock <= 0 ? (
+                          <button
+                            disabled
+                            className="w-full py-2.5 rounded-xl bg-slate-200 dark:bg-zinc-800 text-slate-400 dark:text-zinc-500 font-extrabold text-[10px] uppercase cursor-not-allowed"
+                          >
+                            ESGOTADO
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openProductDetails(prod);
+                            }}
+                            className="w-full py-2.5 rounded-xl bg-[var(--accent-color)] hover:opacity-95 text-white font-extrabold text-[10px] uppercase transition-all active:scale-[0.97] shadow-sm shadow-[var(--accent-color)]/10"
+                          >
+                            COMPRAR AGORA
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -886,12 +909,19 @@ export default function StorefrontPage() {
                         <img 
                           src={prod.image_url} 
                           alt={prod.name} 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${prod.quantity_in_stock <= 0 ? 'opacity-40 grayscale' : ''}`}
                         />
                       ) : (
                         <span className="text-[10px] text-slate-400 font-extrabold uppercase bg-rose-50 dark:bg-zinc-900 w-full h-full flex items-center justify-center">
                           {prod.name.slice(0, 3)}
                         </span>
+                      )}
+                      {prod.quantity_in_stock <= 0 && (
+                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center">
+                          <span className="bg-white/95 dark:bg-zinc-900/95 text-slate-800 dark:text-white text-[10px] font-black tracking-widest px-3.5 py-1.5 rounded-full shadow-md uppercase">
+                            Esgotado
+                          </span>
+                        </div>
                       )}
                     </div>
 
@@ -922,15 +952,24 @@ export default function StorefrontPage() {
                             </span>
                           )}
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openProductDetails(prod);
-                          }}
-                          className="w-full mt-3 py-2 rounded-xl bg-[var(--accent-color)] hover:opacity-95 text-white font-extrabold text-[10px] uppercase transition-all active:scale-[0.97]"
-                        >
-                          ADICIONAR
-                        </button>
+                        {prod.quantity_in_stock <= 0 ? (
+                          <button
+                            disabled
+                            className="w-full mt-3 py-2 rounded-xl bg-slate-200 dark:bg-zinc-800 text-slate-400 dark:text-zinc-500 font-extrabold text-[10px] uppercase cursor-not-allowed"
+                          >
+                            ESGOTADO
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openProductDetails(prod);
+                            }}
+                            className="w-full mt-3 py-2 rounded-xl bg-[var(--accent-color)] hover:opacity-95 text-white font-extrabold text-[10px] uppercase transition-all active:scale-[0.97]"
+                          >
+                            ADICIONAR
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
