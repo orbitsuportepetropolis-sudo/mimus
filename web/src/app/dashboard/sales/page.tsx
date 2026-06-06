@@ -15,7 +15,11 @@ import {
   Plus,
   Minus,
   Loader2,
-  X
+  X,
+  History,
+  Calendar,
+  Check,
+  AlertCircle
 } from 'lucide-react'
 
 interface Product {
@@ -64,6 +68,124 @@ export default function SalesPage() {
   const [newCustBirthday, setNewCustBirthday] = useState('')
   const [custLoading, setCustLoading] = useState(false)
   const [custError, setCustError] = useState<string | null>(null)
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'pdv' | 'history'>('pdv')
+
+  // History & Orders state
+  const [salesHistory, setSalesHistory] = useState<any[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pendente' | 'pago' | 'cancelado'>('all')
+
+  // Confirm Payment Modal
+  const [paymentConfirmModalOpen, setPaymentConfirmModalOpen] = useState(false)
+  const [selectedSaleToConfirm, setSelectedSaleToConfirm] = useState<any | null>(null)
+  const [paymentConfirmMethod, setPaymentConfirmMethod] = useState<'pix' | 'money' | 'credit_card' | 'debit_card'>('pix')
+  const [paymentConfirmLoading, setPaymentConfirmLoading] = useState(false)
+
+  // Cancel Order Modal
+  const [cancelConfirmModalOpen, setCancelConfirmModalOpen] = useState(false)
+  const [selectedSaleToCancel, setSelectedSaleToCancel] = useState<any | null>(null)
+  const [cancelConfirmLoading, setCancelConfirmLoading] = useState(false)
+
+  async function loadSalesHistory() {
+    try {
+      setHistoryLoading(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('store_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) return
+      const storeId = profile.store_id
+
+      let query = supabase
+        .from('sales')
+        .select(`
+          id,
+          created_at,
+          total_value,
+          discount,
+          payment_method,
+          status,
+          customers(name, phone)
+        `)
+        .eq('store_id', storeId)
+
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter)
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false })
+
+      if (error) throw error
+      setSalesHistory(data || [])
+    } catch (err: any) {
+      console.error('Erro ao buscar histórico:', err)
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  async function handleConfirmPayment() {
+    if (!selectedSaleToConfirm) return
+    setPaymentConfirmLoading(true)
+    try {
+      const { error } = await supabase
+        .from('sales')
+        .update({
+          status: 'pago',
+          payment_method: paymentConfirmMethod
+        })
+        .eq('id', selectedSaleToConfirm.id)
+
+      if (error) throw error
+
+      setPaymentConfirmModalOpen(false)
+      setSelectedSaleToConfirm(null)
+      await loadSalesHistory()
+      // Dispatch refresh event to update dashboard widgets
+      window.dispatchEvent(new CustomEvent('dashboard-refresh'))
+    } catch (err: any) {
+      alert('Erro ao confirmar pagamento: ' + err.message)
+    } finally {
+      setPaymentConfirmLoading(false)
+    }
+  }
+
+  async function handleCancelOrder() {
+    if (!selectedSaleToCancel) return
+    setCancelConfirmLoading(true)
+    try {
+      const { error } = await supabase
+        .from('sales')
+        .update({
+          status: 'cancelado'
+        })
+        .eq('id', selectedSaleToCancel.id)
+
+      if (error) throw error
+
+      setCancelConfirmModalOpen(false)
+      setSelectedSaleToCancel(null)
+      await loadSalesHistory()
+      window.dispatchEvent(new CustomEvent('dashboard-refresh'))
+    } catch (err: any) {
+      alert('Erro ao cancelar pedido: ' + err.message)
+    } finally {
+      setCancelConfirmLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'history') {
+      loadSalesHistory()
+    }
+  }, [activeTab, statusFilter])
 
   useEffect(() => {
     loadPDVData(true)
@@ -250,7 +372,7 @@ export default function SalesPage() {
 
       const storeId = profile.store_id
 
-      // 1. Insert the Sale
+      // 1. Insert the Sale (manually in PDV is marked as paid immediately)
       const { data: saleData, error: saleError } = await supabase
         .from('sales')
         .insert([{
@@ -258,7 +380,8 @@ export default function SalesPage() {
           customer_id: selectedCustomer?.id || null,
           total_value: total,
           discount: discountAmount,
-          payment_method: paymentMethod
+          payment_method: paymentMethod,
+          status: 'pago'
         }])
         .select()
 
@@ -313,291 +436,546 @@ export default function SalesPage() {
   )
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 min-h-[75vh] animate-in fade-in duration-200">
+    <div className="space-y-6 animate-in fade-in duration-200">
       
-      {/* 1. Left side: Product catalog (Grid list) */}
-      <div className="lg:col-span-2 space-y-4 flex flex-col h-full">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-extrabold text-slate-800 dark:text-white flex items-center gap-2">
-              <ShoppingBag className="w-5 h-5 text-rose-500" /> Frente de Caixa / PDV
-            </h1>
-            <p className="text-xs text-slate-500 dark:text-zinc-400">Clique nos produtos para adicioná-los ao carrinho.</p>
-          </div>
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-2.5 w-4.5 h-4.5 text-slate-400 dark:text-zinc-500" />
-            <input
-              type="text"
-              placeholder="Buscar maquiagem..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs"
-            />
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="flex-1 flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
-          </div>
-        ) : filteredProducts.length === 0 ? (
-          <div className="flex-1 bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800/80 rounded-2xl p-12 text-center flex flex-col items-center justify-center">
-            <p className="text-slate-400 dark:text-zinc-500 text-xs">Nenhum produto disponível em estoque.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 overflow-y-auto max-h-[65vh] pr-1">
-            {filteredProducts.map(p => (
-              <button
-                key={p.id}
-                onClick={() => addToCart(p)}
-                className="bg-white dark:bg-zinc-900 p-3 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm text-left hover:border-rose-500 hover:ring-1 hover:ring-rose-500/20 transition-all flex flex-col justify-between group active:scale-[0.98]"
-              >
-                <div className="space-y-2">
-                  <div className="aspect-square bg-slate-50 dark:bg-zinc-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-100 dark:border-zinc-800/60">
-                    {p.image_url ? (
-                      <img src={p.image_url} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                    ) : (
-                      <span className="text-[10px] text-slate-300 font-bold uppercase">{p.name.slice(0,3)}</span>
-                    )}
-                  </div>
-                  <div className="space-y-0.5">
-                    <span className="text-[9px] uppercase tracking-wider text-rose-500 font-bold">{p.brand || 'Cosméticos'}</span>
-                    <h3 className="text-xs font-bold text-slate-700 dark:text-zinc-200 line-clamp-2 leading-tight h-8">{p.name}</h3>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between border-t border-slate-50 dark:border-zinc-800/40 pt-2 mt-2">
-                  <span className="text-xs font-extrabold text-slate-900 dark:text-white">R$ {p.sale_price.toFixed(2)}</span>
-                  <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-medium">{p.quantity_in_stock} un.</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
+      {/* Tab Selector */}
+      <div className="flex border-b border-slate-200 dark:border-zinc-800">
+        <button
+          onClick={() => setActiveTab('pdv')}
+          className={`flex items-center gap-2 px-6 py-3 border-b-2 text-xs font-black uppercase tracking-wider transition-all ${
+            activeTab === 'pdv'
+              ? 'border-rose-500 text-rose-600 font-extrabold'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+          }`}
+        >
+          <ShoppingBag className="w-4 h-4" /> Frente de Caixa (PDV)
+        </button>
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`flex items-center gap-2 px-6 py-3 border-b-2 text-xs font-black uppercase tracking-wider transition-all ${
+            activeTab === 'history'
+              ? 'border-rose-500 text-rose-600 font-extrabold'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+          }`}
+        >
+          <History className="w-4 h-4" /> Pedidos & Histórico
+        </button>
       </div>
 
-      {/* 2. Right side: Checkout controls (Cart & customer selection) */}
-      <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm flex flex-col justify-between h-fit gap-6">
-        
-        {/* Cart Header */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-50 dark:border-zinc-800 pb-3">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
-              Carrinho ({cart.reduce((a,c) => a + c.quantity, 0)})
-            </h3>
-            {cart.length > 0 && (
-              <button 
-                onClick={() => setCart([])}
-                className="text-[10px] text-rose-600 font-bold hover:underline"
-              >
-                Esvaziar
-              </button>
+      {activeTab === 'pdv' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 min-h-[75vh]">
+          
+          {/* 1. Left side: Product catalog (Grid list) */}
+          <div className="lg:col-span-2 space-y-4 flex flex-col h-full">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <h1 className="text-xl font-extrabold text-slate-800 dark:text-white flex items-center gap-2">
+                  <ShoppingBag className="w-5 h-5 text-rose-500" /> Frente de Caixa / PDV
+                </h1>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">Clique nos produtos para adicioná-los ao carrinho.</p>
+              </div>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-2.5 w-4.5 h-4.5 text-slate-400 dark:text-zinc-500" />
+                <input
+                  type="text"
+                  placeholder="Buscar maquiagem..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs"
+                />
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex-1 flex items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="flex-1 bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800/80 rounded-2xl p-12 text-center flex flex-col items-center justify-center">
+                <p className="text-slate-400 dark:text-zinc-500 text-xs">Nenhum produto disponível em estoque.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 overflow-y-auto max-h-[65vh] pr-1">
+                {filteredProducts.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => addToCart(p)}
+                    className="bg-white dark:bg-zinc-900 p-3 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm text-left hover:border-rose-500 hover:ring-1 hover:ring-rose-500/20 transition-all flex flex-col justify-between group active:scale-[0.98]"
+                  >
+                    <div className="space-y-2">
+                      <div className="aspect-square bg-slate-50 dark:bg-zinc-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-100 dark:border-zinc-800/60">
+                        {p.image_url ? (
+                          <img src={p.image_url} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                        ) : (
+                          <span className="text-[10px] text-slate-300 font-bold uppercase">{p.name.slice(0,3)}</span>
+                        )}
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] uppercase tracking-wider text-rose-500 font-bold">{p.brand || 'Cosméticos'}</span>
+                        <h3 className="text-xs font-bold text-slate-700 dark:text-zinc-200 line-clamp-2 leading-tight h-8">{p.name}</h3>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-slate-50 dark:border-zinc-800/40 pt-2 mt-2">
+                      <span className="text-xs font-extrabold text-slate-900 dark:text-white">R$ {p.sale_price.toFixed(2)}</span>
+                      <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-medium">{p.quantity_in_stock} un.</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
-          {/* Cart list */}
-          {cart.length === 0 ? (
-            <div className="py-8 text-center text-slate-400 dark:text-zinc-500 text-xs">
-              Adicione maquiagens ao carrinho para começar.
-            </div>
-          ) : (
-            <div className="space-y-3 max-h-[25vh] overflow-y-auto pr-1">
-              {cart.map(item => (
-                <div key={item.product.id} className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50/50 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-800/50 text-xs">
-                  <div className="min-w-0 flex-1">
-                    <h4 className="font-bold text-slate-700 dark:text-zinc-300 truncate">{item.product.name}</h4>
-                    <span className="text-[10px] text-slate-400 dark:text-zinc-500">R$ {item.product.sale_price.toFixed(2)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => decreaseQty(item.product.id)}
-                      className="p-1 rounded bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-300"
-                    >
-                      <Minus className="w-3 h-3" />
-                    </button>
-                    <span className="font-bold text-slate-800 dark:text-white">{item.quantity}</span>
-                    <button 
-                      onClick={() => addToCart(item.product)}
-                      className="p-1 rounded bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-300"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                    <button 
-                      onClick={() => removeFromCart(item.product.id)}
-                      className="p-1 text-slate-400 hover:text-rose-600 rounded"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Customer Select */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Cliente da Compra</label>
-            <button
-              onClick={() => setCustomerModalOpen(true)}
-              className="text-[10px] text-rose-600 font-bold flex items-center gap-0.5 hover:underline"
-            >
-              <UserPlus className="w-3.5 h-3.5" /> Cadastrar Cliente
-            </button>
-          </div>
-          
-          {selectedCustomer ? (
-            <div className="flex items-center justify-between p-2.5 rounded-xl border border-rose-100 dark:border-rose-950/40 bg-rose-50/20 dark:bg-rose-950/10 text-xs">
-              <div>
-                <span className="font-bold text-slate-800 dark:text-zinc-200">{selectedCustomer.name}</span>
-                {selectedCustomer.phone && <p className="text-[10px] text-slate-400">{selectedCustomer.phone}</p>}
+          {/* 2. Right side: Checkout controls */}
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm flex flex-col justify-between h-fit gap-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-50 dark:border-zinc-800 pb-3">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
+                  Carrinho ({cart.reduce((a,c) => a + c.quantity, 0)})
+                </h3>
+                {cart.length > 0 && (
+                  <button 
+                    onClick={() => setCart([])}
+                    className="text-[10px] text-rose-600 font-bold hover:underline"
+                  >
+                    Esvaziar
+                  </button>
+                )}
               </div>
-              <button 
-                onClick={() => setSelectedCustomer(null)}
-                className="text-slate-400 hover:text-rose-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Buscar cliente ou deixar avulso..."
-                value={customerSearch}
-                onChange={(e) => setCustomerSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none text-xs"
-              />
-              {customerSearch && (
-                <div className="absolute left-0 right-0 mt-1 max-h-36 overflow-y-auto bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-xl shadow-lg z-20 text-xs">
-                  {filteredCustomers.map(c => (
-                    <button
-                      key={c.id}
-                      onClick={() => {
-                        setSelectedCustomer(c)
-                        setCustomerSearch('')
-                      }}
-                      className="w-full p-2 text-left hover:bg-slate-50 dark:hover:bg-zinc-950 border-b border-slate-50 dark:border-zinc-850 last:border-0"
-                    >
-                      <span className="font-bold text-slate-700 dark:text-zinc-300">{c.name}</span>
-                      {c.phone && <span className="text-[10px] text-slate-400 ml-2">({c.phone})</span>}
-                    </button>
+
+              {cart.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 dark:text-zinc-500 text-xs">
+                  Adicione maquiagens ao carrinho para começar.
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[25vh] overflow-y-auto pr-1">
+                  {cart.map(item => (
+                    <div key={item.product.id} className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50/50 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-800/50 text-xs">
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-bold text-slate-700 dark:text-zinc-300 truncate">{item.product.name}</h4>
+                        <span className="text-[10px] text-slate-400 dark:text-zinc-500">R$ {item.product.sale_price.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => decreaseQty(item.product.id)}
+                          className="p-1 rounded bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-300"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="font-bold text-slate-800 dark:text-white">{item.quantity}</span>
+                        <button 
+                          onClick={() => addToCart(item.product)}
+                          className="p-1 rounded bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-300"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                        <button 
+                          onClick={() => removeFromCart(item.product.id)}
+                          className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
                   ))}
-                  {filteredCustomers.length === 0 && (
-                    <div className="p-2 text-center text-slate-400">Nenhum cliente encontrado.</div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Cliente da Compra</label>
+                <button
+                  onClick={() => setCustomerModalOpen(true)}
+                  className="text-[10px] text-rose-600 font-bold flex items-center gap-0.5 hover:underline"
+                >
+                  <UserPlus className="w-3.5 h-3.5" /> Cadastrar Cliente
+                </button>
+              </div>
+              
+              {selectedCustomer ? (
+                <div className="flex items-center justify-between p-2.5 rounded-xl border border-rose-100 dark:border-rose-950/40 bg-rose-50/20 dark:bg-rose-950/10 text-xs">
+                  <div>
+                    <span className="font-bold text-slate-800 dark:text-zinc-200">{selectedCustomer.name}</span>
+                    {selectedCustomer.phone && <p className="text-[10px] text-slate-400">{selectedCustomer.phone}</p>}
+                  </div>
+                  <button 
+                    onClick={() => setSelectedCustomer(null)}
+                    className="text-slate-400 hover:text-rose-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar cliente ou deixar avulso..."
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none text-xs"
+                  />
+                  {customerSearch && (
+                    <div className="absolute left-0 right-0 mt-1 max-h-36 overflow-y-auto bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-xl shadow-lg z-20 text-xs">
+                      {filteredCustomers.map(c => (
+                        <button
+                          key={c.id}
+                          onClick={() => {
+                            setSelectedCustomer(c)
+                            setCustomerSearch('')
+                          }}
+                          className="w-full p-2 text-left hover:bg-slate-50 dark:hover:bg-zinc-950 border-b border-slate-50 dark:border-zinc-850 last:border-0"
+                        >
+                          <span className="font-bold text-slate-700 dark:text-zinc-300">{c.name}</span>
+                          {c.phone && <span className="text-[10px] text-slate-400 ml-2">({c.phone})</span>}
+                        </button>
+                      ))}
+                      {filteredCustomers.length === 0 && (
+                        <div className="p-2 text-center text-slate-400">Nenhum cliente encontrado.</div>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
             </div>
+
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Desconto Geral (%)</label>
+                  {discountPercentage > 0 && <span className="text-[10px] text-rose-500 font-bold">{discountPercentage}% (- R$ {discountAmount.toFixed(2)})</span>}
+                </div>
+                <div className="relative">
+                  <Percent className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={discountPercentage || ''}
+                    onChange={(e) => setDiscountPercentage(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none text-xs"
+                    placeholder="0 %"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Forma de Pagamento</label>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {[
+                    { value: 'pix', label: 'PIX', icon: Coins },
+                    { value: 'money', label: 'Dinheiro', icon: DollarSign },
+                    { value: 'credit_card', label: 'Crédito', icon: CreditCard },
+                    { value: 'debit_card', label: 'Débito', icon: CreditCard }
+                  ].map(m => {
+                    const Icon = m.icon;
+                    const isSel = paymentMethod === m.value;
+                    return (
+                      <button
+                        key={m.value}
+                        type="button"
+                        onClick={() => setPaymentMethod(m.value as any)}
+                        className={`py-2 px-3 border rounded-xl font-bold flex items-center justify-center gap-1.5 transition-colors ${
+                          isSel 
+                            ? 'border-rose-500 bg-rose-50/20 text-rose-600 dark:bg-rose-950/20' 
+                            : 'border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" /> {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t border-slate-50 dark:border-zinc-800">
+              <div className="space-y-1.5 text-xs text-slate-500 dark:text-zinc-400">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span className="font-semibold text-slate-700 dark:text-zinc-300">R$ {subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Desconto ({discountPercentage}%)</span>
+                  <span className="font-semibold text-rose-500">- R$ {discountAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm font-extrabold text-slate-900 dark:text-white pt-2 border-t border-slate-50 dark:border-zinc-855">
+                  <span>Total Geral</span>
+                  <span>R$ {total.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <button
+                onClick={handleCheckout}
+                disabled={cart.length === 0 || checkoutLoading}
+                className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs tracking-wider uppercase transition-all duration-150 shadow-lg shadow-rose-500/10 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {checkoutLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Processando...
+                  </span>
+                ) : (
+                  'Finalizar Venda'
+                )}
+              </button>
+            </div>
+          </div>
+
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm space-y-6">
+          
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-50 dark:border-zinc-850 pb-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-white">Pedidos e Vendas da Loja</h3>
+              <p className="text-[11px] text-slate-400">Gerencie pedidos recebidos do catálogo e acompanhe o histórico de vendas.</p>
+            </div>
+            
+            <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0 text-[10px]">
+              {[
+                { label: 'Todos', value: 'all' },
+                { label: 'Pendentes / Novos', value: 'pendente' },
+                { label: 'Pagos', value: 'pago' },
+                { label: 'Cancelados', value: 'cancelado' }
+              ].map(f => (
+                <button
+                  key={f.value}
+                  onClick={() => setStatusFilter(f.value as any)}
+                  className={`px-3 py-1.5 rounded-lg border font-bold transition-all ${
+                    statusFilter === f.value
+                      ? 'bg-rose-500 border-rose-500 text-white shadow-sm shadow-rose-500/10'
+                      : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-zinc-850'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {historyLoading ? (
+            <div className="flex justify-center py-20">
+              <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
+            </div>
+          ) : salesHistory.length === 0 ? (
+            <div className="py-20 text-center text-slate-400 dark:text-zinc-500">
+              <History className="w-10 h-10 mx-auto mb-3 opacity-30 text-rose-500" />
+              <p className="text-xs">Nenhum pedido ou venda encontrada.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 dark:border-zinc-800/80 text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-zinc-500">
+                    <th className="py-3 px-2">Cliente</th>
+                    <th className="py-3 px-2">Data / Hora</th>
+                    <th className="py-3 px-2">Valor Total</th>
+                    <th className="py-3 px-2">Forma Pgto</th>
+                    <th className="py-3 px-2">Status</th>
+                    <th className="py-3 px-2 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 dark:divide-zinc-800/40">
+                  {salesHistory.map(sale => {
+                    const custName = sale.customers?.name || 'Cliente Avulso';
+                    const custPhone = sale.customers?.phone || '';
+                    const formattedDate = new Date(sale.created_at).toLocaleString('pt-BR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    });
+                    
+                    const isPaid = sale.status === 'pago';
+                    const isCancelled = sale.status === 'cancelado';
+                    const isPending = !isPaid && !isCancelled;
+
+                    const paymentLabel = 
+                      sale.payment_method === 'pix' ? 'Pix' :
+                      sale.payment_method === 'money' ? 'Dinheiro' :
+                      sale.payment_method === 'credit_card' ? 'Crédito' :
+                      sale.payment_method === 'debit_card' ? 'Débito' : 'Não definido';
+
+                    return (
+                      <tr key={sale.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-950/20">
+                        <td className="py-3 px-2">
+                          <span className="font-bold text-slate-800 dark:text-zinc-200 block">{custName}</span>
+                          {custPhone && <span className="text-[10px] text-slate-400 block">{custPhone}</span>}
+                        </td>
+                        <td className="py-3 px-2 text-slate-400 font-mono">{formattedDate}</td>
+                        <td className="py-3 px-2 font-extrabold text-slate-850 dark:text-zinc-150">
+                          R$ {Number(sale.total_value).toFixed(2)}
+                          {Number(sale.discount) > 0 && (
+                            <span className="text-[9px] text-rose-500 block">Desconto: - R$ {Number(sale.discount).toFixed(2)}</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-2 text-slate-500 dark:text-zinc-400">
+                          {isPaid ? (
+                            <span className="font-semibold text-slate-700 dark:text-zinc-300">{paymentLabel}</span>
+                          ) : isCancelled ? (
+                            <span className="text-slate-400 line-through">N/A</span>
+                          ) : (
+                            <span className="text-amber-600 bg-amber-500/5 px-2 py-0.5 rounded border border-amber-500/10 font-bold text-[9px] uppercase tracking-wide">Pendente</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-2">
+                          {isPaid ? (
+                            <span className="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full font-bold text-[9px] uppercase tracking-wide">Pago</span>
+                          ) : isCancelled ? (
+                            <span className="bg-slate-50 text-slate-500 dark:bg-zinc-800/40 px-2 py-0.5 rounded-full font-bold text-[9px] uppercase tracking-wide">Cancelado</span>
+                          ) : (
+                            <span className="bg-amber-50 text-amber-600 dark:bg-amber-950/30 px-2 py-0.5 rounded-full font-bold text-[9px] uppercase tracking-wide">Aguardando</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-2 text-right">
+                          {isPending ? (
+                            <div className="flex justify-end gap-1.5">
+                              <button
+                                onClick={() => {
+                                  setSelectedSaleToConfirm(sale);
+                                  setPaymentConfirmMethod('pix');
+                                  setPaymentConfirmModalOpen(true);
+                                }}
+                                className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[9px] uppercase tracking-wider transition-colors shadow-sm"
+                              >
+                                Confirmar Pgto
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedSaleToCancel(sale);
+                                  setCancelConfirmModalOpen(true);
+                                }}
+                                className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-300 font-extrabold text-[9px] uppercase tracking-wider transition-colors border border-slate-200 dark:border-zinc-700"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 text-[10px]">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
+      )}
 
-        {/* Discount & Payment Method */}
-        <div className="space-y-4">
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Desconto Geral (%)</label>
-              {discountPercentage > 0 && <span className="text-[10px] text-rose-500 font-bold">{discountPercentage}% (- R$ {discountAmount.toFixed(2)})</span>}
+      {/* Confirm Payment Modal */}
+      {paymentConfirmModalOpen && selectedSaleToConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
+            
+            <div className="flex items-center justify-between border-b border-slate-50 dark:border-zinc-850 pb-2">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
+                <Check className="w-5 h-5 text-emerald-500" /> Confirmar Pagamento
+              </h3>
+              <button onClick={() => setPaymentConfirmModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <div className="relative">
-              <Percent className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={discountPercentage || ''}
-                onChange={(e) => setDiscountPercentage(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none text-xs"
-                placeholder="0 %"
-              />
-            </div>
-          </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Forma de Pagamento</label>
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="text-xs space-y-2">
+              <p className="text-slate-500">
+                Confirme a entrada do pagamento do pedido de <strong>{selectedSaleToConfirm.customers?.name || 'Cliente Avulso'}</strong> no valor de <strong>R$ {Number(selectedSaleToConfirm.total_value).toFixed(2)}</strong>.
+              </p>
+              
+              <div className="p-3 bg-slate-50 dark:bg-zinc-950/40 border border-slate-100 dark:border-zinc-850 rounded-xl space-y-1.5 font-medium">
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Forma de Recebimento</span>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  {[
+                    { value: 'pix', label: 'PIX', icon: Coins },
+                    { value: 'money', label: 'Dinheiro', icon: DollarSign },
+                    { value: 'credit_card', label: 'Crédito', icon: CreditCard },
+                    { value: 'debit_card', label: 'Débito', icon: CreditCard }
+                  ].map(method => {
+                    const Icon = method.icon;
+                    const isSel = paymentConfirmMethod === method.value;
+                    return (
+                      <button
+                        key={method.value}
+                        type="button"
+                        onClick={() => setPaymentConfirmMethod(method.value as any)}
+                        className={`py-2 px-3 border rounded-xl font-bold flex items-center justify-center gap-1.5 transition-colors text-xs ${
+                          isSel 
+                            ? 'border-rose-500 bg-rose-50/20 text-rose-600 dark:bg-rose-955' 
+                            : 'border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" /> {method.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-50 dark:border-zinc-850">
               <button
                 type="button"
-                onClick={() => setPaymentMethod('pix')}
-                className={`py-2 px-3 border rounded-xl font-bold flex items-center justify-center gap-1.5 transition-colors ${
-                  paymentMethod === 'pix' 
-                    ? 'border-rose-500 bg-rose-50/20 text-rose-600 dark:bg-rose-950/20' 
-                    : 'border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-950'
-                }`}
+                onClick={() => setPaymentConfirmModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 text-xs"
               >
-                <Coins className="w-3.5 h-3.5" /> PIX
+                Voltar
               </button>
               <button
-                type="button"
-                onClick={() => setPaymentMethod('money')}
-                className={`py-2 px-3 border rounded-xl font-bold flex items-center justify-center gap-1.5 transition-colors ${
-                  paymentMethod === 'money' 
-                    ? 'border-rose-500 bg-rose-50/20 text-rose-600 dark:bg-rose-950/20' 
-                    : 'border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-950'
-                }`}
+                onClick={handleConfirmPayment}
+                disabled={paymentConfirmLoading}
+                className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs flex items-center gap-1.5"
               >
-                <DollarSign className="w-3.5 h-3.5" /> Dinheiro
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('credit_card')}
-                className={`py-2 px-3 border rounded-xl font-bold flex items-center justify-center gap-1.5 transition-colors ${
-                  paymentMethod === 'credit_card' 
-                    ? 'border-rose-500 bg-rose-50/20 text-rose-600 dark:bg-rose-950/20' 
-                    : 'border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-950'
-                }`}
-              >
-                <CreditCard className="w-3.5 h-3.5" /> Crédito
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('debit_card')}
-                className={`py-2 px-3 border rounded-xl font-bold flex items-center justify-center gap-1.5 transition-colors ${
-                  paymentMethod === 'debit_card' 
-                    ? 'border-rose-500 bg-rose-50/20 text-rose-600 dark:bg-rose-950/20' 
-                    : 'border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-950'
-                }`}
-              >
-                <CreditCard className="w-3.5 h-3.5" /> Débito
+                {paymentConfirmLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Confirmar
               </button>
             </div>
+
           </div>
         </div>
+      )}
 
-        {/* Pricing Summary & Checkout Button */}
-        <div className="space-y-4 pt-4 border-t border-slate-50 dark:border-zinc-800">
-          <div className="space-y-1.5 text-xs text-slate-500 dark:text-zinc-400">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span className="font-semibold text-slate-700 dark:text-zinc-300">R$ {subtotal.toFixed(2)}</span>
+      {/* Cancel Order Modal */}
+      {cancelConfirmModalOpen && selectedSaleToCancel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
+            
+            <div className="flex items-center justify-between border-b border-slate-50 dark:border-zinc-850 pb-2">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
+                <AlertCircle className="w-5 h-5 text-rose-500" /> Cancelar Pedido
+              </h3>
+              <button onClick={() => setCancelConfirmModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <div className="flex justify-between">
-              <span>Desconto ({discountPercentage}%)</span>
-              <span className="font-semibold text-rose-500">- R$ {discountAmount.toFixed(2)}</span>
+
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Você tem certeza de que deseja cancelar o pedido de <strong>{selectedSaleToCancel.customers?.name || 'Cliente Avulso'}</strong>?
+              Esta ação irá <strong>devolver automaticamente os produtos ao estoque</strong> e remover a transação financeira correspondente.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-50 dark:border-zinc-850">
+              <button
+                type="button"
+                onClick={() => setCancelConfirmModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 text-xs"
+              >
+                Não, manter
+              </button>
+              <button
+                onClick={handleCancelOrder}
+                disabled={cancelConfirmLoading}
+                className="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs flex items-center gap-1.5"
+              >
+                {cancelConfirmLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Confirmar Cancelamento
+              </button>
             </div>
-            <div className="flex justify-between text-sm font-extrabold text-slate-900 dark:text-white pt-2 border-t border-slate-50 dark:border-zinc-850">
-              <span>Total Geral</span>
-              <span>R$ {total.toFixed(2)}</span>
-            </div>
+
           </div>
-
-          <button
-            onClick={handleCheckout}
-            disabled={cart.length === 0 || checkoutLoading}
-            className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs tracking-wider uppercase transition-all duration-150 shadow-lg shadow-rose-500/10 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
-          >
-            {checkoutLoading ? (
-              <span className="flex items-center justify-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" /> Processando...
-              </span>
-            ) : (
-              'Finalizar Venda'
-            )}
-          </button>
         </div>
-
-      </div>
+      )}
 
       {/* Success Modal */}
       {successOpen && (

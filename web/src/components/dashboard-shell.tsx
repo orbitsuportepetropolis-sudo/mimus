@@ -346,7 +346,8 @@ export default function DashboardShell({ children, profile, store, lowStockCount
               customer_id: customerId,
               total_value: totalValue,
               discount: 0,
-              payment_method: action.paymentMethod || 'pix'
+              payment_method: action.paymentMethod || 'pix',
+              status: 'pago'
             }])
             .select('id')
             .single()

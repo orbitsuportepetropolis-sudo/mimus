@@ -80,6 +80,7 @@ export default function StorefrontPage() {
   // Cart State
   const [cart, setCart] = useState<CartItem[]>([])
   const [cartOpen, setCartOpen] = useState(false)
+  const [sendingOrder, setSendingOrder] = useState(false)
   const [clientName, setClientName] = useState('')
   const [clientPhone, setClientPhone] = useState('')
   const [isFirstPurchase, setIsFirstPurchase] = useState<boolean | null>(null)
@@ -427,7 +428,7 @@ export default function StorefrontPage() {
   const discountAmount = (isFirstPurchase && couponFirstPurchaseActive) ? Math.round(cartTotal * (couponFirstPurchasePct / 100) * 100) / 100 : 0
   const finalTotal = Math.max(0, cartTotal - discountAmount)
 
-  function handleSendOrder() {
+  async function handleSendOrder() {
     if (!clientName) {
       alert('Por favor, informe seu nome para o pedido.')
       return
@@ -443,36 +444,82 @@ export default function StorefrontPage() {
       return
     }
 
-    // Format WhatsApp message
-    let message = `🌸 *NOVO PEDIDO - ${storeName.toUpperCase()}* 🌸\n\n`
-    message += `👤 *Cliente:* ${clientName}\n`
-    message += `📞 *WhatsApp:* ${clientPhone}\n`
-    message += `🚚 *Método:* ${deliveryType === 'delivery' ? 'Entrega em Domicílio 🛵' : 'Retirar na Loja 🏪'}\n`
-    if (deliveryType === 'delivery') {
-      message += `📍 *Endereço:* ${address}\n`
+    setSendingOrder(true)
+    try {
+      // 1. Prepare items payload for database RPC
+      const itemsPayload = cart.map(item => ({
+        product_id: item.id,
+        quantity: item.qty,
+        unit_price: item.sale_price
+      }))
+
+      const totalValue = (isFirstPurchase && couponFirstPurchaseActive) ? finalTotal : cartTotal
+      const discount = (isFirstPurchase && couponFirstPurchaseActive) ? discountAmount : 0
+
+      // 2. Call Supabase RPC to create storefront order (registers customer + reserves stock)
+      const { data: saleId, error: orderError } = await supabase
+        .rpc('create_storefront_order', {
+          p_store_id: storeId,
+          p_client_name: clientName,
+          p_client_phone: clientPhone,
+          p_total_value: totalValue,
+          p_discount: discount,
+          p_items: itemsPayload
+        })
+
+      if (orderError) {
+        console.error('Error creating storefront order:', orderError)
+        // Check for specific stock error raised by PG function
+        if (orderError.message && orderError.message.includes('estoque')) {
+          alert('Ops! Algum item do seu carrinho acabou de ficar indisponível no estoque. Por favor, ajuste o carrinho e tente novamente.')
+        } else {
+          alert('Ocorreu um erro ao processar seu pedido. Por favor, tente novamente.')
+        }
+        return
+      }
+
+      console.log('Order created successfully in database. Sale ID:', saleId)
+
+      // 3. Format WhatsApp message
+      let message = `🌸 *NOVO PEDIDO - ${storeName.toUpperCase()}* 🌸\n\n`
+      message += `👤 *Cliente:* ${clientName}\n`
+      message += `📞 *WhatsApp:* ${clientPhone}\n`
+      message += `🚚 *Método:* ${deliveryType === 'delivery' ? 'Entrega em Domicílio 🛵' : 'Retirar na Loja 🏪'}\n`
+      if (deliveryType === 'delivery') {
+        message += `📍 *Endereço:* ${address}\n`
+      }
+      message += `\n🛍️ *PRODUTOS SELECIONADOS:*\n`
+
+      cart.forEach(item => {
+        const varsText = item.selected_variations && Object.keys(item.selected_variations).length > 0
+          ? ' (' + Object.entries(item.selected_variations).map(([k, v]) => `${k}: ${v}`).join(', ') + ')'
+          : '';
+        message += `- *${item.qty}x* ${item.name}${varsText} (${item.brand || 'Geral'}) — R$ ${(item.sale_price * item.qty).toFixed(2)}\n`
+      })
+
+      if (isFirstPurchase && couponFirstPurchaseActive) {
+        message += `\n🎟️ *Cupom Primeira Compra (${couponFirstPurchaseCode} - ${couponFirstPurchasePct}%):* - R$ ${discountAmount.toFixed(2)}\n`
+        message += `💰 *VALOR TOTAL DO PEDIDO:* R$ ${finalTotal.toFixed(2)}\n\n`
+      } else {
+        message += `\n💰 *VALOR TOTAL DO PEDIDO:* R$ ${cartTotal.toFixed(2)}\n\n`
+      }
+      message += `Olá! Gostaria de confirmar o meu pedido e combinar a forma de pagamento.`
+
+      const phoneNum = whatsappNumber.replace(/\D/g, '') || '5500000000000'
+      const encodedText = encodeURIComponent(message)
+      const whatsappUrl = `https://wa.me/${phoneNum}?text=${encodedText}`
+
+      // Clear cart on success
+      setCart([])
+      setCartOpen(false)
+
+      window.open(whatsappUrl, '_blank')
+    } catch (err: any) {
+      console.error('Checkout error:', err)
+      alert('Erro ao processar pedido: ' + (err.message || err))
+    } finally {
+      setSendingOrder(false)
     }
-    message += `\n🛍️ *PRODUTOS SELECIONADOS:*\n`
-
-    cart.forEach(item => {
-      const varsText = item.selected_variations && Object.keys(item.selected_variations).length > 0
-        ? ' (' + Object.entries(item.selected_variations).map(([k, v]) => `${k}: ${v}`).join(', ') + ')'
-        : '';
-      message += `- *${item.qty}x* ${item.name}${varsText} (${item.brand || 'Geral'}) — R$ ${(item.sale_price * item.qty).toFixed(2)}\n`
-    })
-
-    if (isFirstPurchase && couponFirstPurchaseActive) {
-      message += `\n🎟️ *Cupom Primeira Compra (${couponFirstPurchaseCode} - ${couponFirstPurchasePct}%):* - R$ ${discountAmount.toFixed(2)}\n`
-      message += `💰 *VALOR TOTAL DO PEDIDO:* R$ ${finalTotal.toFixed(2)}\n\n`
-    } else {
-      message += `\n💰 *VALOR TOTAL DO PEDIDO:* R$ ${cartTotal.toFixed(2)}\n\n`
-    }
-    message += `Olá! Gostaria de confirmar o meu pedido e combinar a forma de pagamento.`
-
-    const phoneNum = whatsappNumber.replace(/\D/g, '') || '5500000000000'
-    const encodedText = encodeURIComponent(message)
-    const whatsappUrl = `https://wa.me/${phoneNum}?text=${encodedText}`
-
-    window.open(whatsappUrl, '_blank')
   }
 
   // Define dynamic style settings
@@ -1242,9 +1289,18 @@ export default function StorefrontPage() {
                 
                 <button 
                   onClick={handleSendOrder}
-                  className="w-full py-4 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/10 active:scale-[0.98] transition-all"
+                  disabled={sendingOrder}
+                  className="w-full py-4 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/10 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
                 >
-                  <Phone className="w-4 h-4 fill-white" /> ENVIAR PEDIDO VIA WHATSAPP <ArrowRight className="w-4 h-4" />
+                  {sendingOrder ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> ENVIANDO PEDIDO...
+                    </>
+                  ) : (
+                    <>
+                      <Phone className="w-4 h-4 fill-white" /> ENVIAR PEDIDO VIA WHATSAPP <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
               </div>
             )}
