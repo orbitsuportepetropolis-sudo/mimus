@@ -148,7 +148,7 @@ export default function ProductsPage() {
   const [formMinStock, setFormMinStock] = useState('5')
   const [formExpDate, setFormExpDate] = useState('')
   const [formDescription, setFormDescription] = useState('')
-  const [formPromotionalPrice, setFormPromotionalPrice] = useState('')
+  const [formPromotionalDiscount, setFormPromotionalDiscount] = useState('')
   const [formHasFreeShipping, setFormHasFreeShipping] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -918,7 +918,10 @@ export default function ProductsPage() {
       setFormMinStock(String(prod.min_stock_alert))
       setFormExpDate(prod.expiration_date || '')
       setFormDescription(prod.description || '')
-      setFormPromotionalPrice(prod.promotional_price ? prod.promotional_price.toFixed(2) : '')
+      const discountPct = (prod.promotional_price && prod.sale_price > 0)
+        ? Math.round((1 - prod.promotional_price / prod.sale_price) * 100)
+        : 0
+      setFormPromotionalDiscount(discountPct > 0 ? String(discountPct) : '')
       setFormHasFreeShipping(!!prod.has_free_shipping)
       
       const initialPreviews = [null, null, null, null, null] as (string | null)[]
@@ -949,7 +952,7 @@ export default function ProductsPage() {
       setFormMinStock('5')
       setFormExpDate('')
       setFormDescription('')
-      setFormPromotionalPrice('')
+      setFormPromotionalDiscount('')
       setFormHasFreeShipping(false)
     }
     setModalOpen(true)
@@ -996,7 +999,7 @@ export default function ProductsPage() {
     setFormMinStock('5')
     setFormExpDate('')
     setFormDescription('')
-    setFormPromotionalPrice('')
+    setFormPromotionalDiscount('')
     setFormHasFreeShipping(false)
 
     setIsCreatingFromEntry(true)
@@ -1078,7 +1081,13 @@ export default function ProductsPage() {
         barcode: formBarcode || null,
         cost_price: parseFloat(formCostPrice) || 0,
         sale_price: parseFloat(formSalePrice) || 0,
-        promotional_price: formPromotionalPrice ? parseFloat(formPromotionalPrice) : null,
+        promotional_price: (() => {
+          const salePrice = parseFloat(formSalePrice) || 0
+          const discountPct = parseFloat(formPromotionalDiscount) || 0
+          return (discountPct > 0 && salePrice > 0)
+            ? Math.round(salePrice * (1 - discountPct / 100) * 100) / 100
+            : null
+        })(),
         has_free_shipping: formHasFreeShipping,
         quantity_in_stock: editingProduct ? (parseInt(formStock) || 0) : 0,
         min_stock_alert: parseInt(formMinStock) || 5,
@@ -2010,12 +2019,13 @@ export default function ProductsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 dark:text-zinc-500 mb-1">Preço Promocional (R$)</label>
+                  <label className="block text-slate-400 dark:text-zinc-500 mb-1">Desconto Promocional (%)</label>
                   <input
                     type="number"
-                    step="0.01"
-                    value={formPromotionalPrice}
-                    onChange={(e) => setFormPromotionalPrice(e.target.value)}
+                    min="0"
+                    max="100"
+                    value={formPromotionalDiscount}
+                    onChange={(e) => setFormPromotionalDiscount(e.target.value)}
                     placeholder="Deixe em branco se não houver"
                     className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
                   />

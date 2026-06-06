@@ -50,7 +50,7 @@ export default function SalesPage() {
   // Cart & Checkout state
   const [cart, setCart] = useState<CartItem[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
-  const [discount, setDiscount] = useState<number>(0)
+  const [discountPercentage, setDiscountPercentage] = useState<number>(0)
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'money' | 'credit_card' | 'debit_card'>('pix')
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [successOpen, setSuccessOpen] = useState(false)
@@ -167,7 +167,8 @@ export default function SalesPage() {
 
   // Calculate Totals
   const subtotal = cart.reduce((acc, curr) => acc + (curr.product.sale_price * curr.quantity), 0)
-  const total = Math.max(0, subtotal - discount)
+  const discountAmount = Math.round(subtotal * (discountPercentage / 100) * 100) / 100
+  const total = Math.max(0, subtotal - discountAmount)
 
   // Quick Customer Create
   async function handleCreateCustomer(e: React.FormEvent) {
@@ -246,7 +247,7 @@ export default function SalesPage() {
           store_id: storeId,
           customer_id: selectedCustomer?.id || null,
           total_value: total,
-          discount: discount,
+          discount: discountAmount,
           payment_method: paymentMethod
         }])
         .select()
@@ -279,7 +280,7 @@ export default function SalesPage() {
       // Clear PDV state
       setCart([])
       setSelectedCustomer(null)
-      setDiscount(0)
+      setDiscountPercentage(0)
       setSuccessOpen(true)
       
       // Reload product stock list
@@ -486,18 +487,19 @@ export default function SalesPage() {
         <div className="space-y-4">
           <div>
             <div className="flex justify-between items-center mb-1">
-              <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Desconto Geral (R$)</label>
-              {discount > 0 && <span className="text-[10px] text-rose-500 font-bold">- R$ {discount.toFixed(2)}</span>}
+              <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500">Desconto Geral (%)</label>
+              {discountPercentage > 0 && <span className="text-[10px] text-rose-500 font-bold">{discountPercentage}% (- R$ {discountAmount.toFixed(2)})</span>}
             </div>
             <div className="relative">
               <Percent className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
               <input
                 type="number"
                 min="0"
-                value={discount || ''}
-                onChange={(e) => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
+                max="100"
+                value={discountPercentage || ''}
+                onChange={(e) => setDiscountPercentage(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
                 className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none text-xs"
-                placeholder="R$ 0,00"
+                placeholder="0 %"
               />
             </div>
           </div>
@@ -561,8 +563,8 @@ export default function SalesPage() {
               <span className="font-semibold text-slate-700 dark:text-zinc-300">R$ {subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
-              <span>Desconto</span>
-              <span className="font-semibold text-rose-500">- R$ {discount.toFixed(2)}</span>
+              <span>Desconto ({discountPercentage}%)</span>
+              <span className="font-semibold text-rose-500">- R$ {discountAmount.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm font-extrabold text-slate-900 dark:text-white pt-2 border-t border-slate-50 dark:border-zinc-850">
               <span>Total Geral</span>

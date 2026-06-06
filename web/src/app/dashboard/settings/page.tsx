@@ -15,7 +15,8 @@ import {
   ShoppingBag,
   ArrowRight,
   Globe,
-  Store
+  Store,
+  Percent
 } from 'lucide-react'
 
 const GOOGLE_FONTS = [
@@ -49,6 +50,11 @@ export default function SettingsPage() {
   const [marqueeText, setMarqueeText] = useState('')
   const [customDomain, setCustomDomain] = useState('')
   const [isProUser, setIsProUser] = useState(true)
+
+  // First Purchase Coupon States
+  const [couponFirstPurchaseActive, setCouponFirstPurchaseActive] = useState(false)
+  const [couponFirstPurchaseCode, setCouponFirstPurchaseCode] = useState('BEMVINDA')
+  const [couponFirstPurchasePct, setCouponFirstPurchasePct] = useState('10')
 
 interface BannerConfig {
   title: string
@@ -123,6 +129,9 @@ interface BannerConfig {
           setFontFamily(store.font_family || 'Inter')
           setMarqueeText(store.marquee_text || '')
           setCustomDomain(store.custom_domain || '')
+          setCouponFirstPurchaseActive(!!store.coupon_first_purchase_active)
+          setCouponFirstPurchaseCode(store.coupon_first_purchase_code || 'BEMVINDA')
+          setCouponFirstPurchasePct(String(store.coupon_first_purchase_pct ?? '10'))
 
           const plan = store.plan || 'free'
           const status = store.plan_status || 'trial'
@@ -337,14 +346,17 @@ interface BannerConfig {
           marquee_text: marqueeText || null,
           custom_domain: customDomain ? customDomain.trim().toLowerCase() : null,
           company_name: companyName || null,
-          cnpj: cnpj || null
+          cnpj: cnpj || null,
+          coupon_first_purchase_active: couponFirstPurchaseActive,
+          coupon_first_purchase_code: couponFirstPurchaseCode,
+          coupon_first_purchase_pct: parseFloat(couponFirstPurchasePct) || 0
         })
         .eq('id', storeId)
 
       if (error) {
         // If it's a DDL missing column error, notify the user gracefully but save the rest
         if (error.code === '42703') {
-          throw new Error('Colunas necessárias não existem no banco de dados. Por favor, execute a seguinte query no SQL Editor do Supabase:\n\nALTER TABLE public.stores ADD COLUMN IF NOT EXISTS company_name text;\nALTER TABLE public.stores ADD COLUMN IF NOT EXISTS cnpj text;')
+          throw new Error('Colunas necessárias não existem no banco de dados. Por favor, execute a seguinte query no SQL Editor do Supabase:\n\nALTER TABLE public.stores ADD COLUMN IF NOT EXISTS company_name text;\nALTER TABLE public.stores ADD COLUMN IF NOT EXISTS cnpj text;\nALTER TABLE public.stores ADD COLUMN IF NOT EXISTS coupon_first_purchase_active boolean NOT NULL DEFAULT false;\nALTER TABLE public.stores ADD COLUMN IF NOT EXISTS coupon_first_purchase_code text NOT NULL DEFAULT \'BEMVINDA\';\nALTER TABLE public.stores ADD COLUMN IF NOT EXISTS coupon_first_purchase_pct numeric NOT NULL DEFAULT 10;')
         }
         throw error
       }
@@ -701,6 +713,57 @@ interface BannerConfig {
                   <div><strong>Destino/Valor:</strong> mimusapp.vercel.app</div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Card 4: Storefront Coupons */}
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm space-y-4">
+            <h2 className="text-sm font-bold text-slate-700 dark:text-zinc-200 border-b border-slate-50 dark:border-zinc-800/60 pb-2 flex items-center gap-2">
+              <Percent className="w-4 h-4 text-rose-500" /> Cupom de Primeira Compra
+            </h2>
+            
+            <div className="space-y-4 text-xs font-semibold">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="couponFirstPurchaseActive"
+                  checked={couponFirstPurchaseActive}
+                  onChange={(e) => setCouponFirstPurchaseActive(e.target.checked)}
+                  className="w-4 h-4 text-rose-600 border-slate-200 rounded focus:ring-rose-500 cursor-pointer"
+                />
+                <label htmlFor="couponFirstPurchaseActive" className="text-slate-600 dark:text-zinc-300 cursor-pointer select-none">
+                  Ativar cupom de primeira compra automaticamente na sacola da vitrine
+                </label>
+              </div>
+
+              {couponFirstPurchaseActive && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-200">
+                  <div>
+                    <label className="block text-slate-400 dark:text-zinc-500 mb-1">Código do Cupom *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: BEMVINDA"
+                      value={couponFirstPurchaseCode}
+                      onChange={(e) => setCouponFirstPurchaseCode(e.target.value.toUpperCase().replace(/\s+/g, ''))}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 font-mono text-[11px]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 dark:text-zinc-500 mb-1">Porcentagem de Desconto (%) *</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      max="100"
+                      value={couponFirstPurchasePct}
+                      onChange={(e) => setCouponFirstPurchasePct(String(Math.min(100, Math.max(1, parseInt(e.target.value) || 1))))}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 font-mono text-[11px]"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

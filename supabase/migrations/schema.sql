@@ -21,6 +21,9 @@ CREATE TABLE public.stores (
     campaign_banner_url text,
     marquee_text text,
     banners jsonb NOT NULL DEFAULT '[]'::jsonb,
+    coupon_first_purchase_active boolean NOT NULL DEFAULT false,
+    coupon_first_purchase_code text NOT NULL DEFAULT 'BEMVINDA',
+    coupon_first_purchase_pct numeric NOT NULL DEFAULT 10,
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

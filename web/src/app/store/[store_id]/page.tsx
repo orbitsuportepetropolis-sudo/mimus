@@ -84,6 +84,11 @@ export default function StorefrontPage() {
   const [clientPhone, setClientPhone] = useState('')
   const [isFirstPurchase, setIsFirstPurchase] = useState<boolean | null>(null)
   const [phoneChecking, setPhoneChecking] = useState(false)
+
+  // Dynamic Coupon Settings States
+  const [couponFirstPurchaseActive, setCouponFirstPurchaseActive] = useState(false)
+  const [couponFirstPurchaseCode, setCouponFirstPurchaseCode] = useState('BEMVINDA')
+  const [couponFirstPurchasePct, setCouponFirstPurchasePct] = useState(10)
   const [deliveryType, setDeliveryType] = useState<'delivery' | 'pickup'>('pickup')
   const [address, setAddress] = useState('')
 
@@ -168,7 +173,7 @@ export default function StorefrontPage() {
       
       const firstQuery = await supabase
         .from('stores')
-        .select('name, logo_url, primary_color, accent_color, font_family, campaign_title, campaign_subtitle, campaign_cta, campaign_tag, campaign_banner_url, marquee_text, banners, company_name, cnpj')
+        .select('name, logo_url, primary_color, accent_color, font_family, campaign_title, campaign_subtitle, campaign_cta, campaign_tag, campaign_banner_url, marquee_text, banners, company_name, cnpj, coupon_first_purchase_active, coupon_first_purchase_code, coupon_first_purchase_pct')
         .eq('id', storeId)
         .maybeSingle()
 
@@ -217,6 +222,9 @@ export default function StorefrontPage() {
         setMarqueeText(store.marquee_text || null)
         setCompanyName(store.company_name || '')
         setCnpj(store.cnpj || '')
+        setCouponFirstPurchaseActive(store.coupon_first_purchase_active || false)
+        setCouponFirstPurchaseCode(store.coupon_first_purchase_code || 'BEMVINDA')
+        setCouponFirstPurchasePct(Number(store.coupon_first_purchase_pct ?? 10))
 
         // Parse banners array with fallback to legacy fields
         let loadedBanners: Banner[] = []
@@ -410,7 +418,7 @@ export default function StorefrontPage() {
 
   const cartTotal = cart.reduce((acc, item) => acc + (item.sale_price * item.qty), 0)
   const cartItemsCount = cart.reduce((acc, item) => acc + item.qty, 0)
-  const discountAmount = isFirstPurchase ? Math.round(cartTotal * 0.1 * 100) / 100 : 0
+  const discountAmount = (isFirstPurchase && couponFirstPurchaseActive) ? Math.round(cartTotal * (couponFirstPurchasePct / 100) * 100) / 100 : 0
   const finalTotal = Math.max(0, cartTotal - discountAmount)
 
   function handleSendOrder() {
@@ -446,8 +454,8 @@ export default function StorefrontPage() {
       message += `- *${item.qty}x* ${item.name}${varsText} (${item.brand || 'Geral'}) — R$ ${(item.sale_price * item.qty).toFixed(2)}\n`
     })
 
-    if (isFirstPurchase) {
-      message += `\n🎟️ *Desconto Primeira Compra (10%):* - R$ ${discountAmount.toFixed(2)}\n`
+    if (isFirstPurchase && couponFirstPurchaseActive) {
+      message += `\n🎟️ *Cupom Primeira Compra (${couponFirstPurchaseCode} - ${couponFirstPurchasePct}%):* - R$ ${discountAmount.toFixed(2)}\n`
       message += `💰 *VALOR TOTAL DO PEDIDO:* R$ ${finalTotal.toFixed(2)}\n\n`
     } else {
       message += `\n💰 *VALOR TOTAL DO PEDIDO:* R$ ${cartTotal.toFixed(2)}\n\n`
@@ -1113,10 +1121,10 @@ export default function StorefrontPage() {
                             </span>
                           )}
                         </div>
-                        {isFirstPurchase === true && (
+                        {isFirstPurchase === true && couponFirstPurchaseActive && (
                           <div className="mt-1.5 p-2.5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-xl text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
                             <Percent className="w-3.5 h-3.5 text-emerald-500" />
-                            <span>Parabéns! Identificamos que este é o seu primeiro pedido. <strong>Desconto de 10% aplicado automaticamente!</strong> 🎉</span>
+                            <span>Parabéns! Identificamos que este é o seu primeiro pedido. Cupom <strong>{couponFirstPurchaseCode}</strong> de <strong>{couponFirstPurchasePct}%</strong> aplicado automaticamente! 🎉</span>
                           </div>
                         )}
                         {isFirstPurchase === false && (
@@ -1177,21 +1185,21 @@ export default function StorefrontPage() {
             {/* Drawer Footer (Total and WhatsApp send) */}
             {cart.length > 0 && (
               <div className="p-5 border-t border-slate-100 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 space-y-3">
-                {isFirstPurchase && (
+                {isFirstPurchase && couponFirstPurchaseActive && (
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-slate-400 font-medium">Subtotal:</span>
                     <span className="font-bold text-slate-700 dark:text-zinc-300">R$ {cartTotal.toFixed(2)}</span>
                   </div>
                 )}
-                {isFirstPurchase && (
+                {isFirstPurchase && couponFirstPurchaseActive && (
                   <div className="flex justify-between items-center text-xs text-emerald-600 dark:text-emerald-400 font-bold">
-                    <span>Desconto Primeira Compra (10%):</span>
+                    <span>Desconto Primeira Compra ({couponFirstPurchaseCode} - {couponFirstPurchasePct}%):</span>
                     <span>- R$ {discountAmount.toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between items-center text-slate-800 dark:text-white">
                   <span className="text-xs font-semibold text-slate-400">Total do pedido:</span>
-                  <span className="text-lg font-black">R$ {isFirstPurchase ? finalTotal.toFixed(2) : cartTotal.toFixed(2)}</span>
+                  <span className="text-lg font-black">R$ {(isFirstPurchase && couponFirstPurchaseActive) ? finalTotal.toFixed(2) : cartTotal.toFixed(2)}</span>
                 </div>
                 
                 <button 
