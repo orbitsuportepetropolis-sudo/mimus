@@ -260,12 +260,21 @@ export default function IntegrationsPage() {
         setStatusMessage({ text: 'Estoque sincronizado na Loja Integrada! Níveis de estoque atualizados.', type: 'success' })
       } else if (actionType === 'import_orders') {
         // Mock import a new order which creates a sale
-        const { data: product } = await supabase
+        let { data: product, error: prodErr } = await supabase
           .from('products')
-          .select('id, sale_price')
+          .select('id, sale_price, active')
           .eq('store_id', profile.store_id)
           .eq('active', true)
           .limit(1)
+
+        if (prodErr && prodErr.code === '42703') {
+          const fallback = await supabase
+            .from('products')
+            .select('id, sale_price')
+            .eq('store_id', profile.store_id)
+            .limit(1)
+          product = fallback.data as any
+        }
 
         if (product && product[0]) {
           // Register a mock sale

@@ -128,11 +128,19 @@ export default function DashboardPage() {
       setRecentSales(processedRecentSales)
 
       // 2. Fetch products and count alerts
-      const { data: productsData } = await supabase
+      let { data: productsData, error: prodError } = await supabase
         .from('products')
-        .select('id, name, brand, sale_price, quantity_in_stock, min_stock_alert, expiration_date')
+        .select('id, name, brand, sale_price, quantity_in_stock, min_stock_alert, expiration_date, active')
         .eq('store_id', storeId)
         .eq('active', true)
+
+      if (prodError && prodError.code === '42703') {
+        const fallback = await supabase
+          .from('products')
+          .select('id, name, brand, sale_price, quantity_in_stock, min_stock_alert, expiration_date')
+          .eq('store_id', storeId)
+        productsData = fallback.data as any
+      }
 
       let lowStock = 0
       let expiring = 0
@@ -144,6 +152,7 @@ export default function DashboardPage() {
 
       if (productsData) {
         productsData.forEach((prod: any) => {
+          if (prod.active === false) return
           // Low stock alert
           if (prod.quantity_in_stock <= prod.min_stock_alert) {
             lowStock++

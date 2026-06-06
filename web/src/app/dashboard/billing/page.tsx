@@ -131,13 +131,21 @@ export default function BillingPage() {
         }
 
         // Fetch products count
-        const { count } = await supabase
+        let productCountQuery = await supabase
           .from('products')
           .select('*', { count: 'exact', head: true })
           .eq('store_id', profile.store_id)
           .eq('active', true)
 
-        setProductCount(count || 0)
+        if (productCountQuery.error && productCountQuery.error.code === '42703') {
+          const fallback = await supabase
+            .from('products')
+            .select('*', { count: 'exact', head: true })
+            .eq('store_id', profile.store_id)
+          setProductCount(fallback.count || 0)
+        } else {
+          setProductCount(productCountQuery.count || 0)
+        }
       }
     } catch (err) {
       console.error(err)

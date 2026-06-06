@@ -93,13 +93,29 @@ export default function SalesPage() {
       const storeId = profile.store_id
       
       // Fetch products in stock
-      const { data: prods } = await supabase
+      let { data: prods, error: prodsErr } = await supabase
         .from('products')
-        .select('id, name, brand, sale_price, quantity_in_stock, image_url')
+        .select('id, name, brand, sale_price, quantity_in_stock, image_url, active')
         .eq('store_id', storeId)
         .eq('active', true)
         .gt('quantity_in_stock', 0)
         .order('name', { ascending: true })
+
+      if (prodsErr && prodsErr.code === '42703') {
+        const fallback = await supabase
+          .from('products')
+          .select('id, name, brand, sale_price, quantity_in_stock, image_url')
+          .eq('store_id', storeId)
+          .gt('quantity_in_stock', 0)
+          .order('name', { ascending: true })
+        prods = fallback.data as any
+      }
+
+      if (prods) {
+        setProducts(prods.filter((p: any) => p.active !== false))
+      } else {
+        setProducts([])
+      }
 
       // Fetch customers
       const { data: custs } = await supabase
@@ -107,12 +123,6 @@ export default function SalesPage() {
         .select('id, name, phone')
         .eq('store_id', storeId)
         .order('name', { ascending: true })
-
-      if (prods) {
-        setProducts(prods)
-      } else {
-        setProducts([])
-      }
 
       if (custs) {
         setCustomers(custs)

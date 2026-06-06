@@ -127,12 +127,21 @@ export default function DashboardShell({ children, profile, store, lowStockCount
       if (!profile) return
       const storeId = profile.store_id
 
-      const { data: prods } = await supabase
+      let { data: prods, error: prodsErr } = await supabase
         .from('products')
-        .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock')
+        .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock, active')
         .eq('store_id', storeId)
         .eq('active', true)
         .order('name', { ascending: true })
+
+      if (prodsErr && prodsErr.code === '42703') {
+        const fallback = await supabase
+          .from('products')
+          .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock')
+          .eq('store_id', storeId)
+          .order('name', { ascending: true })
+        prods = fallback.data as any
+      }
 
       const { data: custs } = await supabase
         .from('customers')
@@ -140,7 +149,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
         .eq('store_id', storeId)
         .order('name', { ascending: true })
 
-      if (prods) setProducts(prods)
+      if (prods) setProducts(prods.filter((p: any) => p.active !== false))
       if (custs) setCustomers(custs)
     } catch (err) {
       console.error('Erro ao carregar dados do Agente IA:', err)
@@ -210,13 +219,21 @@ export default function DashboardShell({ children, profile, store, lowStockCount
       if (!profile) throw new Error('Loja não encontrada')
       const store_id = profile.store_id
 
-      // Fetch latest products and customers in real-time to have most updated lists
-      const { data: prods } = await supabase
+      let { data: prods, error: prodsErr } = await supabase
         .from('products')
-        .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock')
+        .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock, active')
         .eq('store_id', store_id)
         .eq('active', true)
         .order('name', { ascending: true })
+
+      if (prodsErr && prodsErr.code === '42703') {
+        const fallback = await supabase
+          .from('products')
+          .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock')
+          .eq('store_id', store_id)
+          .order('name', { ascending: true })
+        prods = fallback.data as any
+      }
 
       const { data: custs } = await supabase
         .from('customers')
@@ -224,7 +241,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
         .eq('store_id', store_id)
         .order('name', { ascending: true })
 
-      const currentProducts = prods || []
+      const currentProducts = prods ? prods.filter((p: any) => p.active !== false) : []
       const currentCustomers = custs || []
 
       const response = await fetch('/api/chat', {

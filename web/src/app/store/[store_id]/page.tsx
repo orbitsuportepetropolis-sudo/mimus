@@ -253,13 +253,12 @@ export default function StorefrontPage() {
         .from('products')
         .select('*')
         .eq('store_id', storeId)
-        .eq('active', true)
         .gt('quantity_in_stock', 0)
         .order('name', { ascending: true })
 
       if (prodsErr) throw prodsErr
       if (prods) {
-        const inStockProds = prods.filter(p => p.quantity_in_stock > 0)
+        const inStockProds = prods.filter(p => p.quantity_in_stock > 0 && p.active !== false)
         setProducts(inStockProds)
         
         console.log('DEBUG STOREFRONT:', {

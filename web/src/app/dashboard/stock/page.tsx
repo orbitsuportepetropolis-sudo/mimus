@@ -72,13 +72,27 @@ export default function StockPage() {
       if (!profile) return
       const storeId = profile.store_id
 
-      // Fetch products for the dropdown
-      const { data: prods } = await supabase
+      let { data: prods, error: prodsErr } = await supabase
         .from('products')
-        .select('id, name, quantity_in_stock')
+        .select('id, name, quantity_in_stock, active')
         .eq('store_id', storeId)
         .eq('active', true)
         .order('name', { ascending: true })
+
+      if (prodsErr && prodsErr.code === '42703') {
+        const fallback = await supabase
+          .from('products')
+          .select('id, name, quantity_in_stock')
+          .eq('store_id', storeId)
+          .order('name', { ascending: true })
+        prods = fallback.data as any
+      }
+
+      if (prods) {
+        setProducts(prods.filter((p: any) => p.active !== false))
+      } else {
+        setProducts([])
+      }
 
       // Fetch stock movements history
       const { data: moves } = await supabase
@@ -87,12 +101,6 @@ export default function StockPage() {
         .eq('store_id', storeId)
         .order('created_at', { ascending: false })
         .limit(50)
-
-      if (prods) {
-        setProducts(prods)
-      } else {
-        setProducts([])
-      }
 
       if (moves) {
         setMovements(moves)

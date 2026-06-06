@@ -33,11 +33,22 @@ export default async function DashboardLayout({
   // --- ONBOARDING GUARD (first-access only) ---
   // Check if store has any products. If not, this is a brand-new user and they
   // must complete onboarding before accessing the dashboard.
-  const { count: productCount } = await supabase
+  let productCount = 0
+  const prodQuery = await supabase
     .from('products')
     .select('*', { count: 'exact', head: true })
     .eq('store_id', profile.store_id)
     .eq('active', true)
+
+  if (prodQuery.error && prodQuery.error.code === '42703') {
+    const fallback = await supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true })
+      .eq('store_id', profile.store_id)
+    productCount = fallback.count || 0
+  } else {
+    productCount = prodQuery.count || 0
+  }
 
   if (productCount === 0) {
     redirect('/onboarding')
@@ -52,12 +63,24 @@ export default async function DashboardLayout({
     .single()
 
   // Fetch low stock count for notifications
-  const { count: lowStockCount } = await supabase
+  let lowStockCount = 0
+  const lowStockQuery = await supabase
     .from('products')
     .select('*', { count: 'exact', head: true })
     .eq('store_id', profile.store_id)
     .eq('active', true)
     .lte('quantity_in_stock', 5)
+
+  if (lowStockQuery.error && lowStockQuery.error.code === '42703') {
+    const fallback = await supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true })
+      .eq('store_id', profile.store_id)
+      .lte('quantity_in_stock', 5)
+    lowStockCount = fallback.count || 0
+  } else {
+    lowStockCount = lowStockQuery.count || 0
+  }
 
   return (
     <DashboardShell 

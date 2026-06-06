@@ -805,21 +805,32 @@ export default function ProductsPage() {
         setTrialEndsAt(st.trial_ends_at)
       }
 
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('products')
         .select('*')
         .eq('store_id', storeId)
         .eq('active', true)
         .order('name', { ascending: true })
 
+      if (error && error.code === '42703') {
+        const fallback = await supabase
+          .from('products')
+          .select('*')
+          .eq('store_id', storeId)
+          .order('name', { ascending: true })
+        data = fallback.data
+        error = fallback.error
+      }
+
       if (error) throw error
 
       if (data) {
-        setProducts(data)
+        const activeProds = data.filter(p => p.active !== false)
+        setProducts(activeProds)
         
         // Extract unique categories and brands for filters
-        const cats = Array.from(new Set(data.map(p => p.category).filter(Boolean))) as string[]
-        const bnds = Array.from(new Set(data.map(p => p.brand).filter(Boolean))) as string[]
+        const cats = Array.from(new Set(activeProds.map(p => p.category).filter(Boolean))) as string[]
+        const bnds = Array.from(new Set(activeProds.map(p => p.brand).filter(Boolean))) as string[]
         setCategories(cats)
         setBrands(bnds)
       } else {
@@ -1180,7 +1191,18 @@ export default function ProductsPage() {
           .eq('id', id)
           .eq('store_id', store_id)
 
-        if (error) throw error
+        if (error) {
+          if (error.code === '42703') {
+            const { error: deleteError } = await supabase
+              .from('products')
+              .delete()
+              .eq('id', id)
+              .eq('store_id', store_id)
+            if (deleteError) throw deleteError
+          } else {
+            throw error
+          }
+        }
         await loadProducts()
         window.dispatchEvent(new CustomEvent('dashboard-refresh'))
       } catch (err: any) {
