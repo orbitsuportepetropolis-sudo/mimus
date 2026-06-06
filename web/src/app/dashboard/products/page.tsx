@@ -97,6 +97,7 @@ export default function ProductsPage() {
   const [selectedTotalCost, setSelectedTotalCost] = useState('0.00')
   const [productSearchTerm, setProductSearchTerm] = useState('')
   const [showProductDropdown, setShowProductDropdown] = useState(false)
+  const [isCreatingFromEntry, setIsCreatingFromEntry] = useState(false)
 
   // Save Entry loading/error states
   const [entryLoading, setEntryLoading] = useState(false)
@@ -879,6 +880,50 @@ export default function ProductsPage() {
     }
     setModalOpen(true)
   }
+  
+  // Quick register from goods entry flow
+  function openProductQuickRegister(searchTerm: string) {
+    const getTrialDaysLeft = () => {
+      if (!trialEndsAt) return 0
+      const diff = new Date(trialEndsAt).getTime() - Date.now()
+      return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+    }
+    const isTrialActive = planStatus === 'trial' && getTrialDaysLeft() > 0
+    const isPro = storePlan === 'pro' || isTrialActive
+
+    if (!isPro && products.length >= 50) {
+      alert('Limite de 50 produtos atingido no Plano Free. Faça o upgrade para o Plano Pro por apenas R$ 49/mês para liberar cadastros ilimitados!')
+      return
+    }
+
+    setFormError(null)
+    setImageFile(null)
+    setImagePreview(null)
+    setEditingProduct(null)
+    
+    setFormName(searchTerm)
+    setFormBrand('')
+    setFormCategory('')
+    setFormSku('')
+    setFormBarcode('')
+    
+    const qty = parseInt(selectedQty) || 1
+    const cost = parseFloat(selectedTotalCost) || 0
+    const unitCost = cost > 0 && qty > 0 ? (cost / qty).toFixed(2) : '0.00'
+    setFormCostPrice(unitCost)
+    
+    setFormSalePrice('0.00')
+    setFormStock('0')
+    setFormMinStock('5')
+    setFormExpDate('')
+    setFormDescription('')
+    setFormPromotionalPrice('')
+    setFormHasFreeShipping(false)
+
+    setIsCreatingFromEntry(true)
+    setModalOpen(true)
+  }
+
 
   // Image Selection Handle
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -971,6 +1016,8 @@ export default function ProductsPage() {
         description: formDescription || null
       }
 
+      let newlyCreatedProd: any = null
+
       if (editingProduct) {
         // Update product
         const { error } = await supabase
@@ -989,6 +1036,10 @@ export default function ProductsPage() {
 
         if (error) throw error
 
+        if (newProd && newProd[0]) {
+          newlyCreatedProd = newProd[0]
+        }
+
         // If stock > 0, log an initial stock entry in movements
         if (newProd && newProd[0] && parseInt(formStock) > 0) {
           await supabase.from('stock_movements').insert([{
@@ -1003,6 +1054,17 @@ export default function ProductsPage() {
 
       await loadProducts()
       setModalOpen(false)
+
+      if (newlyCreatedProd && isCreatingFromEntry) {
+        setSelectedProductId(newlyCreatedProd.id)
+        setProductSearchTerm(newlyCreatedProd.name)
+        if (newlyCreatedProd.cost_price > 0) {
+          const qty = parseInt(selectedQty) || 1
+          setSelectedTotalCost((newlyCreatedProd.cost_price * qty).toFixed(2))
+        }
+        setIsCreatingFromEntry(false)
+      }
+
     } catch (err: any) {
       if (err.code === '42703') {
         setFormError('Colunas necessárias não existem na tabela de produtos. Por favor, execute a seguinte query no SQL Editor do Supabase:\n\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS promotional_price numeric(10,2);\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS has_free_shipping boolean NOT NULL DEFAULT false;')
@@ -1423,7 +1485,7 @@ export default function ProductsPage() {
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs"
                   />
                   {showProductDropdown && (
-                    <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl max-h-48 overflow-y-auto z-50 divide-y divide-slate-100 dark:divide-zinc-800/60 text-xs">
+                    <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 divide-y divide-slate-100 dark:divide-zinc-800/60 text-xs">
                       {filteredSearchProducts.length === 0 ? (
                         <div className="p-3 text-slate-400 dark:text-zinc-500 text-center">Nenhum produto cadastrado com este nome.</div>
                       ) : (
@@ -1446,8 +1508,22 @@ export default function ProductsPage() {
                           </button>
                         ))
                       )}
+                      {productSearchTerm.trim().length > 0 && (
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            openProductQuickRegister(productSearchTerm)
+                            setShowProductDropdown(false)
+                          }}
+                          className="w-full text-left px-3 py-2.5 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1.5 border-t border-slate-100 dark:border-zinc-800/60"
+                        >
+                          ➕ Cadastrar &quot;{productSearchTerm}&quot; como Novo Produto
+                        </button>
+                      )}
                     </div>
                   )}
+
                 </div>
 
                 <div className="md:col-span-2">
