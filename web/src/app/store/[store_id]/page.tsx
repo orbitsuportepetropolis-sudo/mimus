@@ -17,7 +17,10 @@ import {
   CheckCircle,
   Truck,
   ShieldCheck,
-  Percent
+  Percent,
+  CreditCard,
+  Coins,
+  DollarSign
 } from 'lucide-react'
 
 interface Product {
@@ -92,6 +95,7 @@ export default function StorefrontPage() {
   const [couponFirstPurchasePct, setCouponFirstPurchasePct] = useState(10)
   const [deliveryType, setDeliveryType] = useState<'delivery' | 'pickup'>('pickup')
   const [address, setAddress] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card' | 'debit_card' | 'money'>('pix')
 
   // Verify first purchase on phone number change
   useEffect(() => {
@@ -464,7 +468,10 @@ export default function StorefrontPage() {
           p_client_phone: clientPhone,
           p_total_value: totalValue,
           p_discount: discount,
-          p_items: itemsPayload
+          p_items: itemsPayload,
+          p_delivery_type: deliveryType,
+          p_delivery_address: deliveryType === 'delivery' ? address : null,
+          p_payment_method: paymentMethod
         })
 
       if (orderError) {
@@ -488,6 +495,12 @@ export default function StorefrontPage() {
       if (deliveryType === 'delivery') {
         message += `📍 *Endereço:* ${address}\n`
       }
+      const paymentLabel = 
+        paymentMethod === 'pix' ? 'Pix ⚡' :
+        paymentMethod === 'credit_card' ? 'Cartão de Crédito 💳' :
+        paymentMethod === 'debit_card' ? 'Cartão de Débito 💳' :
+        paymentMethod === 'money' ? 'Dinheiro 💵' : 'A combinar';
+      message += `💳 *Forma de Pagamento:* ${paymentLabel}\n`
       message += `\n🛍️ *PRODUTOS SELECIONADOS:*\n`
 
       cart.forEach(item => {
@@ -1261,6 +1274,35 @@ export default function StorefrontPage() {
                           />
                         </div>
                       )}
+
+                      <div>
+                        <label className="block text-slate-400 mb-1">Forma de Pagamento</label>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {[
+                            { value: 'pix', label: 'Pix', icon: Coins },
+                            { value: 'credit_card', label: 'Crédito', icon: CreditCard },
+                            { value: 'debit_card', label: 'Débito', icon: CreditCard },
+                            { value: 'money', label: 'Dinheiro', icon: DollarSign }
+                          ].map(m => {
+                            const Icon = m.icon;
+                            const isSel = paymentMethod === m.value;
+                            return (
+                              <button
+                                key={m.value}
+                                type="button"
+                                onClick={() => setPaymentMethod(m.value as any)}
+                                className={`py-2.5 px-3 rounded-xl border flex items-center justify-center gap-1.5 transition-all font-semibold ${
+                                  isSel 
+                                    ? 'border-[var(--primary-color)] bg-pink-50/30 dark:bg-pink-950/10 text-[var(--primary-color)] font-bold shadow-sm' 
+                                    : 'border-slate-200 dark:border-zinc-800 text-slate-500 dark:hover:bg-zinc-850 hover:bg-slate-50'
+                                }`}
+                              >
+                                <Icon className="w-3.5 h-3.5" /> {m.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </>

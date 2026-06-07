@@ -74,6 +74,8 @@ CREATE TABLE public.sales (
     total_value numeric(10,2) NOT NULL DEFAULT 0.00,
     discount numeric(10,2) NOT NULL DEFAULT 0.00,
     payment_method text NOT NULL, -- 'pix', 'money', 'credit_card', 'debit_card'
+    delivery_type text DEFAULT 'pickup',
+    delivery_address text,
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -410,5 +412,8 @@ ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS status text DEFAULT 'activ
 ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS notes text;
 
 ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS status text DEFAULT 'novo';
+ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS delivery_type text DEFAULT 'pickup';
+ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS delivery_address text;
+
 
 

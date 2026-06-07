@@ -116,6 +116,8 @@ export default function SalesPage() {
           discount,
           payment_method,
           status,
+          delivery_type,
+          delivery_address,
           customers(name, phone),
           sale_items(
             id,
@@ -812,6 +814,15 @@ export default function SalesPage() {
                         <td className="py-3 px-2 max-w-[220px] sm:max-w-[320px]">
                           <span className="font-bold text-slate-800 dark:text-zinc-200 block">{custName}</span>
                           {custPhone && <span className="text-[10px] text-slate-400 block mb-1">{custPhone}</span>}
+                          {sale.delivery_type && (
+                            <span className={`inline-flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full font-bold border mr-1.5 mb-1 ${
+                              sale.delivery_type === 'delivery'
+                                ? 'bg-amber-50/50 text-amber-600 border-amber-100/30 dark:bg-amber-950/10 dark:text-amber-400 dark:border-amber-900/20'
+                                : 'bg-blue-50/50 text-blue-600 border-blue-100/30 dark:bg-blue-950/10 dark:text-blue-400 dark:border-blue-900/20'
+                            }`}>
+                              {sale.delivery_type === 'delivery' ? '🛵 Entrega' : '🏪 Retirada'}
+                            </span>
+                          )}
                           {sale.sale_items && sale.sale_items.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1.5">
                               {sale.sale_items.map((item: any) => (
@@ -1207,6 +1218,30 @@ export default function SalesPage() {
                   </p>
                 </div>
               </div>
+
+              {/* Delivery / Modality Info */}
+              {selectedSaleDetails.delivery_type && (
+                <div className="p-3 bg-slate-50 dark:bg-zinc-950/40 border border-slate-100 dark:border-zinc-850 rounded-xl space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Modalidade de Compra</span>
+                    <span className={`inline-flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full font-bold border ${
+                      selectedSaleDetails.delivery_type === 'delivery'
+                        ? 'bg-amber-50/50 text-amber-600 border-amber-100/30 dark:bg-amber-950/10 dark:text-amber-400 dark:border-amber-900/20'
+                        : 'bg-blue-50/50 text-blue-600 border-blue-100/30 dark:bg-blue-950/10 dark:text-blue-400 dark:border-blue-900/20'
+                    }`}>
+                      {selectedSaleDetails.delivery_type === 'delivery' ? '🛵 Entrega em Domicílio' : '🏪 Retirar na Loja'}
+                    </span>
+                  </div>
+                  {selectedSaleDetails.delivery_type === 'delivery' && selectedSaleDetails.delivery_address && (
+                    <div className="border-t border-slate-100 dark:border-zinc-800/60 pt-2">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Endereço de Entrega</span>
+                      <p className="font-medium text-slate-700 dark:text-zinc-300 mt-1 leading-relaxed break-words font-sans">
+                        {selectedSaleDetails.delivery_address}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Products list */}
               <div className="space-y-2">

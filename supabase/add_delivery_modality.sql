@@ -1,73 +1,13 @@
 -- =========================================================================
--- SISTEMA DE PEDIDOS DO CATÁLOGO: RESERVA DE ESTOQUE + INTEGRAÇÃO FINANCEIRA
+-- MIGRAÇÃO: ADICIONAR MODALIDADE DE COMPRA E ENDEREÇO DE ENTREGA
 -- Execute no SQL Editor do Supabase (projeto: lmuyarubwmdoaadxbgpl)
 -- =========================================================================
 
--- 0. Garantir que a coluna 'status' existe na tabela public.sales e atualizar registros existentes
-ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS status text DEFAULT 'pago';
-UPDATE public.sales SET status = 'pago' WHERE status IS NULL;
+-- 1. Adicionar colunas de entrega na tabela public.sales caso não existam
+ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS delivery_type text DEFAULT 'pickup';
+ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS delivery_address text;
 
--- 1. Modificar o trigger financeiro para lançar receita APENAS quando a venda for marcada como 'pago'
-CREATE OR REPLACE FUNCTION public.log_sale_financial_transaction()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- Apenas lança a receita se o status da venda for 'pago'
-  IF NEW.status = 'pago' AND (TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM 'pago') THEN
-    -- Evitar duplicados caso a venda seja atualizada várias vezes
-    IF NOT EXISTS (SELECT 1 FROM public.financial_transactions WHERE sale_id = NEW.id) THEN
-      INSERT INTO public.financial_transactions (store_id, type, value, category, description, date, sale_id)
-      VALUES (
-        NEW.store_id,
-        'revenue',
-        NEW.total_value,
-        'sale',
-        'Venda realizada no PDV / Confirmada',
-        NEW.created_at::date,
-        NEW.id
-      );
-    END IF;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Garantir que o trigger de transação financeira rode ao INSERIR e ao ATUALIZAR a venda
-DROP TRIGGER IF EXISTS tr_log_sale_financial_transaction ON public.sales;
-CREATE TRIGGER tr_log_sale_financial_transaction
-AFTER INSERT OR UPDATE ON public.sales
-FOR EACH ROW
-EXECUTE FUNCTION public.log_sale_financial_transaction();
-
-
--- 2. Criar trigger para estornar estoque e deletar financeiro caso a venda seja cancelada
-CREATE OR REPLACE FUNCTION public.log_sale_status_changes()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_item record;
-BEGIN
-  -- Se o status mudou para 'cancelado' (e não estava cancelado antes)
-  IF NEW.status = 'cancelado' AND (OLD.status IS DISTINCT FROM 'cancelado') THEN
-    -- Devolver os produtos de volta ao estoque
-    FOR v_item IN (SELECT product_id, quantity FROM public.sale_items WHERE sale_id = NEW.id) LOOP
-      INSERT INTO public.stock_movements (store_id, product_id, quantity, type, reason)
-      VALUES (NEW.store_id, v_item.product_id, v_item.quantity, 'entry', 'manual_adjustment');
-    END LOOP;
-    
-    -- Deletar a transação financeira correspondente (se existir)
-    DELETE FROM public.financial_transactions WHERE sale_id = NEW.id;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-DROP TRIGGER IF EXISTS tr_log_sale_status_changes ON public.sales;
-CREATE TRIGGER tr_log_sale_status_changes
-AFTER UPDATE OF status ON public.sales
-FOR EACH ROW
-EXECUTE FUNCTION public.log_sale_status_changes();
-
-
--- 3. Criar a função RPC para inserção segura de pedidos do catálogo (bypass RLS para anon)
+-- 2. Atualizar a função RPC create_storefront_order para suportar a modalidade de compra e método de pagamento
 DROP FUNCTION IF EXISTS public.create_storefront_order(uuid, text, text, numeric, numeric, jsonb);
 DROP FUNCTION IF EXISTS public.create_storefront_order(uuid, text, text, numeric, numeric, jsonb, text, text);
 DROP FUNCTION IF EXISTS public.create_storefront_order(uuid, text, text, numeric, numeric, jsonb, text, text, text);
