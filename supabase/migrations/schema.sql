@@ -179,7 +179,7 @@ BEGIN
   WHERE id = NEW.product_id;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE TRIGGER tr_update_product_stock
 AFTER INSERT ON public.stock_movements
@@ -201,7 +201,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE TRIGGER tr_log_sale_stock_movement
 AFTER INSERT ON public.sale_items
@@ -309,6 +309,9 @@ CREATE POLICY "Isolamento de loja para vendas (SELECT)" ON public.sales
 
 CREATE POLICY "Isolamento de loja para vendas (INSERT)" ON public.sales
     FOR INSERT TO authenticated WITH CHECK (store_id = public.get_user_store_id());
+
+CREATE POLICY "Isolamento de loja para vendas (UPDATE)" ON public.sales
+    FOR UPDATE TO authenticated USING (store_id = public.get_user_store_id()) WITH CHECK (store_id = public.get_user_store_id());
 
 -- Políticas para SALE_ITEMS
 CREATE POLICY "Isolamento de loja para itens da venda (SELECT)" ON public.sale_items
