@@ -186,7 +186,7 @@ export default function SuportePage() {
                   <p className="text-[11px] text-slate-400 mt-0.5">Seg. a Sex. das 9h às 18h</p>
                 </div>
                 <a
-                  href="https://wa.me/5524993173232?text=Ol%C3%A1%20Mimus!%20Preciso%20de%20suporte%20com%20a%20minha%20loja."
+                  href="https://wa.me/5511957337045?text=Ol%C3%A1%20Mimus!%20Preciso%20de%20suporte%20com%20a%20minha%20loja."
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-max px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
