@@ -150,6 +150,8 @@ export default function ProductsPage() {
   const [formDescription, setFormDescription] = useState('')
   const [formPromotionalDiscount, setFormPromotionalDiscount] = useState('')
   const [formHasFreeShipping, setFormHasFreeShipping] = useState(false)
+  const [formVisibleInStorefront, setFormVisibleInStorefront] = useState(true)
+  const [formIsLaunch, setFormIsLaunch] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [imageFiles, setImageFiles] = useState<(File | null)[]>([null, null, null, null, null])
@@ -934,6 +936,8 @@ export default function ProductsPage() {
         : 0
       setFormPromotionalDiscount(discountPct > 0 ? String(discountPct) : '')
       setFormHasFreeShipping(!!prod.has_free_shipping)
+      setFormVisibleInStorefront(prod.visible_in_storefront !== false)
+      setFormIsLaunch(!!prod.is_launch)
       
       const initialPreviews = [null, null, null, null, null] as (string | null)[]
       if (prod.images && Array.isArray(prod.images) && prod.images.length > 0) {
@@ -965,6 +969,8 @@ export default function ProductsPage() {
       setFormDescription('')
       setFormPromotionalDiscount('')
       setFormHasFreeShipping(false)
+      setFormVisibleInStorefront(true)
+      setFormIsLaunch(false)
     }
     setModalOpen(true)
   }
@@ -1012,6 +1018,8 @@ export default function ProductsPage() {
     setFormDescription('')
     setFormPromotionalDiscount('')
     setFormHasFreeShipping(false)
+    setFormVisibleInStorefront(true)
+    setFormIsLaunch(false)
 
     setIsCreatingFromEntry(true)
     setModalOpen(true)
@@ -1100,6 +1108,8 @@ export default function ProductsPage() {
             : null
         })(),
         has_free_shipping: formHasFreeShipping,
+        visible_in_storefront: formVisibleInStorefront,
+        is_launch: formIsLaunch,
         quantity_in_stock: editingProduct ? (parseInt(formStock) || 0) : 0,
         min_stock_alert: parseInt(formMinStock) || 5,
         expiration_date: formExpDate || null,
@@ -1160,7 +1170,7 @@ export default function ProductsPage() {
 
     } catch (err: any) {
       if (err.code === '42703' || err.message?.includes('column')) {
-        setFormError('Colunas necessárias não existem na tabela de produtos. Por favor, execute a seguinte query no SQL Editor do Supabase:\n\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS images jsonb DEFAULT \'[]\'::jsonb NOT NULL;\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS variations jsonb DEFAULT \'[]\'::jsonb NOT NULL;')
+        setFormError('Colunas necessárias não existem na tabela de produtos. Por favor, execute a seguinte query no SQL Editor do Supabase:\n\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS images jsonb DEFAULT \'[]\'::jsonb NOT NULL;\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS variations jsonb DEFAULT \'[]\'::jsonb NOT NULL;\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS visible_in_storefront boolean NOT NULL DEFAULT true;\nALTER TABLE public.products ADD COLUMN IF NOT EXISTS is_launch boolean NOT NULL DEFAULT false;')
       } else {
         setFormError(err.message || 'Erro ao salvar produto. Preencha todos os campos corretamente.')
       }
@@ -1415,6 +1425,18 @@ export default function ProductsPage() {
                             <div>
                               <h4 className="font-bold text-slate-700 dark:text-zinc-200">{p.name}</h4>
                               <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">{p.sku || 'Sem SKU'}</span>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {p.is_launch && (
+                                  <span className="text-[8px] font-black uppercase tracking-wider bg-amber-500 text-white px-1.5 py-0.5 rounded shadow-sm">
+                                    Lançamento 🚀
+                                  </span>
+                                )}
+                                {p.visible_in_storefront === false && (
+                                  <span className="text-[8px] font-black uppercase tracking-wider bg-slate-400 text-white px-1.5 py-0.5 rounded dark:bg-zinc-800 dark:text-zinc-300">
+                                    Oculto na Vitrine 👁️‍
+                                  </span>
+                                )}
+                              </div>
                               {p.variations && (() => {
                                 const parsed = typeof p.variations === 'string' ? JSON.parse(p.variations) : p.variations;
                                 return Array.isArray(parsed) && parsed.length > 0 ? (
@@ -2053,16 +2075,49 @@ export default function ProductsPage() {
                   />
                 </div>
 
-                <div className="flex items-center gap-2 pt-5">
-                  <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600 dark:text-zinc-300">
-                    <input
-                      type="checkbox"
-                      checked={formHasFreeShipping}
-                      onChange={(e) => setFormHasFreeShipping(e.target.checked)}
-                      className="w-4 h-4 rounded text-rose-600 border-slate-200 focus:ring-rose-500 cursor-pointer"
-                    />
-                    <span>Ativar etiqueta de Frete Grátis</span>
-                  </label>
+                <div className="col-span-2 space-y-3 bg-slate-50 dark:bg-zinc-950/40 p-3 rounded-xl border border-slate-100 dark:border-zinc-800/80">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-1">Configurações da Vitrine</span>
+                  
+                  <div className="flex flex-col gap-2.5">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none text-slate-600 dark:text-zinc-300">
+                      <input
+                        type="checkbox"
+                        checked={formVisibleInStorefront}
+                        onChange={(e) => setFormVisibleInStorefront(e.target.checked)}
+                        className="w-4 h-4 rounded text-rose-600 border-slate-200 focus:ring-rose-500 cursor-pointer"
+                      />
+                      <div>
+                        <span className="block font-semibold">Exibir na Vitrine Pública</span>
+                        <span className="text-[10px] text-slate-400 dark:text-zinc-550">Se desmarcado, o produto ficará oculto para os clientes na vitrine.</span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none text-slate-600 dark:text-zinc-300 border-t border-slate-100 dark:border-zinc-850 pt-2.5">
+                      <input
+                        type="checkbox"
+                        checked={formIsLaunch}
+                        onChange={(e) => setFormIsLaunch(e.target.checked)}
+                        className="w-4 h-4 rounded text-rose-600 border-slate-200 focus:ring-rose-500 cursor-pointer"
+                      />
+                      <div>
+                        <span className="block font-semibold">Marcar como Lançamento (Novidade)</span>
+                        <span className="text-[10px] text-slate-400 dark:text-zinc-550">Exibe uma etiqueta especial de "Lançamento" e destaca o produto na vitrine.</span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none text-slate-600 dark:text-zinc-300 border-t border-slate-100 dark:border-zinc-850 pt-2.5">
+                      <input
+                        type="checkbox"
+                        checked={formHasFreeShipping}
+                        onChange={(e) => setFormHasFreeShipping(e.target.checked)}
+                        className="w-4 h-4 rounded text-rose-600 border-slate-200 focus:ring-rose-500 cursor-pointer"
+                      />
+                      <div>
+                        <span className="block font-semibold">Etiqueta de Frete Grátis</span>
+                        <span className="text-[10px] text-slate-400 dark:text-zinc-550">Exibe a etiqueta de frete grátis neste produto na vitrine.</span>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
                 <div>

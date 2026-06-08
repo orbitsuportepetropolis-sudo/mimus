@@ -36,6 +36,8 @@ interface Product {
   has_free_shipping: boolean
   images?: string[] | null
   variations?: { name: string; options: string[] }[] | null
+  visible_in_storefront?: boolean
+  is_launch?: boolean
 }
 
 interface CartItem extends Product {
@@ -262,7 +264,7 @@ export default function StorefrontPage() {
 
       if (prodsErr) throw prodsErr
       if (prods) {
-        const activeProds = prods.filter(p => p.active !== false)
+        const activeProds = prods.filter(p => p.active !== false && p.visible_in_storefront !== false)
         // Sort products: in-stock first, sold-out at the end. Keep name alphabetical within groups.
         const sortedProds = activeProds.sort((a, b) => {
           const aInStock = (a.quantity_in_stock || 0) > 0;
@@ -417,6 +419,7 @@ export default function StorefrontPage() {
   }
 
   const campaignProducts = activeBannerTag ? products.filter(matchesCampaignTag) : []
+  const launchProducts = products.filter(p => p.is_launch)
   const otherProducts = products // Não esconde produtos em destaque do catálogo geral
   const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[]
 
@@ -794,6 +797,11 @@ export default function StorefrontPage() {
                   >
                     {/* Badge */}
                     <div className="absolute top-3 left-3 z-10 flex flex-col gap-1">
+                      {prod.is_launch && (
+                        <div className="bg-amber-500 text-white text-[9px] font-extrabold px-2.5 py-0.5 rounded-full shadow-sm">
+                          LANÇAMENTO 🚀
+                        </div>
+                      )}
                       {prod.promotional_price && prod.promotional_price > 0 && (
                         <div className="bg-[var(--primary-color)] text-white text-[9px] font-extrabold px-2.5 py-0.5 rounded-full shadow-sm">
                           {Math.round((1 - prod.promotional_price / prod.sale_price) * 100)}% OFF
@@ -807,6 +815,119 @@ export default function StorefrontPage() {
                     </div>
 
                     <div className="aspect-square bg-slate-50 dark:bg-zinc-950 relative flex items-center justify-center text-slate-300 border-b border-slate-50 dark:border-zinc-950 overflow-hidden">
+                      {prod.image_url ? (
+                        <img 
+                          src={prod.image_url} 
+                          alt={prod.name} 
+                          className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${prod.quantity_in_stock <= 0 ? 'opacity-40 grayscale' : ''}`}
+                        />
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-extrabold uppercase bg-rose-50 dark:bg-zinc-900 w-full h-full flex items-center justify-center">
+                          {prod.name.slice(0, 3)}
+                        </span>
+                      )}
+                      {prod.quantity_in_stock <= 0 && (
+                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center">
+                          <span className="bg-white/95 dark:bg-zinc-900/95 text-slate-800 dark:text-white text-[10px] font-black tracking-widest px-3.5 py-1.5 rounded-full shadow-md uppercase">
+                            Esgotado
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                      <div>
+                        <span className="text-[9px] font-bold text-[var(--primary-color)] uppercase tracking-wider block">
+                          {prod.brand || 'Exclusivo'}
+                        </span>
+                        <h3 className="text-xs font-bold text-slate-700 dark:text-zinc-200 mt-0.5 line-clamp-2 leading-tight h-8">
+                          {prod.name}
+                        </h3>
+                      </div>
+
+                      <div className="space-y-3 pt-2">
+                        <div className="flex flex-col">
+                          {prod.promotional_price && prod.promotional_price > 0 ? (
+                            <>
+                              <span className="text-[10px] text-slate-400 line-through">
+                                R$ {prod.sale_price.toFixed(2)}
+                              </span>
+                              <span className="text-sm font-black text-slate-900 dark:text-white">
+                                R$ {prod.promotional_price.toFixed(2)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-sm font-black text-slate-900 dark:text-white">
+                              R$ {prod.sale_price.toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+                        {prod.quantity_in_stock <= 0 ? (
+                          <button
+                            disabled
+                            className="w-full py-2.5 rounded-xl bg-slate-200 dark:bg-zinc-800 text-slate-400 dark:text-zinc-500 font-extrabold text-[10px] uppercase cursor-not-allowed"
+                          >
+                            ESGOTADO
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openProductDetails(prod);
+                            }}
+                            className="w-full py-2.5 rounded-xl bg-[var(--accent-color)] hover:opacity-95 text-white font-extrabold text-[10px] uppercase transition-all active:scale-[0.97] shadow-sm shadow-[var(--accent-color)]/10"
+                          >
+                            COMPRAR AGORA
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Novidades e Lançamentos */}
+        {launchProducts.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-pink-100/40 pb-2">
+              <h2 className="text-sm font-extrabold text-slate-800 dark:text-white flex items-center gap-2 uppercase tracking-wide">
+                <Sparkles className="w-4.5 h-4.5 text-amber-500" />
+                Novidades e Lançamentos 🚀
+              </h2>
+              <span className="text-[9px] font-black text-amber-600 bg-amber-500/10 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                LANÇAMENTOS
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-4 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-none">
+              {launchProducts.map(prod => {
+                return (
+                   <div 
+                    key={prod.id} 
+                    onClick={() => openProductDetails(prod)}
+                    className="w-48 bg-white dark:bg-zinc-900 rounded-[24px] border border-slate-100 dark:border-zinc-800/80 shadow-sm overflow-hidden flex flex-col flex-shrink-0 relative group hover:shadow-md transition-shadow duration-300 cursor-pointer"
+                  >
+                    {/* Badge */}
+                    <div className="absolute top-3 left-3 z-10 flex flex-col gap-1">
+                      <div className="bg-amber-500 text-white text-[9px] font-extrabold px-2.5 py-0.5 rounded-full shadow-sm">
+                        LANÇAMENTO 🚀
+                      </div>
+                      {prod.promotional_price && prod.promotional_price > 0 && (
+                        <div className="bg-[var(--primary-color)] text-white text-[9px] font-extrabold px-2.5 py-0.5 rounded-full shadow-sm">
+                          {Math.round((1 - prod.promotional_price / prod.sale_price) * 100)}% OFF
+                        </div>
+                      )}
+                      {prod.has_free_shipping && (
+                        <div className="bg-emerald-600 text-white text-[9px] font-extrabold px-2.5 py-0.5 rounded-full shadow-sm">
+                          FRETE GRÁTIS
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="aspect-square bg-slate-50 dark:bg-zinc-950 relative flex items-center justify-center text-slate-350 border-b border-slate-50 dark:border-zinc-950 overflow-hidden">
                       {prod.image_url ? (
                         <img 
                           src={prod.image_url} 
@@ -952,6 +1073,11 @@ export default function StorefrontPage() {
                   >
                     {/* Badges */}
                     <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1">
+                      {prod.is_launch && (
+                        <div className="bg-amber-500 text-white text-[8px] font-black tracking-widest px-2.5 py-0.5 rounded-full shadow-sm">
+                          LANÇAMENTO 🚀
+                        </div>
+                      )}
                       {prod.has_free_shipping && (
                         <div className="bg-pink-500/10 text-[var(--primary-color)] text-[8px] font-black tracking-widest px-2.5 py-0.5 rounded-full" style={{ color: primaryColor }}>
                           FRETE GRÁTIS
@@ -1385,6 +1511,11 @@ export default function StorefrontPage() {
                     <div className="aspect-square bg-slate-50 dark:bg-zinc-950 rounded-3xl overflow-hidden border border-slate-100 dark:border-zinc-850/85 relative flex items-center justify-center text-slate-355 shadow-inner group">
                       {/* Badges */}
                       <div className="absolute top-4 left-4 z-10 flex flex-col gap-1.5">
+                        {selectedProduct.is_launch && (
+                          <div className="bg-amber-500 text-white text-[10px] font-extrabold px-3 py-1 rounded-full shadow-md">
+                            LANÇAMENTO 🚀
+                          </div>
+                        )}
                         {selectedProduct.promotional_price && selectedProduct.promotional_price > 0 && (
                           <div className="bg-[var(--primary-color)] text-white text-[10px] font-extrabold px-3 py-1 rounded-full shadow-md">
                             {Math.round((1 - selectedProduct.promotional_price / selectedProduct.sale_price) * 100)}% OFF
