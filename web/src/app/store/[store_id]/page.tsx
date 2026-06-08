@@ -1166,7 +1166,7 @@ export default function StorefrontPage() {
         </div>
 
         {/* High-conversion trust indicators */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-8 border-t border-pink-100/30">
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-8 border-t border-pink-100/30">
           <div className="bg-white dark:bg-zinc-900/60 p-4 rounded-2xl border border-slate-100 dark:border-zinc-800 flex items-center gap-3">
             <Truck className="w-8 h-8 text-[var(--primary-color)] flex-shrink-0" />
             <div>
@@ -1179,13 +1179,6 @@ export default function StorefrontPage() {
             <div>
               <h4 className="text-xs font-bold">Compra Segura</h4>
               <p className="text-[9.5px] text-slate-400">Dados 100% protegidos</p>
-            </div>
-          </div>
-          <div className="bg-white dark:bg-zinc-900/60 p-4 rounded-2xl border border-slate-100 dark:border-zinc-800 flex items-center gap-3">
-            <Percent className="w-8 h-8 text-[var(--primary-color)] flex-shrink-0" />
-            <div>
-              <h4 className="text-xs font-bold">5% OFF no PIX</h4>
-              <p className="text-[9.5px] text-slate-400">Desconto acumulativo</p>
             </div>
           </div>
           <div className="bg-white dark:bg-zinc-900/60 p-4 rounded-2xl border border-slate-100 dark:border-zinc-800 flex items-center gap-3">
