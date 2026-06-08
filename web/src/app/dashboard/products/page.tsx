@@ -37,6 +37,8 @@ interface Product {
   has_free_shipping?: boolean
   images?: string[] | null
   variations?: { name: string; options: string[] }[] | null
+  visible_in_storefront?: boolean
+  is_launch?: boolean
 }
 
 interface StockEntry {
