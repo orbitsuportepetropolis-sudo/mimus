@@ -658,7 +658,14 @@ export default function StorefrontPage() {
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {logoUrl ? (
-              <img src={logoUrl} alt={storeName} className="h-10 max-w-[150px] object-contain" />
+              <div className="flex items-center gap-3">
+                <img src={logoUrl} alt={storeName} className="h-10 max-w-[120px] object-contain" />
+                <div className="h-6 w-px bg-slate-200 dark:bg-zinc-800" />
+                <div>
+                  <h1 className="text-sm font-black uppercase tracking-tight text-slate-800 dark:text-white leading-none">{storeName}</h1>
+                  <span className="text-[8px] uppercase tracking-wider text-[var(--primary-color)] font-bold">Vitrine Virtual</span>
+                </div>
+              </div>
             ) : (
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 rounded-full bg-[var(--primary-color)] text-white font-extrabold text-sm flex items-center justify-center shadow-lg shadow-pink-500/10">
