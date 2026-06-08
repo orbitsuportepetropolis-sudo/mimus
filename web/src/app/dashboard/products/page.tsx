@@ -36,7 +36,7 @@ interface Product {
   promotional_price?: number | null
   has_free_shipping?: boolean
   images?: string[] | null
-  variations?: { name: string; options: string[] }[] | null
+  variations?: { name: string; options: any[] }[] | null
   visible_in_storefront?: boolean
   is_launch?: boolean
 }
@@ -158,7 +158,9 @@ export default function ProductsPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [imageFiles, setImageFiles] = useState<(File | null)[]>([null, null, null, null, null])
   const [imagePreviews, setImagePreviews] = useState<(string | null)[]>([null, null, null, null, null])
-  const [formVariations, setFormVariations] = useState<{ name: string; options: string[] }[]>([])
+  const [formVariations, setFormVariations] = useState<{ name: string; options: any[] }[]>([])
+  const [currentStoreId, setCurrentStoreId] = useState<string | null>(null)
+  const [uploadingOptionImg, setUploadingOptionImg] = useState<{ varIdx: number; optIdx: number } | null>(null)
   const [newVarName, setNewVarName] = useState('')
   const [newVarOptions, setNewVarOptions] = useState('')
   const [formLoading, setFormLoading] = useState(false)
@@ -801,6 +803,7 @@ export default function ProductsPage() {
 
       if (!profile) return
       const storeId = profile.store_id
+      setCurrentStoreId(storeId)
 
       if (profile.stores) {
         const st = profile.stores as any
@@ -857,6 +860,7 @@ export default function ProductsPage() {
       .split(',')
       .map(opt => opt.trim())
       .filter(Boolean)
+      .map(opt => ({ value: opt, color: '', image_url: '' }))
     if (options.length === 0) return
 
     setFormVariations([
@@ -869,6 +873,42 @@ export default function ProductsPage() {
 
   function removeVariation(index: number) {
     setFormVariations(formVariations.filter((_, i) => i !== index))
+  }
+
+  function updateOptionField(varIdx: number, optIdx: number, field: 'color' | 'image_url', value: string) {
+    const updated = [...formVariations]
+    const opt = updated[varIdx].options[optIdx]
+    let optData: any = typeof opt === 'string' ? { value: opt } : { ...opt }
+    optData[field] = value
+    updated[varIdx].options[optIdx] = optData
+    setFormVariations(updated)
+  }
+
+  function removeOptionField(varIdx: number, optIdx: number, field: 'color' | 'image_url') {
+    updateOptionField(varIdx, optIdx, field, '')
+  }
+
+  async function handleVariationImageUpload(varIdx: number, optIdx: number, file: File) {
+    if (!currentStoreId) {
+      alert('Erro: ID da loja não identificado. Tente recarregar a página.')
+      return
+    }
+
+    setUploadingOptionImg({ varIdx, optIdx })
+
+    try {
+      const url = await uploadProductImage(file, currentStoreId)
+      if (url) {
+        updateOptionField(varIdx, optIdx, 'image_url', url)
+      } else {
+        alert('Erro ao fazer upload da imagem.')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Erro ao fazer upload da imagem.')
+    } finally {
+      setUploadingOptionImg(null)
+    }
   }
 
   // Helper to manage multi-images
@@ -1445,7 +1485,7 @@ export default function ProductsPage() {
                                   <div className="flex flex-wrap gap-1 mt-1">
                                     {parsed.map((v: any, index: number) => (
                                       <span key={index} className="text-[9px] px-1.5 py-0.5 bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 rounded font-semibold border border-slate-200/20">
-                                        {v.name}: {v.options.join(', ')}
+                                        {v.name}: {v.options.map((o: any) => typeof o === 'string' ? o : (o?.value || '')).join(', ')}
                                       </span>
                                     ))}
                                   </div>
@@ -2216,27 +2256,109 @@ export default function ProductsPage() {
 
                   {/* List of active variations */}
                   {formVariations.length > 0 && (
-                    <div className="space-y-2">
+                    <div className="space-y-4">
                       {formVariations.map((v, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/30">
-                          <div>
-                            <span className="text-xs font-bold text-slate-700 dark:text-zinc-200">{v.name}:</span>
-                            <div className="flex flex-wrap gap-1.5 mt-1">
-                              {v.options.map((opt, optIdx) => (
-                                <span key={optIdx} className="text-[10px] bg-rose-50 dark:bg-rose-955/20 text-rose-650 dark:text-rose-400 px-2 py-0.5 rounded-full font-bold border border-rose-100/30 dark:border-rose-900/10">
-                                  {opt}
-                                </span>
-                              ))}
-                            </div>
+                        <div key={idx} className="p-3.5 rounded-xl border border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/30 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-700 dark:text-zinc-200 uppercase tracking-wider">{v.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeVariation(idx)}
+                              className="p-1 rounded-lg text-slate-400 hover:text-rose-650 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all"
+                              title="Remover variação"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => removeVariation(idx)}
-                            className="p-1 rounded-lg text-slate-400 hover:text-rose-650 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all"
-                            title="Remover variação"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          
+                          {/* Options grid */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            {v.options.map((opt, optIdx) => {
+                              const optData = typeof opt === 'string' ? { value: opt, color: '', image_url: '' } : opt;
+                              const optVal = optData.value || '';
+                              const optColor = optData.color || '';
+                              const optImage = optData.image_url || '';
+                              const isUploading = uploadingOptionImg?.varIdx === idx && uploadingOptionImg?.optIdx === optIdx;
+
+                              return (
+                                <div key={optIdx} className="flex items-center justify-between gap-3 p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200/60 dark:border-zinc-800 text-xs">
+                                  {/* Option Name */}
+                                  <span className="font-bold text-slate-700 dark:text-zinc-355 select-none truncate max-w-[80px]" title={optVal}>
+                                    {optVal}
+                                  </span>
+
+                                  <div className="flex items-center gap-2">
+                                    {/* Color Swatch & Picker */}
+                                    <div className="flex items-center gap-1 bg-slate-50 dark:bg-zinc-950 px-1.5 py-0.5 rounded border border-slate-200 dark:border-zinc-850 shrink-0">
+                                      <label 
+                                        className="relative w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-zinc-700 cursor-pointer shadow-sm shrink-0 block" 
+                                        style={{ backgroundColor: optColor || '#ffffff' }}
+                                        title="Escolher cor"
+                                      >
+                                        <input 
+                                          type="color" 
+                                          value={optColor || '#ffffff'} 
+                                          onChange={(e) => updateOptionField(idx, optIdx, 'color', e.target.value)}
+                                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" 
+                                        />
+                                      </label>
+                                      <input 
+                                        type="text" 
+                                        placeholder="#HEX"
+                                        value={optColor}
+                                        onChange={(e) => updateOptionField(idx, optIdx, 'color', e.target.value)}
+                                        className="w-12 bg-transparent text-[9px] font-mono border-none focus:outline-none focus:ring-0 text-slate-650 dark:text-zinc-400 p-0"
+                                      />
+                                      {optColor && (
+                                        <button 
+                                          type="button" 
+                                          onClick={() => removeOptionField(idx, optIdx, 'color')}
+                                          className="text-slate-400 hover:text-rose-650 transition-colors"
+                                          title="Limpar cor"
+                                        >
+                                          <X className="w-2.5 h-2.5" />
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    {/* Photo Upload & Preview */}
+                                    <div className="flex items-center gap-1 bg-slate-50 dark:bg-zinc-950 px-1.5 py-0.5 rounded border border-slate-200 dark:border-zinc-850 shrink-0">
+                                      {isUploading ? (
+                                        <Loader2 className="w-3.5 h-3.5 text-rose-500 animate-spin shrink-0" />
+                                      ) : optImage ? (
+                                        <div className="relative group/thumb w-5 h-5 rounded border border-slate-200 dark:border-zinc-850 overflow-hidden shrink-0">
+                                          <img src={optImage} alt="Variação" className="w-full h-full object-cover" />
+                                          <button 
+                                            type="button" 
+                                            onClick={() => removeOptionField(idx, optIdx, 'image_url')}
+                                            className="absolute inset-0 bg-black/60 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center text-white"
+                                            title="Remover foto"
+                                          >
+                                            <X className="w-2.5 h-2.5" />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <label className="cursor-pointer text-[9px] text-slate-500 dark:text-zinc-400 hover:text-rose-650 flex items-center gap-0.5 shrink-0 font-bold">
+                                          <Upload className="w-3 h-3" />
+                                          <span>Foto</span>
+                                          <input 
+                                            type="file" 
+                                            accept="image/*"
+                                            onChange={(e) => {
+                                              if (e.target.files?.[0]) {
+                                                handleVariationImageUpload(idx, optIdx, e.target.files[0])
+                                              }
+                                            }}
+                                            className="hidden" 
+                                          />
+                                        </label>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       ))}
                     </div>

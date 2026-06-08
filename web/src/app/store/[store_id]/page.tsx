@@ -35,7 +35,7 @@ interface Product {
   promotional_price: number | null
   has_free_shipping: boolean
   images?: string[] | null
-  variations?: { name: string; options: string[] }[] | null
+  variations?: { name: string; options: any[] }[] | null
   visible_in_storefront?: boolean
   is_launch?: boolean
 }
@@ -80,6 +80,7 @@ export default function StorefrontPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [activeImageIndex, setActiveImageIndex] = useState(0)
+  const [variationImage, setVariationImage] = useState<string | null>(null)
   const [selectedOptions, setSelectedOptions] = useState<{ [key: string]: string }>({})
   
   // Cart State
@@ -367,6 +368,7 @@ export default function StorefrontPage() {
   function openProductDetails(prod: Product) {
     setSelectedProduct(prod)
     setActiveImageIndex(0)
+    setVariationImage(null)
     setSelectedOptions({})
     const url = new URL(window.location.href)
     url.searchParams.set('product', prod.id)
@@ -376,6 +378,7 @@ export default function StorefrontPage() {
   function closeProductDetails() {
     setSelectedProduct(null)
     setActiveImageIndex(0)
+    setVariationImage(null)
     setSelectedOptions({})
     const url = new URL(window.location.href)
     url.searchParams.delete('product')
@@ -1498,7 +1501,7 @@ export default function StorefrontPage() {
                   ? selectedProduct.images
                   : (selectedProduct.image_url ? [selectedProduct.image_url] : []);
                 
-                const activeImg = prodImages[activeImageIndex] || null;
+                const activeImg = variationImage || prodImages[activeImageIndex] || null;
 
                 return (
                   <div className="space-y-3">
@@ -1542,7 +1545,10 @@ export default function StorefrontPage() {
                         {prodImages.map((img, idx) => (
                           <button
                             key={idx}
-                            onClick={() => setActiveImageIndex(idx)}
+                            onClick={() => {
+                              setActiveImageIndex(idx);
+                              setVariationImage(null);
+                            }}
                             className={`aspect-square w-14 rounded-xl overflow-hidden border-2 flex-shrink-0 transition-all ${
                               activeImageIndex === idx 
                                 ? 'border-[var(--primary-color)] scale-95 shadow-md' 
@@ -1611,23 +1617,46 @@ export default function StorefrontPage() {
                           Selecione o(a) {v.name} *
                         </label>
                         <div className="flex flex-wrap gap-2">
-                          {v.options.map((opt: string, optIdx: number) => {
-                            const isSelected = selectedOptions[v.name] === opt;
+                          {v.options.map((opt: any, optIdx: number) => {
+                            const optData = typeof opt === 'string' ? { value: opt } : opt;
+                            const optVal = optData?.value || '';
+                            const optColor = optData?.color || '';
+                            const optImage = optData?.image_url || '';
+                            const isSelected = selectedOptions[v.name] === optVal;
+                            
                             return (
                               <button
                                 key={optIdx}
                                 type="button"
-                                onClick={() => setSelectedOptions({
-                                  ...selectedOptions,
-                                  [v.name]: opt
-                                })}
-                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                                onClick={() => {
+                                  setSelectedOptions({
+                                    ...selectedOptions,
+                                    [v.name]: optVal
+                                  });
+                                  if (optImage) {
+                                    setVariationImage(optImage);
+                                  }
+                                }}
+                                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
                                   isSelected
                                     ? 'bg-[var(--primary-color)] border-[var(--primary-color)] text-white shadow-md'
                                     : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-650 dark:text-zinc-350 hover:bg-slate-50 dark:hover:bg-zinc-850'
                                 }`}
                               >
-                                {opt}
+                                {optColor && (
+                                  <span 
+                                    className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/10 shrink-0 shadow-sm"
+                                    style={{ backgroundColor: optColor }}
+                                  />
+                                )}
+                                {optImage && (
+                                  <img 
+                                    src={optImage} 
+                                    alt={optVal} 
+                                    className="w-3.5 h-3.5 rounded object-cover shrink-0 border border-black/10 dark:border-white/10 shadow-sm"
+                                  />
+                                )}
+                                <span>{optVal}</span>
                               </button>
                             );
                           })}
