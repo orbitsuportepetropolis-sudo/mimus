@@ -1719,7 +1719,7 @@ export default function ProductsPage() {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Valor Pago Lote (R$) *</label>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Valor Unitário (R$) *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -1735,7 +1735,7 @@ export default function ProductsPage() {
                     type="button"
                     onClick={() => {
                       const qty = parseInt(selectedQty)
-                      const cost = parseFloat(selectedTotalCost)
+                      const unitCostInput = parseFloat(selectedTotalCost)
                       if (!selectedProductId) {
                         alert('Selecione um produto cadastrado.')
                         return
@@ -1744,8 +1744,8 @@ export default function ProductsPage() {
                         alert('A quantidade deve ser maior que 0.')
                         return
                       }
-                      if (isNaN(cost) || cost <= 0) {
-                        alert('O valor total pago deve ser maior que 0.')
+                      if (isNaN(unitCostInput) || unitCostInput <= 0) {
+                        alert('O valor unitário deve ser maior que 0.')
                         return
                       }
 
@@ -1762,7 +1762,7 @@ export default function ProductsPage() {
                             productId: selectedProductId,
                             productName: prod.name,
                             quantity: qty,
-                            totalCost: cost
+                            totalCost: unitCostInput * qty
                           }
                         ])
                         setSelectedProductId('')
@@ -1794,8 +1794,8 @@ export default function ProductsPage() {
                       <tr className="border-b border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/30 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
                         <th className="px-4 py-3">Produto</th>
                         <th className="px-4 py-3">Quantidade</th>
-                        <th className="px-4 py-3">Valor do Lote</th>
                         <th className="px-4 py-3">Custo Unitário</th>
+                        <th className="px-4 py-3">Total do Lote</th>
                         <th className="px-4 py-3 text-right">Ação</th>
                       </tr>
                     </thead>
@@ -1806,8 +1806,8 @@ export default function ProductsPage() {
                           <tr key={idx} className="hover:bg-slate-50/40 dark:hover:bg-zinc-950/10">
                             <td className="px-4 py-3 font-semibold text-slate-800 dark:text-zinc-200">{item.productName}</td>
                             <td className="px-4 py-3 font-mono">{item.quantity} un.</td>
-                            <td className="px-4 py-3 font-bold text-slate-850 dark:text-zinc-200">R$ {item.totalCost.toFixed(2)}</td>
                             <td className="px-4 py-3 font-mono text-emerald-600 dark:text-emerald-400">R$ {unitCost.toFixed(2)}</td>
+                            <td className="px-4 py-3 font-bold text-slate-850 dark:text-zinc-200">R$ {item.totalCost.toFixed(2)}</td>
                             <td className="px-4 py-3 text-right">
                               <button
                                 type="button"
