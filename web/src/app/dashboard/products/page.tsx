@@ -89,6 +89,7 @@ export default function ProductsPage() {
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0])
   const [entrySupplier, setEntrySupplier] = useState('')
   const [entryObservations, setEntryObservations] = useState('')
+  const [entryFreight, setEntryFreight] = useState('0.00')
   const [entryStatus, setEntryStatus] = useState<'created' | 'awaiting' | 'delivered'>('created')
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
   
@@ -672,7 +673,9 @@ export default function ProductsPage() {
       if (!profile) throw new Error('Loja não encontrada')
       const storeId = profile.store_id
 
-      const totalValue = localEntryItems.reduce((sum, item) => sum + item.totalCost, 0)
+      const itemsTotal = localEntryItems.reduce((sum, item) => sum + item.totalCost, 0)
+      const freightValue = parseFloat(entryFreight) || 0
+      const totalValue = itemsTotal + freightValue
       const totalItems = localEntryItems.reduce((sum, item) => sum + item.quantity, 0)
 
       // 1. Insert header
@@ -753,7 +756,7 @@ export default function ProductsPage() {
           .insert([{
             store_id: storeId,
             type: 'expense',
-            value: totalValue,
+            value: itemsTotal,
             category: 'supplier',
             description: `Compra de Mercadorias${supplierLabel}`,
             date: entryDate
@@ -762,12 +765,31 @@ export default function ProductsPage() {
         if (financeErr) {
           console.error('Erro ao integrar com financeiro:', financeErr)
         }
+
+        // Insert freight as separate financial transaction if applicable
+        if (freightValue > 0) {
+          const { error: freightFinanceErr } = await supabase
+            .from('financial_transactions')
+            .insert([{
+              store_id: storeId,
+              type: 'expense',
+              value: freightValue,
+              category: 'supplier',
+              description: `Frete de Compra de Mercadorias${supplierLabel}`,
+              date: entryDate
+            }])
+
+          if (freightFinanceErr) {
+            console.error('Erro ao integrar frete com financeiro:', freightFinanceErr)
+          }
+        }
       }
 
       // Reset form
       setLocalEntryItems([])
       setEntrySupplier('')
       setEntryObservations('')
+      setEntryFreight('0.00')
       setEntryDate(new Date().toISOString().split('T')[0])
       setEntryStatus('created')
       setExpectedDeliveryDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
@@ -1644,6 +1666,20 @@ export default function ProductsPage() {
                   />
                 </div>
               )}
+
+              {/* Freight field - always visible */}
+              <div className="md:col-span-3">
+                <label className="block text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">Frete (R$)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={entryFreight}
+                  onChange={(e) => setEntryFreight(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs"
+                />
+              </div>
             </div>
 
             <div className="border-t border-slate-100 dark:border-zinc-800/80 pt-6">
@@ -1838,11 +1874,40 @@ export default function ProductsPage() {
                 </div>
                 <div className="w-px bg-slate-200 dark:bg-zinc-800" />
                 <div>
-                  <span className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase tracking-wider font-semibold">Valor Total Pago</span>
-                  <p className="text-base font-extrabold text-rose-650 dark:text-rose-450 mt-0.5 font-mono">
+                  <span className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase tracking-wider font-semibold">Subtotal Produtos</span>
+                  <p className="text-sm font-bold text-slate-700 dark:text-zinc-300 mt-0.5 font-mono">
                     R$ {localEntryItems.reduce((sum, item) => sum + item.totalCost, 0).toFixed(2)}
                   </p>
                 </div>
+                {(parseFloat(entryFreight) || 0) > 0 && (
+                  <>
+                    <div className="w-px bg-slate-200 dark:bg-zinc-800" />
+                    <div>
+                      <span className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase tracking-wider font-semibold">Frete</span>
+                      <p className="text-sm font-bold text-amber-600 dark:text-amber-400 mt-0.5 font-mono">
+                        + R$ {(parseFloat(entryFreight) || 0).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="w-px bg-slate-200 dark:bg-zinc-800" />
+                    <div>
+                      <span className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase tracking-wider font-semibold">Total Geral</span>
+                      <p className="text-base font-extrabold text-rose-600 dark:text-rose-400 mt-0.5 font-mono">
+                        R$ {(localEntryItems.reduce((sum, item) => sum + item.totalCost, 0) + (parseFloat(entryFreight) || 0)).toFixed(2)}
+                      </p>
+                    </div>
+                  </>
+                )}
+                {!(parseFloat(entryFreight) > 0) && (
+                  <>
+                    <div className="w-px bg-slate-200 dark:bg-zinc-800" />
+                    <div>
+                      <span className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase tracking-wider font-semibold">Total Pago</span>
+                      <p className="text-base font-extrabold text-rose-600 dark:text-rose-400 mt-0.5 font-mono">
+                        R$ {localEntryItems.reduce((sum, item) => sum + item.totalCost, 0).toFixed(2)}
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="flex gap-2 w-full sm:w-auto justify-end">
