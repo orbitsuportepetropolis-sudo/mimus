@@ -37,12 +37,13 @@ interface DashboardShellProps {
     trial_ends_at?: string | null 
   } | null
   lowStockCount: number
+  isImpersonating?: boolean
 }
 
 const normalize = (str: string) => 
   str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : ""
 
-export default function DashboardShell({ children, profile, store, lowStockCount }: DashboardShellProps) {
+export default function DashboardShell({ children, profile, store, lowStockCount, isImpersonating = false }: DashboardShellProps) {
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -451,6 +452,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
 
   const menuItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    ...(profile?.role === 'super_admin' ? [{ name: 'Super Admin 👑', href: '/super-admin', icon: Sparkles }] : []),
     { name: 'PDV / Vendas', href: '/dashboard/sales', icon: ShoppingBag },
     { name: 'Produtos', href: '/dashboard/products', icon: Package },
     { name: 'Estoque', href: '/dashboard/stock', icon: ArrowLeftRight },
@@ -646,6 +648,20 @@ export default function DashboardShell({ children, profile, store, lowStockCount
 
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        {isImpersonating && (
+          <div className="bg-amber-500 text-amber-950 px-6 py-2.5 text-xs font-semibold flex items-center justify-between shadow-sm z-50 animate-in fade-in duration-200">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-900 animate-pulse" />
+              <span>Modo Personificação: Acessando como o usuário <strong>{profile?.name}</strong> ({profile?.role === 'admin' ? 'Administrador' : 'Operador'}) na loja <strong>{store?.name}</strong>.</span>
+            </div>
+            <a 
+              href="/api/super-admin/impersonate/stop" 
+              className="bg-amber-950 text-white px-3 py-1 rounded-lg hover:bg-amber-900 transition-colors font-bold shadow-sm"
+            >
+              Sair da Personificação
+            </a>
+          </div>
+        )}
         {/* Top Header Bar for Desktop */}
         <header className="hidden md:flex items-center justify-between px-8 py-4 bg-white dark:bg-zinc-900 border-b border-slate-100 dark:border-zinc-800">
           <div className="flex items-center gap-2">
