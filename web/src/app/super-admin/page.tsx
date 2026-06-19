@@ -407,6 +407,24 @@ export default function SuperAdminPage() {
     }
   }
 
+  const handleDeleteStore = async (storeId: string) => {
+    if (!confirm('ATENÇÃO: Excluir esta loja apagará permanentemente todos os produtos, vendas, clientes e configurações associadas! Confirmar exclusão?')) return
+
+    try {
+      const { error } = await supabase
+        .from('stores')
+        .delete()
+        .eq('id', storeId)
+
+      if (error) throw error
+
+      alert('Loja excluída com sucesso!')
+      loadData()
+    } catch (err: any) {
+      alert('Erro ao excluir loja: ' + err.message)
+    }
+  }
+
   // Filter actions
   const filteredUsers = users.filter(u => 
     u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -742,12 +760,19 @@ export default function SuperAdminPage() {
                       <td className="px-5 py-4 text-slate-400">
                         {store.plan_status === 'trial_custom' ? 'Sem expiração' : (store.trial_ends_at ? new Date(store.trial_ends_at).toLocaleDateString('pt-BR') : 'N/A')}
                       </td>
-                      <td className="px-5 py-4 text-right">
+                      <td className="px-5 py-4 text-right flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleOpenStoreModal(store)}
                           className="px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-850 text-slate-300 text-[10px] font-semibold flex items-center gap-1.5 inline-flex"
                         >
                           <Edit3 className="w-3.5 h-3.5" /> Editar Plano
+                        </button>
+                        <button
+                          onClick={() => handleDeleteStore(store.id)}
+                          className="px-2.5 py-1.5 rounded-lg border border-red-950/40 bg-red-950/20 hover:bg-red-900/30 text-red-400 hover:text-red-300 text-[10px] font-semibold flex items-center gap-1.5 inline-flex transition-all duration-200"
+                          title="Excluir Loja"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Excluir Loja
                         </button>
                       </td>
                     </tr>

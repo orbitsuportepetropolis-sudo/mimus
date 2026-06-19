@@ -120,10 +120,29 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'userId é obrigatório' }, { status: 400 })
       }
 
+      // Get the user's profile to retrieve their store_id before deleting
+      const { data: profile } = await adminClient
+        .from('profiles')
+        .select('store_id, role')
+        .eq('id', userId)
+        .single()
+
       // Delete auth user (cascades to profile)
       const { error: deleteErr } = await adminClient.auth.admin.deleteUser(userId)
 
       if (deleteErr) throw deleteErr
+
+      // If user was store owner (admin), delete their associated store too
+      if (profile && profile.store_id && profile.role === 'admin') {
+        const { error: storeErr } = await adminClient
+          .from('stores')
+          .delete()
+          .eq('id', profile.store_id)
+        
+        if (storeErr) {
+          console.error('Error deleting associated store:', storeErr)
+        }
+      }
 
       // Log deletion
       await logSecurityAction({
