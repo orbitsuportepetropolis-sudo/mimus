@@ -1,795 +1,571 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { 
-  Sparkles, 
-  ShoppingBag, 
-  Package, 
-  TrendingUp, 
-  Check, 
-  ArrowRight, 
-  Loader2, 
-  BookOpen, 
-  FileSpreadsheet, 
-  Monitor, 
-  AlertCircle,
-  PiggyBank,
+import {
+  Sparkles,
+  Package,
+  Globe,
+  Share2,
+  ArrowRight,
+  Loader2,
+  Check,
+  Plus,
+  ChevronRight,
+  ExternalLink,
+  MessageCircle,
+  Copy,
   CheckCircle2,
-  DollarSign
+  X,
 } from 'lucide-react'
 
 export default function OnboardingPage() {
   const router = useRouter()
   const supabase = createClient()
-  
-  const [step, setStep] = useState(1)
-  const [loading, setLoading] = useState(false)
-  const [storeId, setStoreId] = useState<string | null>(null)
-  const [userId, setUserId] = useState<string | null>(null)
-  
-  // Form values
-  const [storeName, setStoreName] = useState('')
-  const [segment, setSegment] = useState('Loja de maquiagem')
-  const [controlType, setControlType] = useState('')
-  const [mainGoal, setMainGoal] = useState('')
-  
-  // Product Form values
-  const [prodName, setProdName] = useState('')
-  const [prodQty, setProdQty] = useState(10)
-  const [prodPrice, setProdPrice] = useState(49.90)
-  const [createdProduct, setCreatedProduct] = useState<any>(null)
-  
-  // Sale Form values
-  const [saleQty, setSaleQty] = useState(1)
-  const [createdSale, setCreatedSale] = useState<any>(null)
 
-  // Load profile and store details on mount
+  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [loading, setLoading] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
+
+  // Store data
+  const [storeId, setStoreId] = useState<string | null>(null)
+  const [storeName, setStoreName] = useState('')
+  const [storeSlug, setStoreSlug] = useState<string | null>(null)
+
+  // Mission 1: Products
+  const [productCount, setProductCount] = useState(0)
+  const PRODUCTS_GOAL = 5
+  const mission1Done = productCount >= PRODUCTS_GOAL
+
+  // Product quick-add form
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [prodName, setProdName] = useState('')
+  const [prodPrice, setProdPrice] = useState('')
+  const [prodQty, setProdQty] = useState('10')
+  const [addingProduct, setAddingProduct] = useState(false)
+  const prodNameRef = useRef<HTMLInputElement>(null)
+
+  // Mission 2: Vitrine published
+  const [vitrineOpened, setVitrineOpened] = useState(false)
+  const mission2Done = vitrineOpened
+
+  // Mission 3: Shared
+  const [shared, setShared] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const mission3Done = shared
+
+  const allDone = mission1Done && mission2Done && mission3Done
+
+  // Load store on mount
   useEffect(() => {
     async function loadStore() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      setUserId(user.id)
-      
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('store_id')
-        .eq('id', user.id)
-        .single()
-        
-      if (profile?.store_id) {
+      setInitialLoading(true)
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { router.push('/login'); return }
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('store_id')
+          .eq('id', user.id)
+          .single()
+
+        if (!profile?.store_id) return
+
         setStoreId(profile.store_id)
-        
+
         const { data: store } = await supabase
           .from('stores')
-          .select('name')
+          .select('name, custom_domain')
           .eq('id', profile.store_id)
           .single()
-          
-        if (store?.name) {
-          setStoreName(store.name)
+
+        if (store?.name) setStoreName(store.name)
+        if (store?.custom_domain) setStoreSlug(store.custom_domain)
+
+        // Count existing products
+        const { count } = await supabase
+          .from('products')
+          .select('id', { count: 'exact', head: true })
+          .eq('store_id', profile.store_id)
+
+        setProductCount(count || 0)
+
+        // Restore mission progress from localStorage
+        const ls = localStorage.getItem(`mimus_onboarding_missions_${profile.store_id}`)
+        if (ls) {
+          const saved = JSON.parse(ls)
+          if (saved.vitrineOpened) setVitrineOpened(true)
+          if (saved.shared) setShared(true)
+          if (saved.step) setStep(saved.step)
         }
+      } finally {
+        setInitialLoading(false)
       }
     }
     loadStore()
   }, [supabase, router])
 
-  // Step 2 Action: Update store name
-  async function handleStoreUpdate() {
-    if (!storeName.trim() || !storeId) return
-    setLoading(true)
-    try {
-      const { error } = await supabase
-        .from('stores')
-        .update({ name: storeName })
-        .eq('id', storeId)
-      if (error) throw error
-      setStep(3)
-    } catch (err) {
-      alert('Erro ao atualizar nome da loja. Tente novamente.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Persist mission state
+  useEffect(() => {
+    if (!storeId) return
+    localStorage.setItem(`mimus_onboarding_missions_${storeId}`, JSON.stringify({
+      vitrineOpened,
+      shared,
+      step,
+    }))
+  }, [storeId, vitrineOpened, shared, step])
 
-  // Step 6 Action: Create product
-  async function handleCreateProduct() {
+  // Quick-add product handler
+  async function handleAddProduct() {
     if (!prodName.trim() || !storeId) return
-    setLoading(true)
+    setAddingProduct(true)
     try {
-      const { data, error } = await supabase
+      const price = parseFloat(prodPrice) || 0
+      const qty = parseInt(prodQty) || 10
+
+      const { error } = await supabase
         .from('products')
         .insert([{
           store_id: storeId,
-          name: prodName,
-          quantity_in_stock: prodQty,
-          sale_price: prodPrice,
-          brand: 'Mimus',
-          cost_price: Math.round(prodPrice * 0.5 * 100) / 100 // Estimate 50% cost for simulation
+          name: prodName.trim(),
+          sale_price: price,
+          cost_price: price > 0 ? Math.round(price * 0.5 * 100) / 100 : 0,
+          quantity_in_stock: qty,
+          brand: '',
         }])
-        .select()
-        .single()
-        
+
       if (error) throw error
-      setCreatedProduct(data)
-      setStep(5) // Return to checklist with 33% progress
-    } catch (err) {
+
+      setProductCount(c => c + 1)
+      setProdName('')
+      setProdPrice('')
+      setProdQty('10')
+      prodNameRef.current?.focus()
+    } catch {
       alert('Erro ao cadastrar produto. Tente novamente.')
     } finally {
-      setLoading(false)
+      setAddingProduct(false)
     }
   }
 
-  // Step 7 Action: Register sale
-  async function handleRegisterSale() {
-    if (!createdProduct || !storeId) return
-    setLoading(true)
-    try {
-      const totalValue = Math.round(createdProduct.sale_price * saleQty * 100) / 100
-      
-      // 1. Insert sale
-      const { data: saleData, error: saleError } = await supabase
-        .from('sales')
-        .insert([{
-          store_id: storeId,
-          customer_id: null,
-          total_value: totalValue,
-          discount: 0,
-          payment_method: 'pix'
-        }])
-        .select()
-        .single()
-        
-      if (saleError) throw saleError
-      
-      // 2. Insert sale item
-      const { error: itemError } = await supabase
-        .from('sale_items')
-        .insert([{
-          sale_id: saleData.id,
-          product_id: createdProduct.id,
-          quantity: saleQty,
-          unit_price: createdProduct.sale_price
-        }])
-        
-      if (itemError) throw itemError
-      
-      setCreatedSale(saleData)
-      setStep(5) // Return to checklist with 66% progress
-    } catch (err) {
-      alert('Erro ao registrar venda. Tente novamente.')
-    } finally {
-      setLoading(false)
-    }
+  // Vitrine URL
+  const vitrineUrl = storeId
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/store/${storeId}`
+    : ''
+
+  function handleOpenVitrine() {
+    if (!vitrineUrl) return
+    window.open(vitrineUrl, '_blank')
+    setVitrineOpened(true)
   }
 
-  // Final Action: Complete onboarding
+  async function handleCopyLink() {
+    await navigator.clipboard.writeText(vitrineUrl)
+    setCopied(true)
+    setShared(true)
+    setTimeout(() => setCopied(false), 2500)
+  }
+
+  function handleWhatsappShare() {
+    const text = encodeURIComponent(
+      `Olá! Confira minha vitrine online: ${vitrineUrl}`
+    )
+    window.open(`https://wa.me/?text=${text}`, '_blank')
+    setShared(true)
+  }
+
   function handleCompleteOnboarding() {
-    if (storeId && userId) {
+    if (storeId) {
       localStorage.setItem(`mimus_onboarding_completed_${storeId}`, 'true')
     }
     router.push('/dashboard')
   }
 
-  // Load full demo data (Aura Glow Cosméticos)
-  async function handleLoadDemoData() {
-    if (!storeId) return
-    setLoading(true)
-    try {
-      // 1. Update store details
-      await supabase
-        .from('stores')
-        .update({ 
-          name: 'Aura Glow Cosméticos', 
-          plan: 'pro', 
-          plan_status: 'active',
-          primary_color: '#ec4899',
-          accent_color: '#14b8a6',
-          campaign_title: 'Coleção Pele Perfeita Glow ✨',
-          campaign_subtitle: 'Ganhe um pincel exclusivo nas compras acima de R$ 150',
-          campaign_cta: 'Ver produtos',
-          campaign_tag: 'Promoção de Outono'
-        })
-        .eq('id', storeId)
-
-      // 2. Insert Customers
-      const customersToInsert = [
-        { store_id: storeId, name: 'Beatriz Silva', phone: '(11) 98765-4321', instagram: 'beatriz.makeup', birthday: '1995-04-12' },
-        { store_id: storeId, name: 'Mariana Santos', phone: '(11) 99888-7766', instagram: 'mari.santos', birthday: '1998-09-22' },
-        { store_id: storeId, name: 'Gabriela Costa', phone: '(11) 97766-5544', instagram: 'gabi_costaa', birthday: '1990-12-05' },
-        { store_id: storeId, name: 'Amanda Ferreira', phone: '(11) 96655-4433', instagram: 'amanda.fer', birthday: '2001-07-18' },
-        { store_id: storeId, name: 'Carla Oliveira', phone: '(11) 95544-3322', instagram: 'carla.olive', birthday: '1988-02-28' }
-      ]
-      
-      const { data: insertedCustomers, error: custError } = await supabase
-        .from('customers')
-        .insert(customersToInsert)
-        .select()
-        
-      if (custError) throw custError
-
-      // 3. Insert Products
-      const productsToInsert = [
-        { store_id: storeId, name: 'Batom Velvet Matte Rose', brand: 'Bruna Tavares', category: 'Maquiagem', sku: 'BT-BVM-01', barcode: '7891011121314', cost_price: 24.90, sale_price: 49.90, quantity_in_stock: 15, min_stock_alert: 3, description: 'Batom líquido de alta pigmentação com efeito matte e textura aveludada.' },
-        { store_id: storeId, name: 'Corretivo Hyaluronic Peach', brand: 'Mimus Beauty', category: 'Maquiagem', sku: 'MM-CHP-02', barcode: '7891011121321', cost_price: 34.90, sale_price: 69.90, quantity_in_stock: 8, min_stock_alert: 3, description: 'Corretivo hidratante com ácido hialurônico de alta cobertura.' },
-        { store_id: storeId, name: 'Base Fluida Satin 03', brand: 'Macauba', category: 'Maquiagem', sku: 'MC-BFS-03', barcode: '7891011121338', cost_price: 45.00, sale_price: 89.90, quantity_in_stock: 12, min_stock_alert: 4, description: 'Base de acabamento acetinado com cobertura média construível.' },
-        { store_id: storeId, name: 'Rimel Extra Volume Black', brand: 'Maybelline', category: 'Olhos', sku: 'MB-REV-04', barcode: '7891011121345', cost_price: 29.90, sale_price: 59.90, quantity_in_stock: 20, min_stock_alert: 5, description: 'Máscara para cílios para volume extremo e definição perfeita.' },
-        { store_id: storeId, name: 'Blush Rosé Líquido', brand: 'Mari Maria', category: 'Maquiagem', sku: 'MM-BRL-07', barcode: '7891011121376', cost_price: 22.00, sale_price: 44.90, quantity_in_stock: 10, min_stock_alert: 3, description: 'Blush líquido cremoso de longa duração e acabamento natural.' },
-        { store_id: storeId, name: 'Delineador Holográfico Glow', brand: 'Aura Glow', category: 'Olhos', sku: 'AG-DHG-05', barcode: '7891011121352', cost_price: 19.90, sale_price: 39.90, quantity_in_stock: 0, min_stock_alert: 3, description: 'Delineador líquido holográfico com brilho intenso de secagem rápida.' },
-        { store_id: storeId, name: 'Sérum Renovador Vitamina C', brand: 'Simple Organic', category: 'Skincare', sku: 'SO-SRV-06', barcode: '7891011121369', cost_price: 59.90, sale_price: 119.90, quantity_in_stock: 5, min_stock_alert: 2, description: 'Sérum facial antioxidante de vitamina C 10% pura.' },
-        { store_id: storeId, name: 'Iluminador Pó Compacto Gold', brand: 'Bruna Tavares', category: 'Maquiagem', sku: 'BT-IPG-09', barcode: '7891011121390', cost_price: 29.90, sale_price: 59.90, quantity_in_stock: 4, min_stock_alert: 3, description: 'Iluminador facial compacto com partículas ultrafinas de brilho dourado.' }
-      ]
-
-      const { data: insertedProducts, error: prodError } = await supabase
-        .from('products')
-        .insert(productsToInsert)
-        .select()
-
-      if (prodError) throw prodError
-
-      // Get some IDs for sales references
-      const cust1 = insertedCustomers?.find(c => c.name === 'Beatriz Silva')?.id || null
-      const cust2 = insertedCustomers?.find(c => c.name === 'Mariana Santos')?.id || null
-      const cust3 = insertedCustomers?.find(c => c.name === 'Gabriela Costa')?.id || null
-
-      const prod1 = insertedProducts?.find(p => p.sku === 'BT-BVM-01')
-      const prod2 = insertedProducts?.find(p => p.sku === 'MM-CHP-02')
-      const prod3 = insertedProducts?.find(p => p.sku === 'MC-BFS-03')
-      const prod4 = insertedProducts?.find(p => p.sku === 'MB-REV-04')
-      const prod7 = insertedProducts?.find(p => p.sku === 'MM-BRL-07')
-
-      // 4. Insert Sales
-      // Sale 1
-      if (prod1 && prod2) {
-        const { data: sale1, error: sale1Err } = await supabase
-          .from('sales')
-          .insert({ store_id: storeId, customer_id: cust1, total_value: 119.80, discount: 0, payment_method: 'pix', created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() })
-          .select().single()
-        
-        if (!sale1Err && sale1) {
-          await supabase.from('sale_items').insert([
-            { sale_id: sale1.id, product_id: prod1.id, quantity: 1, unit_price: 49.90 },
-            { sale_id: sale1.id, product_id: prod2.id, quantity: 1, unit_price: 69.90 }
-          ])
-        }
-      }
-
-      // Sale 2
-      if (prod3 && prod4) {
-        const { data: sale2, error: sale2Err } = await supabase
-          .from('sales')
-          .insert({ store_id: storeId, customer_id: cust2, total_value: 149.80, discount: 0, payment_method: 'credit_card', created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() })
-          .select().single()
-
-        if (!sale2Err && sale2) {
-          await supabase.from('sale_items').insert([
-            { sale_id: sale2.id, product_id: prod3.id, quantity: 1, unit_price: 89.90 },
-            { sale_id: sale2.id, product_id: prod4.id, quantity: 1, unit_price: 59.90 }
-          ])
-        }
-      }
-
-      // Sale 3
-      if (prod7) {
-        const { data: sale3, error: sale3Err } = await supabase
-          .from('sales')
-          .insert({ store_id: storeId, customer_id: cust3, total_value: 89.80, discount: 0, payment_method: 'money', created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() })
-          .select().single()
-
-        if (!sale3Err && sale3) {
-          await supabase.from('sale_items').insert([
-            { sale_id: sale3.id, product_id: prod7.id, quantity: 2, unit_price: 44.90 }
-          ])
-        }
-      }
-
-      // 5. Insert Expenses
-      await supabase.from('financial_transactions').insert([
-        { store_id: storeId, type: 'expense', value: 150.00, category: 'supplier', description: 'Compra de embalagens personalizadas', date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
-        { store_id: storeId, type: 'expense', value: 49.00, category: 'other', description: 'Assinatura Mimus Software Pro', date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }
-      ])
-
-      // Complete onboarding
-      localStorage.setItem(`mimus_onboarding_completed_${storeId}`, 'true')
-      router.push('/dashboard')
-    } catch (err) {
-      alert('Erro ao carregar dados de teste. Tente novamente.')
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-950">
+        <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
+      </div>
+    )
   }
 
-  // Progress calculations
-  const isProductCreated = !!createdProduct
-  const isSaleCreated = !!createdSale
-  const progressPercent = isSaleCreated ? 66 : isProductCreated ? 33 : 0
-
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-pink-50 via-slate-50 to-rose-50 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 overflow-hidden font-sans">
-      {/* Background decorations */}
-      <div className="absolute top-1/4 right-1/4 w-[35rem] h-[35rem] bg-rose-300/10 dark:bg-rose-950/15 rounded-full blur-[90px] pointer-events-none animate-pulse duration-[6000ms]" />
-      <div className="absolute bottom-1/4 left-1/4 w-[35rem] h-[35rem] bg-pink-300/15 dark:bg-pink-950/10 rounded-full blur-[100px] pointer-events-none" />
+    <div className="min-h-screen relative flex items-center justify-center p-4 bg-zinc-950 overflow-hidden font-sans">
+      {/* Background glows */}
+      <div className="absolute top-1/4 right-1/4 w-[30rem] h-[30rem] bg-rose-600/8 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-1/4 left-1/4 w-[30rem] h-[30rem] bg-pink-600/6 rounded-full blur-[120px] pointer-events-none" />
 
-      <div className="w-full max-w-lg relative z-10 transition-all duration-300">
-        {/* Logo and Progress bar at the top (only visible after step 1 and not on celebration steps) */}
-        {step > 1 && step < 8 && (
-          <div className="mb-6 flex flex-col items-center">
-            <span className="text-xl font-bold tracking-tight text-slate-800 dark:text-zinc-200">
-              Mimus<span className="text-rose-600">.</span>
-            </span>
-            <div className="w-48 h-1 bg-slate-200 dark:bg-zinc-800 rounded-full mt-2 overflow-hidden">
-              <div 
-                className="h-full bg-rose-600 transition-all duration-500 ease-out" 
-                style={{ width: `${(step / 7) * 100}%` }}
-              />
+      <div className="w-full max-w-md relative z-10">
+
+        {/* Header */}
+        <div className="text-center mb-8">
+          <span className="text-2xl font-black tracking-tight text-white">
+            Mimus<span className="text-rose-500">.</span>
+          </span>
+        </div>
+
+        {/* ── TELA 1: BOAS-VINDAS ── */}
+        {step === 1 && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl animate-in fade-in duration-300">
+            <div className="text-center space-y-6">
+              <div className="w-20 h-20 bg-rose-500/10 rounded-3xl flex items-center justify-center mx-auto border border-rose-500/20 shadow-lg shadow-rose-500/10">
+                <Sparkles className="w-10 h-10 text-rose-400" />
+              </div>
+
+              <div className="space-y-2">
+                <h1 className="text-2xl font-extrabold text-white">
+                  Bem-vinda ao Mimus
+                  {storeName ? `, ${storeName.split(' ')[0]}` : ''}!
+                </h1>
+                <p className="text-zinc-400 text-sm leading-relaxed">
+                  Em 3 passos simples, sua vitrine estará pronta para receber clientes.
+                </p>
+              </div>
+
+              {/* Mission preview pills */}
+              <div className="space-y-2.5 text-left">
+                {[
+                  { icon: Package,  label: 'Cadastre 5 produtos' },
+                  { icon: Globe,    label: 'Publique sua vitrine' },
+                  { icon: Share2,   label: 'Compartilhe com uma cliente' },
+                ].map(({ icon: Icon, label }, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-zinc-800/60 border border-zinc-700/50"
+                  >
+                    <div className="w-7 h-7 rounded-xl bg-rose-500/10 flex items-center justify-center shrink-0">
+                      <Icon className="w-3.5 h-3.5 text-rose-400" />
+                    </div>
+                    <span className="text-xs font-semibold text-zinc-300">
+                      <span className="text-rose-400 font-bold mr-1.5">{i + 1}.</span>
+                      {label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setStep(2)}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 transition-all shadow-xl shadow-rose-500/20 active:scale-[0.98]"
+              >
+                Começar <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}
 
-        {/* ONBOARDING WIZARD CARD */}
-        <div className="bg-white/70 dark:bg-zinc-900/80 backdrop-blur-lg rounded-3xl border border-slate-100 dark:border-zinc-800/60 p-8 md:p-10 shadow-2xl shadow-rose-900/5 transition-all">
-          
-          {/* TELA 1: BOAS-VINDAS */}
-          {step === 1 && (
-            <div className="text-center space-y-6 animate-in fade-in duration-300">
-              <div className="w-20 h-20 bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 rounded-3xl flex items-center justify-center mx-auto border border-rose-500/20 shadow-lg shadow-rose-500/5 animate-bounce">
-                <Sparkles className="w-10 h-10" />
-              </div>
-              <div className="space-y-2">
-                <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-                  Bem-vindo ao Mimus
-                </h1>
-                <p className="text-slate-500 dark:text-zinc-400 text-sm md:text-base max-w-md mx-auto leading-relaxed">
-                  Controle vendas, estoque e finanças da sua loja em poucos minutos.
-                </p>
-              </div>
-              <div className="space-y-3 pt-2">
-                <button
-                  onClick={() => setStep(2)}
-                  className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 transition-all duration-200 shadow-xl shadow-rose-500/20 active:scale-[0.99]"
-                >
-                  Começar configuração do zero <ArrowRight className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={handleLoadDemoData}
-                  disabled={loading || !storeId}
-                  className="w-full py-3.5 px-6 rounded-2xl border border-rose-500/35 hover:bg-rose-500/5 text-rose-650 dark:text-rose-400 font-extrabold text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-all"
-                >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Testar com dados fictícios prontos (Aura Glow)'}
-                </button>
-              </div>
-            </div>
-          )}
+        {/* ── TELA 2: MISSÕES ── */}
+        {step === 2 && (
+          <div className="space-y-4 animate-in fade-in duration-300">
 
-          {/* TELA 2: CONHECENDO SUA LOJA */}
-          {step === 2 && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              <div className="space-y-1">
-                <span className="text-[10px] font-extrabold text-rose-600 dark:text-rose-400 uppercase tracking-widest">Passo 1 de 3</span>
-                <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">Conhecendo sua loja</h2>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
-                    Qual o nome da sua loja?
-                  </label>
-                  <input
-                    type="text"
-                    value={storeName}
-                    onChange={(e) => setStoreName(e.target.value)}
-                    placeholder="Ex: Bella Makeup, Mimus Cosméticos"
-                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-sm transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
-                    Qual seu segmento?
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {[
-                      'Loja de maquiagem',
-                      'Loja de cosméticos',
-                      'Revendedora de beleza',
-                      'Outro nicho'
-                    ].map((opt) => (
-                      <button
-                        key={opt}
-                        type="button"
-                        onClick={() => setSegment(opt)}
-                        className={`p-3 border rounded-2xl text-left text-xs font-bold transition-all ${
-                          segment === opt
-                            ? 'border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                            : 'border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-950'
-                        }`}
-                      >
-                        {opt}
-                      </button>
-                    ))}
+            {/* Header */}
+            <div className="text-center space-y-1 mb-2">
+              <h2 className="text-xl font-extrabold text-white">Sua jornada de ativação</h2>
+              <p className="text-zinc-500 text-xs">Complete as 3 missões para ativar sua vitrine</p>
+            </div>
+
+            {/* Progress indicator */}
+            <div className="flex items-center justify-center gap-2 mb-4">
+              {[1, 2, 3].map(n => {
+                const done = n === 1 ? mission1Done : n === 2 ? mission2Done : mission3Done
+                return (
+                  <React.Fragment key={n}>
+                    <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-[10px] font-black transition-all duration-300 ${
+                      done
+                        ? 'border-emerald-500 bg-emerald-500 text-white'
+                        : 'border-zinc-700 text-zinc-500'
+                    }`}>
+                      {done ? <Check className="w-3.5 h-3.5" /> : n}
+                    </div>
+                    {n < 3 && (
+                      <div className={`h-0.5 w-8 rounded-full transition-all duration-500 ${
+                        (n === 1 && mission1Done) || (n === 2 && mission2Done)
+                          ? 'bg-emerald-500'
+                          : 'bg-zinc-800'
+                      }`} />
+                    )}
+                  </React.Fragment>
+                )
+              })}
+            </div>
+
+            {/* ─── Missão 1 ─── */}
+            <div className={`bg-zinc-900 border rounded-3xl p-6 transition-all duration-300 ${
+              mission1Done
+                ? 'border-emerald-500/30 bg-emerald-950/10'
+                : 'border-zinc-800'
+            }`}>
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-2xl flex items-center justify-center border transition-all ${
+                    mission1Done
+                      ? 'bg-emerald-500 border-emerald-400'
+                      : 'bg-rose-500/10 border-rose-500/30'
+                  }`}>
+                    {mission1Done
+                      ? <Check className="w-4 h-4 text-white" />
+                      : <Package className="w-4 h-4 text-rose-400" />
+                    }
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-extrabold text-rose-400 uppercase tracking-widest">Missão 1</span>
+                    <h3 className="text-sm font-extrabold text-white">Cadastre 5 produtos</h3>
                   </div>
                 </div>
-              </div>
-              <button
-                onClick={handleStoreUpdate}
-                disabled={loading || !storeName.trim()}
-                className="w-full py-3.5 px-6 rounded-2xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-extrabold text-xs tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg shadow-rose-500/15"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Continuar'}
-              </button>
-            </div>
-          )}
-
-          {/* TELA 3: COMO VOCÊ CONTROLA HOJE */}
-          {step === 3 && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              <div className="space-y-1">
-                <span className="text-[10px] font-extrabold text-rose-600 dark:text-rose-400 uppercase tracking-widest">Passo 2 de 3</span>
-                <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">Como você controla hoje?</h2>
-                <p className="text-xs text-slate-400 dark:text-zinc-500">Como você controla seu estoque e vendas atualmente?</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { label: 'Caderno', icon: BookOpen },
-                  { label: 'Excel', icon: FileSpreadsheet },
-                  { label: 'Outro sistema', icon: Monitor },
-                  { label: 'Não controlo', icon: AlertCircle }
-                ].map((item) => {
-                  const Icon = item.icon
-                  return (
-                    <button
-                      key={item.label}
-                      type="button"
-                      onClick={() => setControlType(item.label)}
-                      className={`p-5 border rounded-2xl flex flex-col items-center justify-center text-center gap-3 transition-all ${
-                        controlType === item.label
-                          ? 'border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400 ring-2 ring-rose-500/10'
-                          : 'border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/40 text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
-                      }`}
-                    >
-                      <Icon className="w-6 h-6 text-rose-500" />
-                      <span className="text-xs font-bold">{item.label}</span>
-                    </button>
-                  )
-                })}
-              </div>
-              <p className="text-center text-[10px] text-slate-400 dark:text-zinc-500 font-medium">
-                Essa informação é valiosa para marketing e produto.
-              </p>
-              <button
-                onClick={() => setStep(4)}
-                disabled={!controlType}
-                className="w-full py-3.5 px-6 rounded-2xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-extrabold text-xs tracking-wider uppercase flex items-center justify-center shadow-lg shadow-rose-500/15"
-              >
-                Continuar
-              </button>
-            </div>
-          )}
-
-          {/* TELA 4: DEFINE SUA META */}
-          {step === 4 && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              <div className="space-y-1">
-                <span className="text-[10px] font-extrabold text-rose-600 dark:text-rose-400 uppercase tracking-widest">Passo 3 de 3</span>
-                <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">Defina sua meta</h2>
-                <p className="text-xs text-slate-400 dark:text-zinc-500">Qual seu objetivo principal?</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { label: 'Controlar estoque', icon: Package },
-                  { label: 'Controlar vendas', icon: ShoppingBag },
-                  { label: 'Controlar finanças', icon: DollarSign },
-                  { label: 'Entender meu lucro', icon: PiggyBank }
-                ].map((item) => {
-                  const Icon = item.icon
-                  return (
-                    <button
-                      key={item.label}
-                      type="button"
-                      onClick={() => setMainGoal(item.label)}
-                      className={`p-5 border rounded-2xl flex flex-col items-center justify-center text-center gap-3 transition-all ${
-                        mainGoal === item.label
-                          ? 'border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400 ring-2 ring-rose-500/10'
-                          : 'border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/40 text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
-                      }`}
-                    >
-                      <Icon className="w-6 h-6 text-rose-500" />
-                      <span className="text-xs font-bold">{item.label}</span>
-                    </button>
-                  )
-                })}
-              </div>
-              <p className="text-center text-[10px] text-slate-400 dark:text-zinc-500 font-medium">
-                Isso personaliza a experiência.
-              </p>
-              <button
-                onClick={() => setStep(5)}
-                disabled={!mainGoal}
-                className="w-full py-3.5 px-6 rounded-2xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-extrabold text-xs tracking-wider uppercase flex items-center justify-center shadow-lg shadow-rose-500/15"
-              >
-                Continuar
-              </button>
-            </div>
-          )}
-
-          {/* TELA 5: CHECKLIST DE CONFIGURAÇÃO */}
-          {step === 5 && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              <div className="space-y-1">
-                <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">Configure sua loja</h2>
-                <p className="text-xs text-slate-400 dark:text-zinc-500">Conclua o checklist rápido para ativar o Mimus.</p>
+                <div className="text-right">
+                  <span className={`text-lg font-black ${
+                    mission1Done ? 'text-emerald-400' : 'text-white'
+                  }`}>
+                    {Math.min(productCount, PRODUCTS_GOAL)}
+                    <span className="text-zinc-600 font-bold text-sm">/{PRODUCTS_GOAL}</span>
+                  </span>
+                </div>
               </div>
 
               {/* Progress bar */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center text-xs font-bold text-slate-600 dark:text-zinc-300">
-                  <span>Progresso da configuração</span>
-                  <span>{progressPercent}%</span>
-                </div>
-                <div className="w-full h-2.5 bg-slate-100 dark:bg-zinc-800 rounded-full overflow-hidden border border-slate-200/40 dark:border-zinc-800/40">
-                  <div 
-                    className="h-full bg-gradient-to-r from-rose-500 to-pink-500 transition-all duration-700 ease-out" 
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
+              <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-4">
+                <div
+                  className="h-full bg-gradient-to-r from-rose-500 to-pink-500 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min((productCount / PRODUCTS_GOAL) * 100, 100)}%` }}
+                />
               </div>
 
-              {/* Checklist items */}
-              <div className="space-y-3.5">
-                {/* Item 1 */}
-                <div className={`p-4 rounded-2xl border flex items-center gap-4 transition-all ${
-                  isProductCreated 
-                    ? 'border-emerald-100 dark:border-emerald-950/20 bg-emerald-500/5 text-slate-700 dark:text-zinc-300' 
-                    : 'border-slate-100 dark:border-zinc-800/80 bg-slate-50/50 dark:bg-zinc-950/20 text-slate-500'
-                }`}>
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${
-                    isProductCreated 
-                      ? 'border-emerald-500 bg-emerald-500 text-white' 
-                      : 'border-slate-300 dark:border-zinc-700'
-                  }`}>
-                    {isProductCreated && <Check className="w-3.5 h-3.5" />}
-                  </div>
-                  <span className={`text-xs font-bold ${isProductCreated ? 'line-through text-slate-400 dark:text-zinc-500' : ''}`}>
-                    Cadastre seu primeiro produto
-                  </span>
-                </div>
+              {!mission1Done && (
+                <>
+                  {!showAddForm ? (
+                    <button
+                      onClick={() => { setShowAddForm(true); setTimeout(() => prodNameRef.current?.focus(), 50) }}
+                      className="w-full py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 font-bold text-xs flex items-center justify-center gap-2 transition-all"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Adicionar produto
+                    </button>
+                  ) : (
+                    <div className="space-y-2 animate-in fade-in duration-200">
+                      <div className="flex gap-2">
+                        <input
+                          ref={prodNameRef}
+                          type="text"
+                          value={prodName}
+                          onChange={e => setProdName(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && handleAddProduct()}
+                          placeholder="Nome do produto"
+                          className="flex-1 px-3 py-2 rounded-xl border border-zinc-700 bg-zinc-950 focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs text-white placeholder-zinc-600"
+                        />
+                        <button
+                          onClick={() => { setShowAddForm(false); setProdName(''); setProdPrice(''); }}
+                          className="p-2 rounded-xl border border-zinc-700 text-zinc-500 hover:text-white transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 text-xs font-bold">R$</span>
+                          <input
+                            type="number"
+                            value={prodPrice}
+                            onChange={e => setProdPrice(e.target.value)}
+                            placeholder="0,00"
+                            className="w-full pl-8 pr-3 py-2 rounded-xl border border-zinc-700 bg-zinc-950 focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs text-white placeholder-zinc-600"
+                          />
+                        </div>
+                        <div className="relative w-20">
+                          <input
+                            type="number"
+                            value={prodQty}
+                            onChange={e => setProdQty(e.target.value)}
+                            placeholder="Qtd"
+                            className="w-full px-3 py-2 rounded-xl border border-zinc-700 bg-zinc-950 focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs text-white placeholder-zinc-600"
+                          />
+                        </div>
+                        <button
+                          onClick={handleAddProduct}
+                          disabled={addingProduct || !prodName.trim()}
+                          className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white transition-all"
+                        >
+                          {addingProduct ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                      <p className="text-[9px] text-zinc-600 text-center">Pressione Enter para salvar rapidamente</p>
+                    </div>
+                  )}
+                </>
+              )}
 
-                {/* Item 2 */}
-                <div className={`p-4 rounded-2xl border flex items-center gap-4 transition-all ${
-                  isSaleCreated 
-                    ? 'border-emerald-100 dark:border-emerald-950/20 bg-emerald-500/5 text-slate-700 dark:text-zinc-300' 
-                    : 'border-slate-100 dark:border-zinc-800/80 bg-slate-50/50 dark:bg-zinc-950/20 text-slate-500'
-                }`}>
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${
-                    isSaleCreated 
-                      ? 'border-emerald-500 bg-emerald-500 text-white' 
-                      : 'border-slate-300 dark:border-zinc-700'
-                  }`}>
-                    {isSaleCreated && <Check className="w-3.5 h-3.5" />}
-                  </div>
-                  <span className={`text-xs font-bold ${isSaleCreated ? 'line-through text-slate-400 dark:text-zinc-500' : ''}`}>
-                    Registre sua primeira venda
-                  </span>
+              {mission1Done && (
+                <div className="flex items-center gap-2 text-emerald-400">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span className="text-xs font-bold">Missão completa! {productCount} produtos cadastrados.</span>
                 </div>
-
-                {/* Item 3 */}
-                <div className={`p-4 rounded-2xl border flex items-center gap-4 transition-all border-slate-100 dark:border-zinc-800/80 bg-slate-50/50 dark:bg-zinc-950/20 text-slate-500`}>
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center border-2 border-slate-300 dark:border-zinc-700">
-                    {/* Unchecked */}
-                  </div>
-                  <span className="text-xs font-bold">
-                    Veja seu dashboard
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Button based on progress */}
-              {!isProductCreated ? (
-                <button
-                  onClick={() => setStep(6)}
-                  className="w-full py-4 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg shadow-rose-500/10"
-                >
-                  Cadastrar meu primeiro produto <ArrowRight className="w-4 h-4" />
-                </button>
-              ) : !isSaleCreated ? (
-                <button
-                  onClick={() => setStep(7)}
-                  className="w-full py-4 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg shadow-rose-500/10"
-                >
-                  Registrar minha primeira venda <ArrowRight className="w-4 h-4" />
-                </button>
-              ) : (
-                <button
-                  onClick={() => setStep(8)}
-                  className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10"
-                >
-                  Visualizar resultados <ArrowRight className="w-4 h-4" />
-                </button>
               )}
             </div>
-          )}
 
-          {/* TELA 6: PRIMEIRO PRODUTO */}
-          {step === 6 && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              <div className="space-y-1">
-                <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">Primeiro produto</h2>
-                <p className="text-xs text-slate-400 dark:text-zinc-500">Vamos começar pelos seus produtos mais vendidos.</p>
-              </div>
-
-              <div className="space-y-4">
+            {/* ─── Missão 2 ─── */}
+            <div className={`bg-zinc-900 border rounded-3xl p-6 transition-all duration-300 ${
+              mission2Done
+                ? 'border-emerald-500/30 bg-emerald-950/10'
+                : !mission1Done
+                ? 'border-zinc-800/50 opacity-50 pointer-events-none'
+                : 'border-zinc-800'
+            }`}>
+              <div className="flex items-start gap-3 mb-4">
+                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center border transition-all ${
+                  mission2Done
+                    ? 'bg-emerald-500 border-emerald-400'
+                    : 'bg-rose-500/10 border-rose-500/30'
+                }`}>
+                  {mission2Done
+                    ? <Check className="w-4 h-4 text-white" />
+                    : <Globe className="w-4 h-4 text-rose-400" />
+                  }
+                </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
-                    Nome do produto
-                  </label>
-                  <input
-                    type="text"
-                    value={prodName}
-                    onChange={(e) => setProdName(e.target.value)}
-                    placeholder="Ex: Batom Matte Velvet, Base Fluida Glow"
-                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-sm transition-all"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
-                      Quantidade
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={prodQty}
-                      onChange={(e) => setProdQty(parseInt(e.target.value) || 0)}
-                      className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-sm transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
-                      Preço de venda (R$)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={prodPrice}
-                      onChange={(e) => setProdPrice(parseFloat(e.target.value) || 0)}
-                      className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-sm transition-all"
-                    />
-                  </div>
+                  <span className="text-[10px] font-extrabold text-rose-400 uppercase tracking-widest">Missão 2</span>
+                  <h3 className="text-sm font-extrabold text-white">Publique sua vitrine</h3>
+                  <p className="text-[11px] text-zinc-500 mt-0.5">Veja como seus clientes vão te encontrar</p>
                 </div>
               </div>
 
-              <button
-                onClick={handleCreateProduct}
-                disabled={loading || !prodName.trim() || prodQty <= 0 || prodPrice <= 0}
-                className="w-full py-3.5 px-6 rounded-2xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-extrabold text-xs tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg shadow-rose-500/15 animate-pulse"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Salvar produto'}
-              </button>
+              {!mission2Done ? (
+                <button
+                  onClick={handleOpenVitrine}
+                  disabled={!mission1Done}
+                  className="w-full py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 font-bold text-xs flex items-center justify-center gap-2 transition-all"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" /> Ver minha vitrine <ChevronRight className="w-3 h-3 ml-auto" />
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 text-emerald-400">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span className="text-xs font-bold">Vitrine visitada e publicada! ✨</span>
+                </div>
+              )}
             </div>
-          )}
 
-          {/* TELA 7: PRIMEIRA VENDA */}
-          {step === 7 && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              <div className="space-y-1">
-                <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">Primeira venda</h2>
-                <p className="text-xs text-slate-400 dark:text-zinc-500">Agora registre uma venda para ver o Mimus funcionando.</p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="p-4 rounded-2xl border border-rose-100 dark:border-rose-950/20 bg-rose-500/5 flex justify-between items-center">
-                  <div>
-                    <span className="text-[9px] uppercase tracking-wider text-rose-500 font-bold">Produto Selecionado</span>
-                    <h3 className="text-sm font-bold text-slate-800 dark:text-zinc-200">{createdProduct?.name || 'Produto'}</h3>
-                  </div>
-                  <span className="text-sm font-extrabold text-slate-900 dark:text-white">
-                    R$ {createdProduct?.sale_price.toFixed(2)}
-                  </span>
+            {/* ─── Missão 3 ─── */}
+            <div className={`bg-zinc-900 border rounded-3xl p-6 transition-all duration-300 ${
+              mission3Done
+                ? 'border-emerald-500/30 bg-emerald-950/10'
+                : !mission2Done
+                ? 'border-zinc-800/50 opacity-50 pointer-events-none'
+                : 'border-zinc-800'
+            }`}>
+              <div className="flex items-start gap-3 mb-4">
+                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center border transition-all ${
+                  mission3Done
+                    ? 'bg-emerald-500 border-emerald-400'
+                    : 'bg-rose-500/10 border-rose-500/30'
+                }`}>
+                  {mission3Done
+                    ? <Check className="w-4 h-4 text-white" />
+                    : <Share2 className="w-4 h-4 text-rose-400" />
+                  }
                 </div>
-
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
-                    Quantidade vendida
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max={createdProduct?.quantity_in_stock || 10}
-                    value={saleQty}
-                    onChange={(e) => setSaleQty(Math.min(createdProduct?.quantity_in_stock || 10, parseInt(e.target.value) || 1))}
-                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 text-sm transition-all"
-                  />
+                  <span className="text-[10px] font-extrabold text-rose-400 uppercase tracking-widest">Missão 3</span>
+                  <h3 className="text-sm font-extrabold text-white">Compartilhe com uma cliente</h3>
+                  <p className="text-[11px] text-zinc-500 mt-0.5">Envie o link da sua vitrine agora</p>
                 </div>
               </div>
 
-              <button
-                onClick={handleRegisterSale}
-                disabled={loading || saleQty <= 0}
-                className="w-full py-3.5 px-6 rounded-2xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-extrabold text-xs tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg shadow-rose-500/15"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Registrar venda'}
-              </button>
+              {!mission3Done ? (
+                <div className="space-y-2">
+                  {/* Vitrine URL display */}
+                  <div className="flex items-center gap-2 px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl">
+                    <span className="text-[10px] text-zinc-500 font-mono truncate flex-1">{vitrineUrl}</span>
+                    <button
+                      onClick={handleCopyLink}
+                      disabled={!mission2Done}
+                      className="shrink-0 text-zinc-400 hover:text-white transition-colors p-1"
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={handleWhatsappShare}
+                      disabled={!mission2Done}
+                      className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600/10 hover:bg-emerald-600/20 border border-emerald-600/30 text-emerald-400 font-bold text-xs transition-all disabled:opacity-40"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                    </button>
+                    <button
+                      onClick={handleCopyLink}
+                      disabled={!mission2Done}
+                      className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 font-bold text-xs transition-all disabled:opacity-40"
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copied ? 'Copiado!' : 'Copiar link'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-emerald-400">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span className="text-xs font-bold">Link compartilhado! Sua primeira cliente pode estar chegando 🚀</span>
+                </div>
+              )}
             </div>
-          )}
 
-          {/* TELA 8: MOMENTO AHA */}
-          {step === 8 && (
-            <div className="space-y-8 animate-in fade-in duration-300 text-center">
-              <div className="space-y-2">
-                <span className="text-[10px] font-extrabold text-rose-600 dark:text-rose-400 uppercase tracking-widest">Aqui está a parte mais importante</span>
-                <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">Metas e Faturamento Atualizados!</h2>
-              </div>
-
-              {/* simulated metric cards */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-slate-50/60 dark:bg-zinc-950/40 p-4 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm flex flex-col items-center">
-                  <TrendingUp className="w-5 h-5 text-emerald-500 mb-2" />
-                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Faturamento</span>
-                  <p className="text-xs md:text-sm font-extrabold text-slate-800 dark:text-white mt-1">
-                    R$ {(createdProduct?.sale_price * saleQty).toFixed(2)}
-                  </p>
-                </div>
-                <div className="bg-slate-50/60 dark:bg-zinc-950/40 p-4 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm flex flex-col items-center">
-                  <Package className="w-5 h-5 text-rose-500 mb-2" />
-                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Estoque</span>
-                  <p className="text-xs md:text-sm font-extrabold text-slate-800 dark:text-white mt-1">
-                    {createdProduct ? createdProduct.quantity_in_stock - saleQty : 0} itens
-                  </p>
-                </div>
-                <div className="bg-slate-50/60 dark:bg-zinc-950/40 p-4 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm flex flex-col items-center">
-                  <PiggyBank className="w-5 h-5 text-purple-500 mb-2" />
-                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Lucro Est.</span>
-                  <p className="text-xs md:text-sm font-extrabold text-slate-800 dark:text-white mt-1">
-                    R$ {((createdProduct?.sale_price - (createdProduct?.cost_price || 0)) * saleQty).toFixed(2)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl max-w-sm mx-auto flex items-center justify-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                  Parabéns! Sua loja já está sendo controlada pelo Mimus.
-                </p>
-              </div>
-
+            {/* CTA final */}
+            {allDone ? (
               <button
-                onClick={() => setStep(9)}
-                className="w-full py-4 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs tracking-wider uppercase shadow-lg shadow-rose-500/15"
+                onClick={() => setStep(3)}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 transition-all shadow-xl shadow-emerald-500/20 animate-in fade-in duration-500"
               >
-                Ir para o painel
+                Ver meu painel <ArrowRight className="w-4 h-4" />
               </button>
-            </div>
-          )}
-
-          {/* TELA 9: ATIVAÇÃO DO TESTE */}
-          {step === 9 && (
-            <div className="text-center space-y-6 animate-in fade-in duration-300">
-              <div className="w-20 h-20 bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 rounded-full flex items-center justify-center mx-auto border border-rose-500/20 shadow-lg shadow-rose-500/5 animate-pulse">
-                <Sparkles className="w-10 h-10" />
-              </div>
-              
-              <div className="space-y-2">
-                <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">🎉 Seu teste grátis começou</h2>
-                <p className="text-slate-500 dark:text-zinc-400 text-xs md:text-sm max-w-xs mx-auto leading-relaxed">
-                  Restam 7 dias para explorar todos os recursos e impulsionar suas vendas.
-                </p>
-              </div>
-
+            ) : (
               <button
                 onClick={handleCompleteOnboarding}
-                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 transition-all shadow-xl shadow-rose-500/10"
+                className="w-full py-3 text-zinc-600 hover:text-zinc-400 text-xs font-medium transition-colors"
               >
-                Explorar Mimus
+                Continuar sem completar →
               </button>
-            </div>
-          )}
+            )}
+          </div>
+        )}
 
-        </div>
+        {/* ── TELA 3: PARABÉNS ── */}
+        {step === 3 && (
+          <div className="bg-zinc-900 border border-emerald-500/20 rounded-3xl p-10 shadow-2xl text-center space-y-7 animate-in fade-in zoom-in-95 duration-400">
+            <div className="w-24 h-24 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto border-2 border-emerald-500/30 shadow-xl shadow-emerald-500/10">
+              <CheckCircle2 className="w-12 h-12 text-emerald-400" />
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-2xl font-extrabold text-white">Sua loja está no ar! 🎉</h2>
+              <p className="text-zinc-400 text-sm leading-relaxed max-w-xs mx-auto">
+                Você cadastrou seus produtos, publicou sua vitrine e já compartilhou com uma cliente. 
+                Agora é hora de acompanhar os resultados.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Produtos', value: String(productCount), icon: Package },
+                { label: 'Vitrine', value: 'Ativa', icon: Globe },
+                { label: 'Link Enviado', value: '1', icon: Share2 },
+              ].map(({ label, value, icon: Icon }) => (
+                <div key={label} className="bg-zinc-950 rounded-2xl p-3 border border-zinc-800 flex flex-col items-center gap-1">
+                  <Icon className="w-4 h-4 text-rose-400" />
+                  <span className="text-base font-extrabold text-white">{value}</span>
+                  <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">{label}</span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={handleCompleteOnboarding}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 transition-all shadow-xl shadow-rose-500/20"
+            >
+              Explorar o Mimus <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
       </div>
     </div>
   )
