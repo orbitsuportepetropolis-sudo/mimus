@@ -119,10 +119,10 @@ export default function SuperAdminPage() {
           supabase.from('sales').select('id, total_value')
         ])
 
-        // Query view to get users list
+        // Query profiles directly to get users list
         const { data: usersView } = await supabase
-          .from('super_admin_users_view')
-          .select('*')
+          .from('profiles')
+          .select('*, stores(name)')
           .order('created_at', { ascending: false })
           .limit(10)
 
@@ -133,16 +133,40 @@ export default function SuperAdminPage() {
           .order('created_at', { ascending: false })
           .limit(5)
 
-        if (usersView) setUsers(usersView as any)
+        if (usersView) {
+          const formatted = usersView.map((u: any) => ({
+            id: u.id,
+            store_id: u.store_id,
+            name: u.name,
+            role: u.role,
+            status: u.status,
+            created_at: u.created_at,
+            email: u.email,
+            store_name: u.stores?.name || null
+          }))
+          setUsers(formatted)
+        }
         if (storesList) setStores(storesList as any)
       } 
       
       else if (activeTab === 'users') {
         const { data } = await supabase
-          .from('super_admin_users_view')
-          .select('*')
+          .from('profiles')
+          .select('*, stores(name)')
           .order('created_at', { ascending: false })
-        if (data) setUsers(data as any)
+        if (data) {
+          const formatted = data.map((u: any) => ({
+            id: u.id,
+            store_id: u.store_id,
+            name: u.name,
+            role: u.role,
+            status: u.status,
+            created_at: u.created_at,
+            email: u.email,
+            store_name: u.stores?.name || null
+          }))
+          setUsers(formatted)
+        }
       } 
       
       else if (activeTab === 'stores') {

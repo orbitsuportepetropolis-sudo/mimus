@@ -52,6 +52,7 @@ interface StockEntry {
   status: 'created' | 'awaiting' | 'delivered'
   expected_delivery_date: string | null
   delivery_date: string | null
+  freight: number
 }
 
 interface EntryItemDetails {
@@ -538,7 +539,7 @@ export default function ProductsPage() {
     // Validate that all quantities and costs are non-negative
     const invalid = receivedItems.some(item => isNaN(item.quantity) || item.quantity < 0 || isNaN(item.total_cost) || item.total_cost < 0)
     if (invalid) {
-      alert('Por favor, insira valores válidos de quantidade (>= 0) e valor do lote (>= 0).')
+      alert('Por favor, insira valores válidos de quantidade (>= 0) e custo unitário (>= 0).')
       return
     }
 
@@ -556,7 +557,8 @@ export default function ProductsPage() {
       if (!profile) throw new Error('Loja não encontrada')
       const storeId = profile.store_id
 
-      const finalTotalValue = receivedItems.reduce((sum, item) => sum + item.total_cost, 0)
+      const finalItemsTotal = receivedItems.reduce((sum, item) => sum + item.total_cost, 0)
+      const finalTotalValue = finalItemsTotal + (selectedEntry.freight || 0)
       const finalTotalItems = receivedItems.reduce((sum, item) => sum + item.quantity, 0)
 
       // 1. Update each item
@@ -625,7 +627,7 @@ export default function ProductsPage() {
         .insert([{
           store_id: storeId,
           type: 'expense',
-          value: finalTotalValue,
+          value: finalItemsTotal,
           category: 'supplier',
           description: `Compra de Mercadorias (Entregue)${supplierLabel}`,
           date: actualDeliveryDate
@@ -633,6 +635,24 @@ export default function ProductsPage() {
 
       if (financeErr) {
         console.error('Erro ao integrar com financeiro:', financeErr)
+      }
+
+      // Insert freight as separate financial transaction if applicable
+      if ((selectedEntry.freight || 0) > 0) {
+        const { error: freightFinanceErr } = await supabase
+          .from('financial_transactions')
+          .insert([{
+            store_id: storeId,
+            type: 'expense',
+            value: selectedEntry.freight,
+            category: 'supplier',
+            description: `Frete de Compra de Mercadorias (Entregue)${supplierLabel}`,
+            date: actualDeliveryDate
+          }])
+
+        if (freightFinanceErr) {
+          console.error('Erro ao integrar frete com financeiro:', freightFinanceErr)
+        }
       }
 
       // Reset details modal states and reload
@@ -690,7 +710,8 @@ export default function ProductsPage() {
           total_items: totalItems,
           status: entryStatus,
           expected_delivery_date: entryStatus !== 'delivered' ? expectedDeliveryDate : null,
-          delivery_date: entryStatus === 'delivered' ? entryDate : null
+          delivery_date: entryStatus === 'delivered' ? entryDate : null,
+          freight: freightValue
         }])
         .select()
         .single()
@@ -1070,10 +1091,8 @@ export default function ProductsPage() {
     setFormSku('')
     setFormBarcode('')
     
-    const qty = parseInt(selectedQty) || 1
     const cost = parseFloat(selectedTotalCost) || 0
-    const unitCost = cost > 0 && qty > 0 ? (cost / qty).toFixed(2) : '0.00'
-    setFormCostPrice(unitCost)
+    setFormCostPrice(cost.toFixed(2))
     
     setFormSalePrice('0.00')
     setFormStock('0')
@@ -2910,14 +2929,14 @@ export default function ProductsPage() {
                               <th className="px-4 py-3">Produto</th>
                               <th className="px-4 py-3 w-[110px]">Qtd Pedida</th>
                               <th className="px-4 py-3 w-[120px]">Qtd Entregue *</th>
-                              <th className="px-4 py-3 w-[150px]">Valor Total Pago *</th>
-                              <th className="px-4 py-3 text-right">Custo Unitário</th>
+                              <th className="px-4 py-3 w-[150px]">Custo Unitário *</th>
+                              <th className="px-4 py-3 text-right">Total do Item</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/40 bg-white dark:bg-zinc-900/40">
                             {entryDetailsItems.map((item) => {
                               const rItem = receivedItems.find(ri => ri.id === item.id) || { quantity: item.quantity, total_cost: item.total_cost }
-                              const unitCost = rItem.quantity > 0 ? rItem.total_cost / rItem.quantity : 0
+                              const unitCost = rItem.quantity > 0 ? rItem.total_cost / rItem.quantity : (item.unit_cost || 0)
                               
                               return (
                                 <tr key={item.id} className="hover:bg-slate-50/20 dark:hover:bg-zinc-950/5">
@@ -2938,15 +2957,13 @@ export default function ProductsPage() {
                                       value={rItem.quantity}
                                       onChange={(e) => {
                                         const qty = parseInt(e.target.value) || 0
-                                        const originalQty = item.quantity
-                                        const originalTotalCost = item.total_cost
-                                        const proportionalCost = originalQty > 0 ? (originalTotalCost / originalQty) * qty : 0
+                                        const currentUnitCost = rItem.quantity > 0 ? rItem.total_cost / rItem.quantity : item.unit_cost
                                         setReceivedItems(receivedItems.map(ri => {
                                           if (ri.id === item.id) {
                                             return {
                                               ...ri,
                                               quantity: qty,
-                                              total_cost: Number(proportionalCost.toFixed(2))
+                                              total_cost: Number((currentUnitCost * qty).toFixed(2))
                                             }
                                           }
                                           return ri
@@ -2963,14 +2980,15 @@ export default function ProductsPage() {
                                         step="0.01"
                                         min="0"
                                         required
-                                        value={rItem.total_cost}
+                                        value={unitCost > 0 ? Number(unitCost.toFixed(2)) : ''}
+                                        placeholder="0.00"
                                         onChange={(e) => {
                                           const cost = parseFloat(e.target.value) || 0
                                           setReceivedItems(receivedItems.map(ri => {
                                             if (ri.id === item.id) {
                                               return {
                                                 ...ri,
-                                                total_cost: cost
+                                                total_cost: Number((cost * ri.quantity).toFixed(2))
                                               }
                                             }
                                             return ri
@@ -2980,8 +2998,8 @@ export default function ProductsPage() {
                                       />
                                     </div>
                                   </td>
-                                  <td className="px-4 py-3 font-mono text-emerald-600 dark:text-emerald-450 text-right font-bold">
-                                    R$ {unitCost.toFixed(2)}
+                                  <td className="px-4 py-3 font-mono text-slate-850 dark:text-zinc-200 text-right font-bold">
+                                    R$ {rItem.total_cost.toFixed(2)}
                                   </td>
                                 </tr>
                               )
@@ -3050,7 +3068,7 @@ export default function ProductsPage() {
 
                 {/* Resumo Financeiro */}
                 <div className="border-t border-slate-100 dark:border-zinc-800 pt-4 flex justify-between items-center flex-wrap gap-4">
-                  <div className="flex gap-4">
+                  <div className="flex gap-4 flex-wrap">
                     <div>
                       <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">
                         {isConfirmingDelivery ? 'Total Contado' : 'Total de itens'}
@@ -3064,11 +3082,35 @@ export default function ProductsPage() {
                     <div className="w-px bg-slate-200 dark:bg-zinc-800" />
                     <div>
                       <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">
+                        Valor dos Itens
+                      </span>
+                      <p className="text-sm font-bold text-slate-700 dark:text-zinc-300 font-mono">
+                        R$ {isConfirmingDelivery 
+                          ? receivedItems.reduce((sum, item) => sum + item.total_cost, 0).toFixed(2)
+                          : (Number(selectedEntry.total_value) - Number(selectedEntry.freight || 0)).toFixed(2)}
+                      </p>
+                    </div>
+                    {(selectedEntry?.freight > 0 || isConfirmingDelivery) && (
+                      <>
+                        <div className="w-px bg-slate-200 dark:bg-zinc-800" />
+                        <div>
+                          <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">
+                            Frete
+                          </span>
+                          <p className="text-sm font-bold text-slate-700 dark:text-zinc-300 font-mono">
+                            R$ {Number(selectedEntry?.freight || 0).toFixed(2)}
+                          </p>
+                        </div>
+                      </>
+                    )}
+                    <div className="w-px bg-slate-200 dark:bg-zinc-800" />
+                    <div>
+                      <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">
                         {isConfirmingDelivery ? 'Total Final Pago' : 'Valor Total Pago'}
                       </span>
                       <p className="text-sm font-bold text-rose-600 dark:text-rose-450 font-mono">
                         R$ {isConfirmingDelivery 
-                          ? receivedItems.reduce((sum, item) => sum + item.total_cost, 0).toFixed(2)
+                          ? (receivedItems.reduce((sum, item) => sum + item.total_cost, 0) + Number(selectedEntry?.freight || 0)).toFixed(2)
                           : Number(selectedEntry.total_value).toFixed(2)}
                       </p>
                     </div>

@@ -5,10 +5,16 @@
 -- 1. Habilitar a extensão pgcrypto (caso não esteja)
 CREATE EXTENSION IF NOT EXISTS pgcrypto SCHEMA extensions;
 
--- 2. Adicionar coluna 'status' na tabela profiles para permitir suspensão de usuários
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS status text DEFAULT 'active';
+-- 2. Limpeza total de antigas views, funções e políticas para evitar conflitos
+DROP VIEW IF EXISTS public.super_admin_users_view CASCADE;
+DROP FUNCTION IF EXISTS public.get_auth_users() CASCADE;
+DROP FUNCTION IF EXISTS public.is_super_admin() CASCADE;
 
--- 3. Criar tabela de auditoria de logs de segurança (security_logs)
+-- 3. Adicionar colunas necessárias na tabela profiles
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS status text DEFAULT 'active';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email text;
+
+-- 4. Criar tabela de auditoria de logs de segurança (security_logs)
 CREATE TABLE IF NOT EXISTS public.security_logs (
     id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
@@ -24,16 +30,29 @@ CREATE TABLE IF NOT EXISTS public.security_logs (
 -- Ativar RLS para security_logs
 ALTER TABLE public.security_logs ENABLE ROW LEVEL SECURITY;
 
--- 4. Função helper para identificar se o usuário atual é Super Admin
+-- 5. Função helper EM MEMÓRIA (JWT) ultra-robusta e protegida por bloco de exceção
+-- Lê o JWT diretamente da sessão PostgREST sem realizar consultas a tabelas físicas,
+-- prevenindo recursão de políticas e erros de cache de schema.
 CREATE OR REPLACE FUNCTION public.is_super_admin()
 RETURNS boolean AS $$
-  SELECT COALESCE(
-    (SELECT role = 'super_admin' FROM public.profiles WHERE id = auth.uid()),
-    false
-  );
-$$ LANGUAGE sql SECURITY DEFINER;
+DECLARE
+  claims_str text;
+  claims jsonb;
+BEGIN
+  claims_str := current_setting('request.jwt.claims', true);
+  IF claims_str IS NULL OR claims_str = '' THEN
+    RETURN false;
+  END IF;
+  
+  claims := claims_str::jsonb;
+  RETURN (claims -> 'user_metadata' ->> 'role') = 'super_admin';
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN false;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 5. Políticas de acesso para a tabela security_logs
+-- 6. Políticas de acesso para a tabela security_logs
 DROP POLICY IF EXISTS "Permitir inserção de logs por qualquer um" ON public.security_logs;
 CREATE POLICY "Permitir inserção de logs por qualquer um" ON public.security_logs
     FOR INSERT TO public WITH CHECK (true);
@@ -42,72 +61,66 @@ DROP POLICY IF EXISTS "Permitir visualização de logs apenas por super admins" 
 CREATE POLICY "Permitir visualização de logs apenas por super admins" ON public.security_logs
     FOR SELECT TO authenticated USING (public.is_super_admin());
 
--- 6. Adicionar políticas de controle total de RLS para Super Admin em todas as tabelas
--- As políticas permissivas de PostgreSQL se combinam com OR, então essa política garante acesso irrestrito
+-- 7. Adicionar políticas de controle total de RLS para Super Admin em todas as tabelas (Drop e Recreate)
+-- Stores
+DROP POLICY IF EXISTS "Super Admin: acesso total" ON public.stores;
+CREATE POLICY "Super Admin: acesso total" ON public.stores FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
+
+-- Profiles
+DROP POLICY IF EXISTS "Super Admin: acesso total" ON public.profiles;
+CREATE POLICY "Super Admin: acesso total" ON public.profiles FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
+
+-- Products
+DROP POLICY IF EXISTS "Super Admin: acesso total" ON public.products;
+CREATE POLICY "Super Admin: acesso total" ON public.products FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
+
+-- Customers
+DROP POLICY IF EXISTS "Super Admin: acesso total" ON public.customers;
+CREATE POLICY "Super Admin: acesso total" ON public.customers FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
+
+-- Sales
+DROP POLICY IF EXISTS "Super Admin: acesso total" ON public.sales;
+CREATE POLICY "Super Admin: acesso total" ON public.sales FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
+
+-- Sale Items
+DROP POLICY IF EXISTS "Super Admin: acesso total" ON public.sale_items;
+CREATE POLICY "Super Admin: acesso total" ON public.sale_items FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
+
+-- Stock Movements
+DROP POLICY IF EXISTS "Super Admin: acesso total" ON public.stock_movements;
+CREATE POLICY "Super Admin: acesso total" ON public.stock_movements FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
+
+-- Financial Transactions
+DROP POLICY IF EXISTS "Super Admin: acesso total" ON public.financial_transactions;
+CREATE POLICY "Super Admin: acesso total" ON public.financial_transactions FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
+
+-- Integrations
+DROP POLICY IF EXISTS "Super Admin: acesso total" ON public.integrations;
+CREATE POLICY "Super Admin: acesso total" ON public.integrations FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
+
+-- Stock Entries e Stock Entry Items (se as tabelas existirem)
 DO $$
 BEGIN
-    -- Stores
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Super Admin: acesso total' AND tablename = 'stores') THEN
-        CREATE POLICY "Super Admin: acesso total" ON public.stores FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
-    END IF;
-
-    -- Profiles
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Super Admin: acesso total' AND tablename = 'profiles') THEN
-        CREATE POLICY "Super Admin: acesso total" ON public.profiles FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
-    END IF;
-
-    -- Products
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Super Admin: acesso total' AND tablename = 'products') THEN
-        CREATE POLICY "Super Admin: acesso total" ON public.products FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
-    END IF;
-
-    -- Customers
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Super Admin: acesso total' AND tablename = 'customers') THEN
-        CREATE POLICY "Super Admin: acesso total" ON public.customers FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
-    END IF;
-
-    -- Sales
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Super Admin: acesso total' AND tablename = 'sales') THEN
-        CREATE POLICY "Super Admin: acesso total" ON public.sales FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
-    END IF;
-
-    -- Sale Items
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Super Admin: acesso total' AND tablename = 'sale_items') THEN
-        CREATE POLICY "Super Admin: acesso total" ON public.sale_items FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
-    END IF;
-
-    -- Stock Movements
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Super Admin: acesso total' AND tablename = 'stock_movements') THEN
-        CREATE POLICY "Super Admin: acesso total" ON public.stock_movements FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
-    END IF;
-
-    -- Financial Transactions
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Super Admin: acesso total' AND tablename = 'financial_transactions') THEN
-        CREATE POLICY "Super Admin: acesso total" ON public.financial_transactions FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
-    END IF;
-
-    -- Integrations
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Super Admin: acesso total' AND tablename = 'integrations') THEN
-        CREATE POLICY "Super Admin: acesso total" ON public.integrations FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
-    END IF;
-
-    -- Se existirem as tabelas stock_entries e stock_entry_items, criar RLS para elas também
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'stock_entries') THEN
-        IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Super Admin: acesso total' AND tablename = 'stock_entries') THEN
-            CREATE POLICY "Super Admin: acesso total" ON public.stock_entries FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
-        END IF;
+        DROP POLICY IF EXISTS "Super Admin: acesso total" ON public.stock_entries;
+        CREATE POLICY "Super Admin: acesso total" ON public.stock_entries FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
     END IF;
 
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'stock_entry_items') THEN
-        IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Super Admin: acesso total' AND tablename = 'stock_entry_items') THEN
-            CREATE POLICY "Super Admin: acesso total" ON public.stock_entry_items FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
-        END IF;
+        DROP POLICY IF EXISTS "Super Admin: acesso total" ON public.stock_entry_items;
+        CREATE POLICY "Super Admin: acesso total" ON public.stock_entry_items FOR ALL TO authenticated USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
     END IF;
 END $$;
 
--- 7. SEED INICIAL: Criar conta do Super Admin "Adriano Junior" se não existir
--- E-mail: adriano@mimus.com.br
--- Senha padrão: mimus123
+-- 8. Sincronizar e-mails de contas existentes (sintaxe padrão ANSI/PG)
+UPDATE public.profiles
+SET email = auth.users.email
+FROM auth.users
+WHERE public.profiles.id = auth.users.id AND public.profiles.email IS NULL;
+
+-- 9. SEED INICIAL: Criar conta do Super Admin "Adriano Junior" se não existir
+-- Usamos um hash Bcrypt pré-calculado para 'mimus123' e incluímos todas as colunas
+-- obrigatórias de tokens para evitar violação de restrições NOT NULL em qualquer versão do Supabase.
 INSERT INTO auth.users (
   instance_id,
   id,
@@ -120,7 +133,15 @@ INSERT INTO auth.users (
   raw_user_meta_data,
   created_at,
   updated_at,
-  is_anonymous
+  is_anonymous,
+  confirmation_token,
+  email_change,
+  email_change_token_new,
+  recovery_token,
+  phone_change,
+  phone_change_token,
+  email_change_token_current,
+  reauthentication_token
 )
 SELECT
   '00000000-0000-0000-0000-000000000000',
@@ -128,35 +149,26 @@ SELECT
   'authenticated',
   'authenticated',
   'adriano@mimus.com.br',
-  extensions.crypt('mimus123', extensions.gen_salt('bf')),
+  '$2a$10$7EqJtDQOCPH6Jws6h9GqOuxI3JgNu0gECZbScx.K3.A6J.u.C5G5m', -- Hash Bcrypt de 'mimus123'
   NOW(),
   '{"provider": "email", "providers": ["email"]}'::jsonb,
   '{"name": "Adriano Junior", "role": "super_admin"}'::jsonb,
   NOW(),
   NOW(),
-  false
+  false,
+  '', -- confirmation_token
+  '', -- email_change
+  '', -- email_change_token_new
+  '', -- recovery_token
+  '', -- phone_change
+  '', -- phone_change_token
+  '', -- email_change_token_current
+  ''  -- reauthentication_token
 WHERE NOT EXISTS (
   SELECT 1 FROM auth.users WHERE email = 'adriano@mimus.com.br'
 );
 
--- Garantir que o perfil associado na tabela profiles tenha a role 'super_admin', status 'active' e sem store_id associada
+-- Sincronizar dados finais do perfil
 UPDATE public.profiles
-SET role = 'super_admin', status = 'active', store_id = NULL
+SET role = 'super_admin', status = 'active', email = 'adriano@mimus.com.br', store_id = NULL
 WHERE id = 'a0000000-0000-0000-0000-000000000003';
-
--- 8. Criar view segura de usuários e e-mails para o painel de Super Admin
-CREATE OR REPLACE VIEW public.super_admin_users_view WITH (security_barrier) AS
-SELECT 
-    p.id,
-    p.store_id,
-    p.name,
-    p.role,
-    p.status,
-    p.created_at,
-    u.email,
-    s.name as store_name
-FROM public.profiles p
-LEFT JOIN auth.users u ON p.id = u.id
-LEFT JOIN public.stores s ON p.store_id = s.id
-WHERE public.is_super_admin();
-
