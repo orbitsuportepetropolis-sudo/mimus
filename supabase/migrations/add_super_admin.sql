@@ -118,57 +118,8 @@ SET email = auth.users.email
 FROM auth.users
 WHERE public.profiles.id = auth.users.id AND public.profiles.email IS NULL;
 
--- 9. SEED INICIAL: Criar conta do Super Admin "Adriano Junior" se não existir
--- Usamos um hash Bcrypt pré-calculado para 'mimus123' e incluímos todas as colunas
--- obrigatórias de tokens para evitar violação de restrições NOT NULL em qualquer versão do Supabase.
-INSERT INTO auth.users (
-  instance_id,
-  id,
-  aud,
-  role,
-  email,
-  encrypted_password,
-  email_confirmed_at,
-  raw_app_meta_data,
-  raw_user_meta_data,
-  created_at,
-  updated_at,
-  is_anonymous,
-  confirmation_token,
-  email_change,
-  email_change_token_new,
-  recovery_token,
-  phone_change,
-  phone_change_token,
-  email_change_token_current,
-  reauthentication_token
-)
-SELECT
-  '00000000-0000-0000-0000-000000000000',
-  'a0000000-0000-0000-0000-000000000003', -- UUID fixo para o Super Admin
-  'authenticated',
-  'authenticated',
-  'adriano@mimus.com.br',
-  '$2a$10$7EqJtDQOCPH6Jws6h9GqOuxI3JgNu0gECZbScx.K3.A6J.u.C5G5m', -- Hash Bcrypt de 'mimus123'
-  NOW(),
-  '{"provider": "email", "providers": ["email"]}'::jsonb,
-  '{"name": "Adriano Junior", "role": "super_admin"}'::jsonb,
-  NOW(),
-  NOW(),
-  false,
-  '', -- confirmation_token
-  '', -- email_change
-  '', -- email_change_token_new
-  '', -- recovery_token
-  '', -- phone_change
-  '', -- phone_change_token
-  '', -- email_change_token_current
-  ''  -- reauthentication_token
-WHERE NOT EXISTS (
-  SELECT 1 FROM auth.users WHERE email = 'adriano@mimus.com.br'
-);
+-- 9. NOTA SOBRE SEED INICIAL DO SUPER ADMIN:
+-- Para evitar erros de restrição de colunas nulas (como Database error querying schema),
+-- o usuário Super Admin (adriano@mimus.com.br) deve ser criado de forma segura
+-- através da API do Supabase (por exemplo, usando o script create_super_admin.js fornecido).
 
--- Sincronizar dados finais do perfil
-UPDATE public.profiles
-SET role = 'super_admin', status = 'active', email = 'adriano@mimus.com.br', store_id = NULL
-WHERE id = 'a0000000-0000-0000-0000-000000000003';
