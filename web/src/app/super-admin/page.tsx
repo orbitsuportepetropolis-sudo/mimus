@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { 
   Shield, 
@@ -26,10 +26,33 @@ import {
   Target,
   Share2,
   Percent,
-  Heart
+  Heart,
+  Check,
+  X,
+  MessageCircle,
+  UserPlus,
+  ChevronDown
 } from 'lucide-react'
 
-type Tab = 'metrics' | 'funnel' | 'stores' | 'users' | 'sales' | 'logs'
+type Tab = 'metrics' | 'funnel' | 'leads' | 'stores' | 'users' | 'sales' | 'logs'
+
+interface Lead {
+  id: string
+  name: string
+  whatsapp: string | null
+  instagram: string | null
+  loja: string | null
+  origem: string | null
+  dor_principal: string | null
+  demo: boolean
+  conta_criada: boolean
+  ativado: boolean
+  ultimo_contato: string | null
+  proxima_acao: string | null
+  status: string
+  notes: string | null
+  created_at: string
+}
 
 interface UserView {
   id: string
@@ -127,6 +150,12 @@ export default function SuperAdminPage() {
   const [logs, setLogs] = useState<SecurityLog[]>([])
   const [founderMetrics, setFounderMetrics] = useState<DashboardMetrics | null>(null)
   const [funnelUsers, setFunnelUsers] = useState<FunnelUser[]>([])
+  const [leads, setLeads] = useState<Lead[]>([])
+  const [editingCell, setEditingCell] = useState<{ leadId: string; field: string } | null>(null)
+  const [editingValue, setEditingValue] = useState<string>('')
+  const [savingLead, setSavingLead] = useState<string | null>(null)
+  const [addingLead, setAddingLead] = useState(false)
+  const cellInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(null)
 
   // Search states
   const [searchQuery, setSearchQuery] = useState('')
@@ -169,7 +198,15 @@ export default function SuperAdminPage() {
     try {
       setLoading(true)
       
-      if (activeTab === 'metrics' || activeTab === 'funnel') {
+      if (activeTab === 'leads') {
+        const { data } = await supabase
+          .from('leads')
+          .select('*')
+          .order('created_at', { ascending: false })
+        if (data) setLeads(data as Lead[])
+      }
+
+      else if (activeTab === 'metrics' || activeTab === 'funnel') {
         const TEST_STORE_ID = 'b70a51e1-26ad-4236-a332-ba89cf966c76'
         const thirtyDaysAgo = new Date()
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
@@ -646,6 +683,70 @@ export default function SuperAdminPage() {
     s.custom_domain?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  const filteredLeads = leads.filter(l =>
+    l.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    l.loja?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    l.instagram?.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // Lead CRM handlers
+  async function handleSaveLeadCell(leadId: string, field: string, value: any) {
+    setSavingLead(leadId)
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ [field]: value })
+        .eq('id', leadId)
+      if (error) throw error
+      setLeads(prev => prev.map(l => l.id === leadId ? { ...l, [field]: value } : l))
+    } catch (err: any) {
+      alert('Erro ao salvar: ' + err.message)
+    } finally {
+      setSavingLead(null)
+      setEditingCell(null)
+    }
+  }
+
+  async function handleToggleLeadBool(leadId: string, field: 'demo' | 'conta_criada' | 'ativado', current: boolean) {
+    await handleSaveLeadCell(leadId, field, !current)
+  }
+
+  async function handleAddLead() {
+    setAddingLead(true)
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .insert([{ name: 'Novo Lead', status: 'Ativo', origem: 'Instagram' }])
+        .select()
+        .single()
+      if (error) throw error
+      setLeads(prev => [data as Lead, ...prev])
+      setEditingCell({ leadId: data.id, field: 'name' })
+      setEditingValue('Novo Lead')
+    } catch (err: any) {
+      alert('Erro: ' + err.message)
+    } finally {
+      setAddingLead(false)
+    }
+  }
+
+  async function handleDeleteLead(leadId: string) {
+    if (!confirm('Remover este lead? Essa ação é irreversível.')) return
+    const { error } = await supabase.from('leads').delete().eq('id', leadId)
+    if (!error) setLeads(prev => prev.filter(l => l.id !== leadId))
+  }
+
+  function startEdit(leadId: string, field: string, currentValue: any) {
+    setEditingCell({ leadId, field })
+    setEditingValue(currentValue ?? '')
+    setTimeout(() => (cellInputRef.current as HTMLInputElement | null)?.focus(), 30)
+  }
+
+  function commitEdit() {
+    if (!editingCell) return
+    handleSaveLeadCell(editingCell.leadId, editingCell.field, editingValue)
+  }
+
   return (
     <div className="space-y-6">
       
@@ -654,6 +755,7 @@ export default function SuperAdminPage() {
         {[
           { id: 'metrics', label: 'Dashboard do Fundador', icon: TrendingUp },
           { id: 'funnel', label: 'Funil de Ativação', icon: Target },
+          { id: 'leads', label: 'Controle de Leads', icon: UserPlus },
           { id: 'stores', label: 'Lojas & Planos', icon: Globe },
           { id: 'users', label: 'Usuários & RBAC', icon: Users },
           { id: 'sales', label: 'Vendas Globais', icon: ShoppingBag },
@@ -674,6 +776,9 @@ export default function SuperAdminPage() {
               }`}
             >
               <Icon className="w-4 h-4" /> {tab.label}
+              {tab.id === 'leads' && leads.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-md bg-rose-500/20 text-rose-400 text-[9px] font-black">{leads.length}</span>
+              )}
             </button>
           )
         })}
@@ -1131,8 +1236,304 @@ export default function SuperAdminPage() {
         </div>
       )}
 
+      {/* LEADS TAB */}
+      {activeTab === 'leads' && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-rose-500" /> Controle de Leads
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">Pipeline de conversão — clique em qualquer célula para editar</p>
+            </div>
+            <button
+              onClick={handleAddLead}
+              disabled={addingLead}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all shadow-lg shadow-rose-500/15 disabled:opacity-60"
+            >
+              {addingLead ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+              Novo Lead
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+            <input
+              type="text"
+              placeholder="Buscar por nome, loja ou Instagram..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-800 bg-slate-950/60 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs text-slate-100 placeholder-slate-500"
+            />
+          </div>
+
+          {/* Stats bar */}
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              { label: 'Total', value: leads.length, color: 'text-slate-300' },
+              { label: 'Ativos', value: leads.filter(l => l.status === 'Ativo').length, color: 'text-emerald-400' },
+              { label: 'Convertidos', value: leads.filter(l => l.status === 'Convertido').length, color: 'text-blue-400' },
+              { label: 'Inativo/Lost', value: leads.filter(l => l.status === 'Inativo' || l.status === 'Lost').length, color: 'text-rose-400' },
+            ].map(s => (
+              <div key={s.label} className="bg-slate-950 rounded-xl border border-slate-800 px-4 py-3">
+                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">{s.label}</span>
+                <span className={`text-xl font-extrabold ${s.color}`}>{s.value}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Table */}
+          <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs" style={{ minWidth: '1100px' }}>
+                <thead>
+                  <tr className="border-b border-slate-800 bg-slate-900/50 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <th className="px-4 py-3.5 sticky left-0 bg-slate-900/90 z-10 min-w-[140px]">Lead</th>
+                    <th className="px-4 py-3.5 min-w-[110px]">WhatsApp</th>
+                    <th className="px-4 py-3.5 min-w-[110px]">Instagram</th>
+                    <th className="px-4 py-3.5 min-w-[120px]">Loja</th>
+                    <th className="px-4 py-3.5 min-w-[100px]">Origem</th>
+                    <th className="px-4 py-3.5 min-w-[130px]">Dor Principal</th>
+                    <th className="px-4 py-3.5 text-center min-w-[90px]">Demo</th>
+                    <th className="px-4 py-3.5 text-center min-w-[100px]">Conta Criada</th>
+                    <th className="px-4 py-3.5 text-center min-w-[80px]">Ativado</th>
+                    <th className="px-4 py-3.5 min-w-[100px]">Últ. Contato</th>
+                    <th className="px-4 py-3.5 min-w-[130px]">Próxima Ação</th>
+                    <th className="px-4 py-3.5 min-w-[110px]">Status</th>
+                    <th className="px-4 py-3.5 min-w-[50px]"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {filteredLeads.length === 0 ? (
+                    <tr>
+                      <td colSpan={13} className="px-5 py-10 text-center text-slate-500 italic">
+                        {leads.length === 0 ? 'Nenhum lead cadastrado. Clique em "Novo Lead" para começar.' : 'Nenhum resultado encontrado.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredLeads.map(lead => {
+                      const isSaving = savingLead === lead.id
+
+                      function EditableText({ field, value, placeholder, wide }: { field: string; value: string | null; placeholder?: string; wide?: boolean }) {
+                        const isEditing = editingCell?.leadId === lead.id && editingCell?.field === field
+                        if (isEditing) {
+                          return (
+                            <input
+                              ref={cellInputRef as React.RefObject<HTMLInputElement>}
+                              value={editingValue}
+                              onChange={e => setEditingValue(e.target.value)}
+                              onBlur={commitEdit}
+                              onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditingCell(null) }}
+                              className={`${wide ? 'w-40' : 'w-28'} px-2 py-1 rounded-lg bg-slate-800 border border-rose-500/60 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-rose-500`}
+                            />
+                          )
+                        }
+                        return (
+                          <span
+                            onClick={() => startEdit(lead.id, field, value)}
+                            className="block px-2 py-1 rounded-lg hover:bg-slate-800/70 cursor-text text-slate-300 transition-colors min-h-[26px] group relative"
+                          >
+                            {value || <span className="text-slate-600 italic">{placeholder || '—'}</span>}
+                            <Edit3 className="w-2.5 h-2.5 text-slate-600 absolute right-1 top-1.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </span>
+                        )
+                      }
+
+                      const STATUS_OPTS = ['Ativo', 'Em contato', 'Demonstração', 'Convertido', 'Inativo', 'Lost']
+                      const ORIGEM_OPTS = ['Instagram', 'Google', 'Indicação', 'WhatsApp', 'Evento', 'Outro']
+
+                      const statusColors: Record<string, string> = {
+                        'Ativo':         'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+                        'Em contato':    'bg-blue-500/10 text-blue-400 border-blue-500/20',
+                        'Demonstração':  'bg-purple-500/10 text-purple-400 border-purple-500/20',
+                        'Convertido':    'bg-teal-500/10 text-teal-400 border-teal-500/20',
+                        'Inativo':       'bg-slate-700/30 text-slate-500 border-slate-700/30',
+                        'Lost':          'bg-rose-500/10 text-rose-400 border-rose-500/20',
+                      }
+
+                      return (
+                        <tr key={lead.id} className={`hover:bg-slate-900/40 transition-colors ${isSaving ? 'opacity-60' : ''}`}>
+                          {/* Name - sticky */}
+                          <td className="px-4 py-3 sticky left-0 bg-slate-950 z-10">
+                            <EditableText field="name" value={lead.name} placeholder="Nome" wide />
+                          </td>
+
+                          {/* WhatsApp */}
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1">
+                              <EditableText field="whatsapp" value={lead.whatsapp} placeholder="(xx) xxxxx" />
+                              {lead.whatsapp && (
+                                <a
+                                  href={`https://wa.me/55${lead.whatsapp.replace(/\D/g, '')}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="shrink-0 p-1 rounded-lg text-emerald-500 hover:bg-emerald-500/10 transition-colors"
+                                >
+                                  <MessageCircle className="w-3 h-3" />
+                                </a>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Instagram */}
+                          <td className="px-4 py-3">
+                            <EditableText field="instagram" value={lead.instagram} placeholder="@usuario" />
+                          </td>
+
+                          {/* Loja */}
+                          <td className="px-4 py-3">
+                            <EditableText field="loja" value={lead.loja} placeholder="Nome da loja" />
+                          </td>
+
+                          {/* Origem - select */}
+                          <td className="px-4 py-3">
+                            {editingCell?.leadId === lead.id && editingCell?.field === 'origem' ? (
+                              <select
+                                ref={cellInputRef as React.RefObject<HTMLSelectElement>}
+                                value={editingValue}
+                                onChange={e => setEditingValue(e.target.value)}
+                                onBlur={commitEdit}
+                                className="w-28 px-2 py-1 rounded-lg bg-slate-800 border border-rose-500/60 text-slate-100 text-xs focus:outline-none"
+                              >
+                                {ORIGEM_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                            ) : (
+                              <span
+                                onClick={() => startEdit(lead.id, 'origem', lead.origem)}
+                                className="block px-2 py-1 rounded-lg hover:bg-slate-800/70 cursor-pointer text-slate-300 transition-colors min-h-[26px] group relative"
+                              >
+                                {lead.origem || <span className="text-slate-600 italic">—</span>}
+                                <ChevronDown className="w-2.5 h-2.5 text-slate-600 absolute right-1 top-1.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Dor Principal */}
+                          <td className="px-4 py-3">
+                            <EditableText field="dor_principal" value={lead.dor_principal} placeholder="Ex: Estoque" wide />
+                          </td>
+
+                          {/* Demo - toggle */}
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => handleToggleLeadBool(lead.id, 'demo', lead.demo)}
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center mx-auto border transition-all ${
+                                lead.demo
+                                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                                  : 'bg-slate-800/50 border-slate-700 text-slate-600 hover:border-slate-500'
+                              }`}
+                            >
+                              {lead.demo ? <Check className="w-3.5 h-3.5" /> : <X className="w-3 h-3" />}
+                            </button>
+                          </td>
+
+                          {/* Conta Criada - toggle */}
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => handleToggleLeadBool(lead.id, 'conta_criada', lead.conta_criada)}
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center mx-auto border transition-all ${
+                                lead.conta_criada
+                                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                                  : 'bg-slate-800/50 border-slate-700 text-slate-600 hover:border-slate-500'
+                              }`}
+                            >
+                              {lead.conta_criada ? <Check className="w-3.5 h-3.5" /> : <X className="w-3 h-3" />}
+                            </button>
+                          </td>
+
+                          {/* Ativado - toggle */}
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => handleToggleLeadBool(lead.id, 'ativado', lead.ativado)}
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center mx-auto border transition-all ${
+                                lead.ativado
+                                  ? 'bg-teal-500/20 border-teal-500/40 text-teal-400'
+                                  : 'bg-slate-800/50 border-slate-700 text-slate-600 hover:border-slate-500'
+                              }`}
+                            >
+                              {lead.ativado ? <Check className="w-3.5 h-3.5" /> : <X className="w-3 h-3" />}
+                            </button>
+                          </td>
+
+                          {/* Último Contato */}
+                          <td className="px-4 py-3">
+                            {editingCell?.leadId === lead.id && editingCell?.field === 'ultimo_contato' ? (
+                              <input
+                                ref={cellInputRef as React.RefObject<HTMLInputElement>}
+                                type="date"
+                                value={editingValue}
+                                onChange={e => setEditingValue(e.target.value)}
+                                onBlur={commitEdit}
+                                onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditingCell(null) }}
+                                className="w-32 px-2 py-1 rounded-lg bg-slate-800 border border-rose-500/60 text-slate-100 text-xs focus:outline-none"
+                              />
+                            ) : (
+                              <span
+                                onClick={() => startEdit(lead.id, 'ultimo_contato', lead.ultimo_contato || '')}
+                                className="block px-2 py-1 rounded-lg hover:bg-slate-800/70 cursor-pointer text-slate-300 transition-colors min-h-[26px]"
+                              >
+                                {lead.ultimo_contato
+                                  ? new Date(lead.ultimo_contato + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                                  : <span className="text-slate-600 italic">—</span>
+                                }
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Próxima Ação */}
+                          <td className="px-4 py-3">
+                            <EditableText field="proxima_acao" value={lead.proxima_acao} placeholder="Ex: Follow-up" wide />
+                          </td>
+
+                          {/* Status - select badge */}
+                          <td className="px-4 py-3">
+                            {editingCell?.leadId === lead.id && editingCell?.field === 'status' ? (
+                              <select
+                                ref={cellInputRef as React.RefObject<HTMLSelectElement>}
+                                value={editingValue}
+                                onChange={e => setEditingValue(e.target.value)}
+                                onBlur={commitEdit}
+                                className="w-32 px-2 py-1 rounded-lg bg-slate-800 border border-rose-500/60 text-slate-100 text-xs focus:outline-none"
+                              >
+                                {STATUS_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                            ) : (
+                              <button
+                                onClick={() => startEdit(lead.id, 'status', lead.status)}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all hover:opacity-80 ${
+                                  statusColors[lead.status] || statusColors['Inativo']
+                                }`}
+                              >
+                                {lead.status}
+                                <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                              </button>
+                            )}
+                          </td>
+
+                          {/* Delete */}
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => handleDeleteLead(lead.id)}
+                              className="p-1.5 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* SEARCH BAR FOR LISTS */}
-      {activeTab !== 'metrics' && activeTab !== 'funnel' && activeTab !== 'logs' && activeTab !== 'sales' && (
+      {activeTab !== 'metrics' && activeTab !== 'funnel' && activeTab !== 'leads' && activeTab !== 'logs' && activeTab !== 'sales' && (
         <div className="relative">
           <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
           <input
