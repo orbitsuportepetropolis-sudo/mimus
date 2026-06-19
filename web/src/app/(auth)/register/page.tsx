@@ -19,6 +19,7 @@ function RegisterForm() {
   const [storeName, setStoreName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -29,7 +30,7 @@ function RegisterForm() {
     setError(null)
 
     try {
-      const metaData: Record<string, any> = { name }
+      const metaData: Record<string, any> = { name, phone }
       
       // If operator registration link is used, attach store_id and role
       if (inviteStoreId) {
@@ -140,6 +141,21 @@ function RegisterForm() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Seu nome completo"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent text-sm transition-all duration-200"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="phone" className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400 mb-1">
+                  WhatsApp / Telefone
+                </label>
+                <input
+                  id="phone"
+                  type="text"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Ex: (11) 99999-9999"
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent text-sm transition-all duration-200"
                 />
               </div>

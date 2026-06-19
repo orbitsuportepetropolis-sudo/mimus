@@ -35,6 +35,7 @@ interface UserView {
   status: string
   created_at: string
   email: string | null
+  phone: string | null
   store_name: string | null
 }
 
@@ -58,6 +59,8 @@ interface SecurityLog {
   user_agent: string | null
   details: any
   store_id: string | null
+  profiles?: { name: string } | null
+  stores?: { name: string } | null
 }
 
 interface GlobalSale {
@@ -95,9 +98,19 @@ export default function SuperAdminPage() {
   const [newAdminName, setNewAdminName] = useState('')
   const [newAdminEmail, setNewAdminEmail] = useState('')
   const [newAdminPassword, setNewAdminPassword] = useState('')
+  const [newAdminPhone, setNewAdminPhone] = useState('')
   const [newAdminRole, setNewAdminRole] = useState('admin')
   const [newAdminStoreId, setNewAdminStoreId] = useState('')
   const [formLoading, setFormLoading] = useState(false)
+
+  // Edit user states
+  const [editUserName, setEditUserName] = useState('')
+  const [editUserPhone, setEditUserPhone] = useState('')
+  const [editUserRole, setEditUserRole] = useState('admin')
+
+  // Telemetry & Activity states
+  const [featureUsage, setFeatureUsage] = useState<{ name: string; count: number }[]>([])
+  const [recentActivities, setRecentActivities] = useState<SecurityLog[]>([])
 
   // Edit store states
   const [editStorePlan, setEditStorePlan] = useState('free')
@@ -113,10 +126,12 @@ export default function SuperAdminPage() {
       setLoading(true)
       
       if (activeTab === 'metrics') {
-        const [usersRes, storesRes, salesRes] = await Promise.all([
+        const [usersRes, storesRes, salesRes, activitiesRes, usageRes] = await Promise.all([
           supabase.from('profiles').select('id, name, role', { count: 'exact' }),
           supabase.from('stores').select('id, name, plan', { count: 'exact' }),
-          supabase.from('sales').select('id, total_value')
+          supabase.from('sales').select('id, total_value'),
+          supabase.from('security_logs').select('*, profiles(name), stores(name)').order('created_at', { ascending: false }).limit(10),
+          supabase.from('security_logs').select('details').eq('action', 'page_view').order('created_at', { ascending: false }).limit(1000)
         ])
 
         // Query profiles directly to get users list
@@ -142,11 +157,28 @@ export default function SuperAdminPage() {
             status: u.status,
             created_at: u.created_at,
             email: u.email,
+            phone: u.phone || null,
             store_name: u.stores?.name || null
           }))
           setUsers(formatted)
         }
         if (storesList) setStores(storesList as any)
+
+        if (activitiesRes.data) {
+          setRecentActivities(activitiesRes.data as any)
+        }
+
+        if (usageRes.data) {
+          const counts: Record<string, number> = {}
+          usageRes.data.forEach((log: any) => {
+            const name = log.details?.feature_name || 'Dashboard Home'
+            counts[name] = (counts[name] || 0) + 1
+          })
+          const sorted = Object.entries(counts)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count)
+          setFeatureUsage(sorted)
+        }
       } 
       
       else if (activeTab === 'users') {
@@ -163,6 +195,7 @@ export default function SuperAdminPage() {
             status: u.status,
             created_at: u.created_at,
             email: u.email,
+            phone: u.phone || null,
             store_name: u.stores?.name || null
           }))
           setUsers(formatted)
@@ -201,10 +234,10 @@ export default function SuperAdminPage() {
       else if (activeTab === 'logs') {
         const { data } = await supabase
           .from('security_logs')
-          .select('*')
+          .select('*, profiles(name), stores(name)')
           .order('created_at', { ascending: false })
           .limit(100)
-        if (data) setLogs(data)
+        if (data) setLogs(data as any)
       }
     } catch (err) {
       console.error('Error fetching admin data:', err)
@@ -245,21 +278,41 @@ export default function SuperAdminPage() {
     }
   }
 
-  const handleUpdateUserRole = async (userId: string, nextRole: string) => {
+  const handleOpenUserModal = (u: UserView) => {
+    setSelectedUser(u)
+    setEditUserName(u.name || '')
+    setEditUserPhone(u.phone || '')
+    setEditUserRole(u.role || 'admin')
+    setIsUserModalOpen(true)
+  }
+
+  const handleSaveUserDetails = async () => {
+    if (!selectedUser) return
+    setFormLoading(true)
+
     try {
       const response = await fetch('/api/super-admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'edit', userId, role: nextRole })
+        body: JSON.stringify({
+          action: 'edit',
+          userId: selectedUser.id,
+          name: editUserName,
+          phone: editUserPhone,
+          role: editUserRole,
+          status: selectedUser.status
+        })
       })
 
-      if (!response.ok) throw new Error('Erro ao atualizar cargo')
+      if (!response.ok) throw new Error('Erro ao atualizar dados do usuário')
       
-      alert('Cargo atualizado com sucesso!')
+      alert('Usuário atualizado com sucesso!')
       setIsUserModalOpen(false)
       loadData()
     } catch (err: any) {
       alert(err.message)
+    } finally {
+      setFormLoading(false)
     }
   }
 
@@ -296,6 +349,7 @@ export default function SuperAdminPage() {
           name: newAdminName,
           email: newAdminEmail,
           password: newAdminPassword,
+          phone: newAdminPhone,
           role: newAdminRole,
           storeId: newAdminStoreId || undefined
         })
@@ -310,6 +364,7 @@ export default function SuperAdminPage() {
       setNewAdminName('')
       setNewAdminEmail('')
       setNewAdminPassword('')
+      setNewAdminPhone('')
       setNewAdminRole('admin')
       setNewAdminStoreId('')
       loadData()
@@ -503,6 +558,120 @@ export default function SuperAdminPage() {
             </div>
 
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Features Mais Utilizadas */}
+            <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4">
+              <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-emerald-500" /> Features Mais Utilizadas (Uso)
+              </h3>
+              <p className="text-xs text-slate-400">Total de acessos/ações por feature detectadas via telemetria no sistema.</p>
+              
+              <div className="space-y-3.5 mt-2">
+                {featureUsage.length > 0 ? (
+                  featureUsage.slice(0, 6).map((item, idx) => {
+                    const maxVal = featureUsage[0]?.count || 1
+                    const percentage = Math.round((item.count / maxVal) * 100)
+                    const colors = [
+                      'bg-gradient-to-r from-rose-500 to-pink-500',
+                      'bg-gradient-to-r from-amber-500 to-rose-500',
+                      'bg-gradient-to-r from-emerald-500 to-teal-500',
+                      'bg-gradient-to-r from-indigo-500 to-violet-500',
+                      'bg-gradient-to-r from-sky-500 to-indigo-500',
+                      'bg-gradient-to-r from-slate-500 to-slate-400'
+                    ]
+                    const color = colors[idx % colors.length]
+
+                    return (
+                      <div key={item.name} className="space-y-1">
+                        <div className="flex justify-between text-xs font-semibold text-slate-350">
+                          <span>{item.name}</span>
+                          <span className="text-slate-500 font-mono text-[10px]">{item.count} acessos</span>
+                        </div>
+                        <div className="w-full bg-slate-900 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full transition-all duration-500 ${color}`} 
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <p className="text-xs text-slate-550 italic py-6 text-center">Nenhum dado de telemetria registrado ainda.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Últimos Acessos e Atividades */}
+            <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4">
+              <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                <Users className="w-4 h-4 text-indigo-500" /> Últimos Acessos & Atividades
+              </h3>
+              <p className="text-xs text-slate-400">Atividades e navegações em tempo real realizadas pelos usuários.</p>
+              
+              <div className="divide-y divide-slate-800/80 text-xs overflow-y-auto max-h-[300px] pr-1 space-y-2 mt-2">
+                {recentActivities.length > 0 ? (
+                  recentActivities.map(log => {
+                    const userName = log.profiles?.name || 'Sistema/Convidado'
+                    const storeName = log.stores?.name || 'Global'
+                    const formattedDate = new Date(log.created_at).toLocaleString('pt-BR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                      day: '2-digit',
+                      month: '2-digit'
+                    })
+
+                    // Humanize actions
+                    let actionText = log.action
+                    if (log.action === 'page_view') {
+                      actionText = `Acessou ${log.details?.feature_name || 'Dashboard'}`
+                    } else if (log.action.endsWith('_INSERT')) {
+                      const tab = log.action.split('_')[0]
+                      const map: Record<string, string> = {
+                        products: 'Cadastrou Produto',
+                        sales: 'Registrou Venda',
+                        customers: 'Cadastrou Cliente',
+                        stock_movements: 'Movimentou Estoque'
+                      }
+                      actionText = `${map[tab] || 'Criou registro'} (${log.details?.name || ''})`
+                    } else if (log.action.endsWith('_UPDATE')) {
+                      const tab = log.action.split('_')[0]
+                      const map: Record<string, string> = {
+                        products: 'Editou/Excluiu Produto',
+                        customers: 'Editou Cliente'
+                      }
+                      actionText = `${map[tab] || 'Atualizou registro'} (${log.details?.name || ''})`
+                    } else if (log.action === 'user_created') {
+                      actionText = `Criou usuário: ${log.details?.createdEmail || ''}`
+                    } else if (log.action === 'user_updated') {
+                      actionText = `Configurou usuário: ${log.details?.name || ''}`
+                    } else if (log.action === 'user_deleted') {
+                      actionText = 'Deletou usuário'
+                    }
+
+                    return (
+                      <div key={log.id} className="py-2.5 first:pt-0 last:pb-0 flex flex-col gap-1">
+                        <div className="flex justify-between items-start">
+                          <span className="font-bold text-slate-300 truncate max-w-[180px]">{userName}</span>
+                          <span className="text-[9px] text-slate-500 font-mono flex-shrink-0">{formattedDate}</span>
+                        </div>
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-slate-400 truncate max-w-[200px]">{actionText}</span>
+                          <span className="text-[10px] text-indigo-400/80 italic font-medium">{storeName}</span>
+                        </div>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <p className="text-xs text-slate-555 italic py-6 text-center">Nenhuma atividade registrada.</p>
+                )}
+              </div>
+            </div>
+
+          </div>
         </div>
       )}
 
@@ -560,16 +729,18 @@ export default function SuperAdminPage() {
                         <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${
                           store.plan_status === 'active' 
                             ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                            : store.plan_status === 'trial_custom'
+                            ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
                             : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
                         }`}>
-                          {store.plan_status}
+                          {store.plan_status === 'trial_custom' ? 'Avaliação Avulsa' : store.plan_status}
                         </span>
                       </td>
                       <td className="px-5 py-4 font-mono text-[10px] text-slate-400">
                         {store.custom_domain || 'Vitrine Padrão'}
                       </td>
                       <td className="px-5 py-4 text-slate-400">
-                        {store.trial_ends_at ? new Date(store.trial_ends_at).toLocaleDateString('pt-BR') : 'N/A'}
+                        {store.plan_status === 'trial_custom' ? 'Sem expiração' : (store.trial_ends_at ? new Date(store.trial_ends_at).toLocaleDateString('pt-BR') : 'N/A')}
                       </td>
                       <td className="px-5 py-4 text-right">
                         <button
@@ -593,6 +764,7 @@ export default function SuperAdminPage() {
                 <thead>
                   <tr className="border-b border-slate-800 bg-slate-900/40 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     <th className="px-5 py-3.5">Nome / Email</th>
+                    <th className="px-5 py-3.5">WhatsApp / Contato</th>
                     <th className="px-5 py-3.5">Nível de Acesso (Role)</th>
                     <th className="px-5 py-3.5">Status</th>
                     <th className="px-5 py-3.5">Loja Associada</th>
@@ -612,6 +784,24 @@ export default function SuperAdminPage() {
                             <span className="text-[10px] text-slate-500 font-mono">{u.email || 'OAuth/Sem Email'}</span>
                           </div>
                         </div>
+                      </td>
+                      <td className="px-5 py-4">
+                        {u.phone ? (
+                          <a
+                            href={`https://wa.me/${u.phone.replace(/\D/g, '').startsWith('55') ? u.phone.replace(/\D/g, '') : `55${u.phone.replace(/\D/g, '')}`}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-450 border border-emerald-500/25 transition-all active:scale-[0.98] group"
+                            title="Conversar no WhatsApp"
+                          >
+                            <svg className="w-3.5 h-3.5 fill-current text-emerald-400 group-hover:scale-110 transition-transform" viewBox="0 0 24 24">
+                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.458 5.704 1.459h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                            </svg>
+                            <span className="font-mono">{u.phone}</span>
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-slate-500 italic">Sem WhatsApp</span>
+                        )}
                       </td>
                       <td className="px-5 py-4">
                         <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${
@@ -659,10 +849,7 @@ export default function SuperAdminPage() {
                           </button>
 
                           <button
-                            onClick={() => {
-                              setSelectedUser(u)
-                              setIsUserModalOpen(true)
-                            }}
+                            onClick={() => handleOpenUserModal(u)}
                             className="p-1.5 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-850 text-slate-450"
                             title="Configurar Usuário"
                           >
@@ -728,6 +915,8 @@ export default function SuperAdminPage() {
                 <thead>
                   <tr className="border-b border-slate-800 bg-slate-900/40 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     <th className="px-5 py-3.5">Data / Hora</th>
+                    <th className="px-5 py-3.5">Usuário</th>
+                    <th className="px-5 py-3.5">Loja</th>
                     <th className="px-5 py-3.5">Ação Realizada</th>
                     <th className="px-5 py-3.5">Endereço IP</th>
                     <th className="px-5 py-3.5">Dispositivo / User-Agent</th>
@@ -735,21 +924,28 @@ export default function SuperAdminPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {logs.map(log => (
-                    <tr key={log.id} className="hover:bg-slate-900/10">
-                      <td className="px-5 py-4 font-mono text-[10px] text-slate-400">
-                        {new Date(log.created_at).toLocaleString('pt-BR')}
-                      </td>
-                      <td className="px-5 py-4 font-bold text-slate-200">{log.action}</td>
-                      <td className="px-5 py-4 font-mono text-[10px] text-slate-400">{log.ip}</td>
-                      <td className="px-5 py-4 text-slate-400 max-w-xs truncate" title={log.user_agent || ''}>
-                        {log.user_agent}
-                      </td>
-                      <td className="px-5 py-4 font-mono text-[9px] text-slate-500 max-w-md truncate">
-                        {JSON.stringify(log.details)}
-                      </td>
-                    </tr>
-                  ))}
+                  {logs.map(log => {
+                    const userName = log.profiles?.name || 'Sistema/Convidado'
+                    const storeName = log.stores?.name || 'Global'
+
+                    return (
+                      <tr key={log.id} className="hover:bg-slate-900/10">
+                        <td className="px-5 py-4 font-mono text-[10px] text-slate-400">
+                          {new Date(log.created_at).toLocaleString('pt-BR')}
+                        </td>
+                        <td className="px-5 py-4 font-semibold text-slate-350">{userName}</td>
+                        <td className="px-5 py-4 text-indigo-400 text-[11px] font-medium">{storeName}</td>
+                        <td className="px-5 py-4 font-bold text-slate-200">{log.action}</td>
+                        <td className="px-5 py-4 font-mono text-[10px] text-slate-400">{log.ip}</td>
+                        <td className="px-5 py-4 text-slate-400 max-w-xs truncate" title={log.user_agent || ''}>
+                          {log.user_agent}
+                        </td>
+                        <td className="px-5 py-4 font-mono text-[9px] text-slate-500 max-w-md truncate">
+                          {JSON.stringify(log.details)}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -786,6 +982,18 @@ export default function SuperAdminPage() {
                   value={newAdminEmail}
                   onChange={(e) => setNewAdminEmail(e.target.value)}
                   placeholder="adriano@mimus.com.br"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-400 uppercase tracking-wider mb-1.5">WhatsApp / Telefone</label>
+                <input
+                  type="text"
+                  required
+                  value={newAdminPhone}
+                  onChange={(e) => setNewAdminPhone(e.target.value)}
+                  placeholder="Ex: (11) 99999-9999"
                   className="w-full px-3 py-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500 font-mono"
                 />
               </div>
@@ -854,15 +1062,37 @@ export default function SuperAdminPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
           <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl animate-in scale-in duration-150 text-slate-100">
             <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-              <Key className="w-5 h-5 text-amber-500" /> Nível de Acesso (RBAC) - {selectedUser.name}
+              <Key className="w-5 h-5 text-amber-500" /> Configuração do Usuário
             </h3>
 
             <div className="space-y-4 text-xs">
               <div>
-                <label className="block font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Selecione o Cargo / Papel</label>
+                <label className="block font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Nome Completo</label>
+                <input
+                  type="text"
+                  required
+                  value={editUserName}
+                  onChange={(e) => setEditUserName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-400 uppercase tracking-wider mb-1.5">WhatsApp / Telefone</label>
+                <input
+                  type="text"
+                  value={editUserPhone}
+                  onChange={(e) => setEditUserPhone(e.target.value)}
+                  placeholder="Ex: (11) 99999-9999"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Cargo / Papel (RBAC)</label>
                 <select
-                  defaultValue={selectedUser.role}
-                  onChange={(e) => handleUpdateUserRole(selectedUser.id, e.target.value)}
+                  value={editUserRole}
+                  onChange={(e) => setEditUserRole(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500 font-bold"
                 >
                   <option value="super_admin">Super Admin (Acesso Total)</option>
@@ -871,13 +1101,22 @@ export default function SuperAdminPage() {
                 </select>
               </div>
 
-              <div className="flex justify-end pt-4">
+              <div className="flex gap-2 justify-end pt-4">
                 <button
                   type="button"
                   onClick={() => setIsUserModalOpen(false)}
                   className="px-4 py-2 rounded-xl border border-slate-850 hover:bg-slate-800 text-slate-400 font-semibold"
                 >
-                  Fechar
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveUserDetails}
+                  disabled={formLoading}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-450 text-slate-955 font-bold flex items-center gap-1.5"
+                >
+                  {formLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Salvar Alterações
                 </button>
               </div>
             </div>
@@ -915,6 +1154,7 @@ export default function SuperAdminPage() {
                   className="w-full px-3 py-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-100 focus:outline-none"
                 >
                   <option value="trial">Avaliação Gratuita (Trial)</option>
+                  <option value="trial_custom">Avaliação Avulsa (Tempo Indeterminado)</option>
                   <option value="active">Ativa / Pago</option>
                   <option value="expired">Atrasada / Expirada</option>
                 </select>

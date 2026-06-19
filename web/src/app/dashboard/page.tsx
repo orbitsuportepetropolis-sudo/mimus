@@ -62,7 +62,7 @@ export default function DashboardPage() {
     const diff = new Date(trialEndsAt).getTime() - Date.now()
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
   }
-  const isTrialActive = planStatus === 'trial' && getTrialDaysLeft() > 0
+  const isTrialActive = (planStatus === 'trial' && getTrialDaysLeft() > 0) || planStatus === 'trial_custom'
   const isProUser = storePlan === 'pro' || isTrialActive
 
   async function loadDashboardData(showSpinner = false) {

@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     const adminClient = getAdminClient()
 
     if (action === 'create') {
-      const { email, password, name, role = 'admin', storeId } = body
+      const { email, password, name, phone, role = 'admin', storeId } = body
 
       if (!email || !password || !name) {
         return NextResponse.json({ error: 'E-mail, senha e nome são obrigatórios' }, { status: 400 })
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         email,
         password,
         email_confirm: true,
-        user_metadata: { name, role, store_id: storeId }
+        user_metadata: { name, role, store_id: storeId, phone }
       })
 
       if (authErr) throw authErr
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       // Note: The handle_new_user trigger should run automatically, but we can verify/update.
       const { error: profileErr } = await adminClient
         .from('profiles')
-        .update({ role, name, status: 'active', store_id: storeId || null })
+        .update({ role, name, status: 'active', store_id: storeId || null, phone: phone || null })
         .eq('id', authUser.user.id)
 
       // Log the user creation
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, user: authUser.user })
 
     } else if (action === 'edit') {
-      const { userId, name, role, status } = body
+      const { userId, name, role, status, phone } = body
 
       if (!userId) {
         return NextResponse.json({ error: 'userId é obrigatório' }, { status: 400 })
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       // Update profile
       const { error: updateErr } = await adminClient
         .from('profiles')
-        .update({ name, role, status })
+        .update({ name, role, status, phone })
         .eq('id', userId)
 
       if (updateErr) throw updateErr

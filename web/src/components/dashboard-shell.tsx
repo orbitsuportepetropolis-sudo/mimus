@@ -78,10 +78,48 @@ export default function DashboardShell({ children, profile, store, lowStockCount
     return () => window.removeEventListener('dashboard-refresh', loadAgentData)
   }, [])
 
+  // System activity telemetria (Page views tracker)
+  useEffect(() => {
+    if (!profile) return
+
+    const logPageView = async () => {
+      try {
+        let featureName = 'Dashboard Home'
+        if (pathname.includes('/dashboard/sales')) featureName = 'PDV / Vendas'
+        else if (pathname.includes('/dashboard/products')) featureName = 'Produtos'
+        else if (pathname.includes('/dashboard/stock')) featureName = 'Estoque'
+        else if (pathname.includes('/dashboard/customers')) featureName = 'Clientes'
+        else if (pathname.includes('/dashboard/finance')) featureName = 'Financeiro'
+        else if (pathname.includes('/dashboard/settings')) featureName = 'Configurações'
+        else if (pathname.includes('/dashboard/integrations')) featureName = 'Integrações'
+        else if (pathname.includes('/dashboard/team')) featureName = 'Equipe'
+        else if (pathname.includes('/dashboard/billing')) featureName = 'Mensalidade'
+        else if (pathname.includes('/super-admin')) featureName = 'Painel Super Admin'
+
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        await supabase.from('security_logs').insert([{
+          user_id: user.id,
+          action: 'page_view',
+          details: { 
+            path: pathname, 
+            feature_name: featureName 
+          },
+          store_id: profile.store_id || null
+        }])
+      } catch (err) {
+        console.error('Failed to log page view telemetry:', err)
+      }
+    }
+
+    logPageView()
+  }, [pathname, profile, supabase])
+
   const plan = store?.plan || 'free'
   const status = store?.plan_status || 'trial'
   const trialEnds = store?.trial_ends_at ? new Date(store.trial_ends_at).getTime() : 0
-  const isTrialValid = status === 'trial' && trialEnds > Date.now()
+  const isTrialValid = (status === 'trial' && trialEnds > Date.now()) || status === 'trial_custom'
   const isProValid = plan === 'pro' && (status === 'active' || status === 'pending' || status === 'pro')
   const isPro = isTrialValid || isProValid
   const hasAccess = true
