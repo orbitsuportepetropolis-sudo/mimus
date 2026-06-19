@@ -972,111 +972,124 @@ export default function SuperAdminPage() {
 
               {/* Ranking & Logs de Atividade */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Features Mais Utilizadas */}
+                {/* Lojas por Status de Plano */}
                 <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4">
                   <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-emerald-500" /> Features Mais Utilizadas (Uso)
+                    <CreditCard className="w-4 h-4 text-emerald-500" /> Lojas por Status de Plano
                   </h3>
-                  <p className="text-xs text-slate-450">Total de acessos/ações por feature detectadas via telemetria no sistema.</p>
+                  <p className="text-xs text-slate-450">Distribuição das lojas cadastradas de acordo com o status do plano.</p>
                   
                   <div className="space-y-3.5 mt-2">
-                    {featureUsage.length > 0 ? (
-                      featureUsage.slice(0, 6).map((item, idx) => {
-                        const maxVal = featureUsage[0]?.count || 1
-                        const percentage = Math.round((item.count / maxVal) * 100)
-                        const colors = [
-                          'bg-gradient-to-r from-rose-500 to-pink-500',
-                          'bg-gradient-to-r from-amber-500 to-rose-500',
-                          'bg-gradient-to-r from-emerald-500 to-teal-500',
-                          'bg-gradient-to-r from-indigo-500 to-violet-500',
-                          'bg-gradient-to-r from-sky-500 to-indigo-500',
-                          'bg-gradient-to-r from-slate-500 to-slate-400'
-                        ]
-                        const color = colors[idx % colors.length]
+                    {(() => {
+                      const totalStoresCount = stores.length || 1
+                      const planStatusCounts = stores.reduce((acc: Record<string, number>, store) => {
+                        let group = 'Outro'
+                        if (store.plan_status === 'active') {
+                          group = store.plan === 'pro' ? 'Pro Ativo' : 'Gratuito Free'
+                        } else if (store.plan_status === 'trial') {
+                          group = 'Trial Gratuito'
+                        } else if (store.plan_status === 'trial_custom') {
+                          group = 'Trial Avulso'
+                        } else if (store.plan_status === 'canceled') {
+                          group = 'Cancelado'
+                        } else if (store.plan_status === 'expired') {
+                          group = 'Expirado'
+                        }
+                        acc[group] = (acc[group] || 0) + 1
+                        return acc
+                      }, {})
 
-                        return (
-                          <div key={item.name} className="space-y-1">
-                            <div className="flex justify-between text-xs font-semibold text-slate-350">
-                              <span>{item.name}</span>
-                              <span className="text-slate-500 font-mono text-[10px]">{item.count} acessos</span>
+                      const order = ['Pro Ativo', 'Trial Gratuito', 'Trial Avulso', 'Gratuito Free', 'Expirado', 'Cancelado', 'Outro']
+                      const colors: Record<string, string> = {
+                        'Pro Ativo': 'bg-gradient-to-r from-emerald-500 to-teal-500',
+                        'Trial Gratuito': 'bg-gradient-to-r from-indigo-500 to-violet-500',
+                        'Trial Avulso': 'bg-gradient-to-r from-amber-500 to-rose-500',
+                        'Gratuito Free': 'bg-gradient-to-r from-slate-500 to-slate-400',
+                        'Expirado': 'bg-gradient-to-r from-rose-600 to-rose-500',
+                        'Cancelado': 'bg-gradient-to-r from-slate-700 to-slate-650',
+                        'Outro': 'bg-gradient-to-r from-slate-600 to-slate-500'
+                      }
+
+                      const activeStatusGroups = order.filter(group => planStatusCounts[group] > 0)
+
+                      return activeStatusGroups.length > 0 ? (
+                        activeStatusGroups.map(group => {
+                          const count = planStatusCounts[group] || 0
+                          const percentage = Math.round((count / totalStoresCount) * 100)
+                          const color = colors[group] || colors['Outro']
+
+                          return (
+                            <div key={group} className="space-y-1">
+                              <div className="flex justify-between text-xs font-semibold text-slate-350">
+                                <span>{group}</span>
+                                <span className="text-slate-500 font-mono text-[10px]">{count} {count === 1 ? 'loja' : 'lojas'} ({percentage}%)</span>
+                              </div>
+                              <div className="w-full bg-slate-900 rounded-full h-2">
+                                <div 
+                                  className={`h-2 rounded-full transition-all duration-500 ${color}`} 
+                                  style={{ width: `${percentage}%` }}
+                                />
+                              </div>
                             </div>
-                            <div className="w-full bg-slate-900 rounded-full h-2">
-                              <div 
-                                className={`h-2 rounded-full transition-all duration-500 ${color}`} 
-                                style={{ width: `${percentage}%` }}
-                              />
-                            </div>
-                          </div>
-                        )
-                      })
-                    ) : (
-                      <p className="text-xs text-slate-550 italic py-6 text-center">Nenhum dado de telemetria registrado ainda.</p>
-                    )}
+                          )
+                        })
+                      ) : (
+                        <p className="text-xs text-slate-550 italic py-6 text-center">Nenhuma loja cadastrada.</p>
+                      )
+                    })()}
                   </div>
                 </div>
 
-                {/* Últimos Acessos e Atividades */}
+                {/* Cadastros Recentes */}
                 <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4">
                   <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                    <Users className="w-4 h-4 text-indigo-500" /> Últimos Acessos & Atividades
+                    <Users className="w-4 h-4 text-indigo-500" /> Cadastros Recentes
                   </h3>
-                  <p className="text-xs text-slate-450">Atividades e navegações em tempo real realizadas pelos usuários.</p>
+                  <p className="text-xs text-slate-450">As últimas lojas criadas na plataforma e seus respectivos planos.</p>
                   
                   <div className="divide-y divide-slate-800/80 text-xs overflow-y-auto max-h-[300px] pr-1 space-y-2 mt-2">
-                    {recentActivities.length > 0 ? (
-                      recentActivities.map(log => {
-                        const userName = log.profiles?.name || 'Sistema/Convidado'
-                        const storeName = log.stores?.name || 'Global'
-                        const formattedDate = new Date(log.created_at).toLocaleString('pt-BR', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                          day: '2-digit',
-                          month: '2-digit'
+                    {stores.length > 0 ? (
+                      [...stores]
+                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                        .slice(0, 6)
+                        .map(store => {
+                          const formattedDate = new Date(store.created_at).toLocaleDateString('pt-BR')
+                          let badgeColor = 'bg-slate-800 text-slate-400 border border-slate-700/20'
+                          let planLabel = store.plan_status === 'trial_custom' ? 'Trial Avulso' : store.plan_status
+                          
+                          if (store.plan_status === 'active') {
+                            badgeColor = store.plan === 'pro' 
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                              : 'bg-slate-800 text-slate-300 border border-slate-700/20'
+                            planLabel = store.plan === 'pro' ? 'Pro Ativo' : 'Gratuito Free'
+                          } else if (store.plan_status === 'trial') {
+                            badgeColor = 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                            planLabel = 'Trial Gratuito'
+                          } else if (store.plan_status === 'trial_custom') {
+                            badgeColor = 'bg-amber-500/10 text-amber-450 border border-amber-500/20'
+                            planLabel = 'Trial Avulso'
+                          } else if (store.plan_status === 'expired') {
+                            badgeColor = 'bg-rose-500/10 text-rose-450 border border-rose-500/20'
+                            planLabel = 'Expirado'
+                          } else if (store.plan_status === 'canceled') {
+                            badgeColor = 'bg-slate-800 text-slate-500 border border-slate-700/20'
+                            planLabel = 'Cancelado'
+                          }
+
+                          return (
+                            <div key={store.id} className="py-2.5 first:pt-0 last:pb-0 flex justify-between items-center gap-2">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="font-bold text-slate-200">{store.name}</span>
+                                <span className="text-[10px] text-slate-500 font-mono">Cadastrada em {formattedDate}</span>
+                              </div>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${badgeColor}`}>
+                                {planLabel}
+                              </span>
+                            </div>
+                          )
                         })
-
-                        let actionText = log.action
-                        if (log.action === 'page_view') {
-                          actionText = `Acessou ${log.details?.feature_name || 'Dashboard'}`
-                        } else if (log.action.endsWith('_INSERT')) {
-                          const tab = log.action.split('_')[0]
-                          const map: Record<string, string> = {
-                            products: 'Cadastrou Produto',
-                            sales: 'Registrou Venda',
-                            customers: 'Cadastrou Cliente',
-                            stock_movements: 'Movimentou Estoque'
-                          }
-                          actionText = `${map[tab] || 'Criou registro'} (${log.details?.name || ''})`
-                        } else if (log.action.endsWith('_UPDATE')) {
-                          const tab = log.action.split('_')[0]
-                          const map: Record<string, string> = {
-                            products: 'Editou/Excluiu Produto',
-                            customers: 'Editou Cliente'
-                          }
-                          actionText = `${map[tab] || 'Atualizou registro'} (${log.details?.name || ''})`
-                        } else if (log.action === 'user_created') {
-                          actionText = `Criou usuário: ${log.details?.createdEmail || ''}`
-                        } else if (log.action === 'user_updated') {
-                          actionText = `Configurou usuário: ${log.details?.name || ''}`
-                        } else if (log.action === 'user_deleted') {
-                          actionText = 'Deletou usuário'
-                        }
-
-                        return (
-                          <div key={log.id} className="py-2.5 first:pt-0 last:pb-0 flex flex-col gap-1">
-                            <div className="flex justify-between items-start">
-                              <span className="font-bold text-slate-300 truncate max-w-[180px]">{userName}</span>
-                              <span className="text-[9px] text-slate-500 font-mono flex-shrink-0">{formattedDate}</span>
-                            </div>
-                            <div className="flex justify-between text-[11px]">
-                              <span className="text-slate-400 truncate max-w-[200px]">{actionText}</span>
-                              <span className="text-[10px] text-indigo-400/80 italic font-medium">{storeName}</span>
-                            </div>
-                          </div>
-                        )
-                      })
                     ) : (
-                      <p className="text-xs text-slate-555 italic py-6 text-center">Nenhuma atividade registrada.</p>
+                      <p className="text-xs text-slate-550 italic py-6 text-center">Nenhuma loja cadastrada.</p>
                     )}
                   </div>
                 </div>
@@ -1774,44 +1787,62 @@ export default function SuperAdminPage() {
 
           {/* LOGS DE SEGURANÇA TAB */}
           {activeTab === 'logs' && (
-            <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-sm animate-in fade-in duration-200">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-slate-800 bg-slate-900/40 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    <th className="px-5 py-3.5">Data / Hora</th>
-                    <th className="px-5 py-3.5">Usuário</th>
-                    <th className="px-5 py-3.5">Loja</th>
-                    <th className="px-5 py-3.5">Ação Realizada</th>
-                    <th className="px-5 py-3.5">Endereço IP</th>
-                    <th className="px-5 py-3.5">Dispositivo / User-Agent</th>
-                    <th className="px-5 py-3.5">Detalhes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {logs.map(log => {
-                    const userName = log.profiles?.name || 'Sistema/Convidado'
-                    const storeName = log.stores?.name || 'Global'
+            <div className="space-y-4 animate-in fade-in duration-200">
+              {logs.length > 0 ? (
+                <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-800 bg-slate-900/40 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          <th className="px-5 py-3.5">Data / Hora</th>
+                          <th className="px-5 py-3.5">Usuário</th>
+                          <th className="px-5 py-3.5">Loja</th>
+                          <th className="px-5 py-3.5">Ação Realizada</th>
+                          <th className="px-5 py-3.5">Endereço IP</th>
+                          <th className="px-5 py-3.5">Dispositivo / User-Agent</th>
+                          <th className="px-5 py-3.5">Detalhes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {logs.map(log => {
+                          const userName = log.profiles?.name || 'Sistema/Convidado'
+                          const storeName = log.stores?.name || 'Global'
 
-                    return (
-                      <tr key={log.id} className="hover:bg-slate-900/10">
-                        <td className="px-5 py-4 font-mono text-[10px] text-slate-400">
-                          {new Date(log.created_at).toLocaleString('pt-BR')}
-                        </td>
-                        <td className="px-5 py-4 font-semibold text-slate-350">{userName}</td>
-                        <td className="px-5 py-4 text-indigo-400 text-[11px] font-medium">{storeName}</td>
-                        <td className="px-5 py-4 font-bold text-slate-200">{log.action}</td>
-                        <td className="px-5 py-4 font-mono text-[10px] text-slate-400">{log.ip}</td>
-                        <td className="px-5 py-4 text-slate-400 max-w-xs truncate" title={log.user_agent || ''}>
-                          {log.user_agent}
-                        </td>
-                        <td className="px-5 py-4 font-mono text-[9px] text-slate-500 max-w-md truncate">
-                          {JSON.stringify(log.details)}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                          return (
+                            <tr key={log.id} className="hover:bg-slate-900/10">
+                              <td className="px-5 py-4 font-mono text-[10px] text-slate-400">
+                                {new Date(log.created_at).toLocaleString('pt-BR')}
+                              </td>
+                              <td className="px-5 py-4 font-semibold text-slate-350">{userName}</td>
+                              <td className="px-5 py-4 text-indigo-400 text-[11px] font-medium">{storeName}</td>
+                              <td className="px-5 py-4 font-bold text-slate-200">{log.action}</td>
+                              <td className="px-5 py-4 font-mono text-[10px] text-slate-400">{log.ip}</td>
+                              <td className="px-5 py-4 text-slate-400 max-w-xs truncate" title={log.user_agent || ''}>
+                                {log.user_agent}
+                              </td>
+                              <td className="px-5 py-4 font-mono text-[9px] text-slate-500 max-w-md truncate">
+                                {JSON.stringify(log.details)}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-slate-950 rounded-2xl border border-slate-800 p-16 flex flex-col items-center justify-center gap-4 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-900/40 flex items-center justify-center">
+                    <Lock className="w-7 h-7 text-slate-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-bold text-slate-400">Nenhum log de segurança registrado</h3>
+                    <p className="text-xs text-slate-500 max-w-sm leading-relaxed">
+                      Os logs de segurança são registrados automaticamente pelo sistema quando ações críticas ocorrem (criação de usuários, alterações de plano, acessos suspeitos, etc.).
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>
