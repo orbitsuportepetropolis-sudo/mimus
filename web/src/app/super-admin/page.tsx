@@ -415,7 +415,7 @@ export default function SuperAdminPage() {
         setFunnelUsers(funnelRealUsers)
 
         // Telemetry Feature Usage processing
-        const pageViewsLogs = recentLogs.filter((log: any) => log.action === 'page_view')
+        const pageViewsLogs = recentLogs.filter((log: any) => log.action === 'page_view' && log.store_id !== TEST_STORE_ID)
         const counts: Record<string, number> = {}
         pageViewsLogs.forEach((log: any) => {
           const name = log.details?.feature_name || 'Dashboard Home'
@@ -1090,6 +1090,118 @@ export default function SuperAdminPage() {
                         })
                     ) : (
                       <p className="text-xs text-slate-550 italic py-6 text-center">Nenhuma loja cadastrada.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Telemetria e Logs de Atividade */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                {/* Features Mais Utilizadas */}
+                <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4">
+                  <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-emerald-500" /> Uso de Funcionalidades (Telemetria)
+                  </h3>
+                  <p className="text-xs text-slate-450">Total de acessos por funcionalidade detectados via telemetria no sistema.</p>
+                  
+                  <div className="space-y-3.5 mt-2">
+                    {featureUsage.length > 0 ? (
+                      featureUsage.slice(0, 6).map((item, idx) => {
+                        const maxVal = featureUsage[0]?.count || 1
+                        const percentage = Math.round((item.count / maxVal) * 100)
+                        const colors = [
+                          'bg-gradient-to-r from-rose-500 to-pink-500',
+                          'bg-gradient-to-r from-amber-500 to-rose-500',
+                          'bg-gradient-to-r from-emerald-500 to-teal-500',
+                          'bg-gradient-to-r from-indigo-500 to-violet-500',
+                          'bg-gradient-to-r from-sky-500 to-indigo-500',
+                          'bg-gradient-to-r from-slate-500 to-slate-400'
+                        ]
+                        const color = colors[idx % colors.length]
+
+                        return (
+                          <div key={item.name} className="space-y-1">
+                            <div className="flex justify-between text-xs font-semibold text-slate-350">
+                              <span>{item.name}</span>
+                              <span className="text-slate-500 font-mono text-[10px]">{item.count} acessos</span>
+                            </div>
+                            <div className="w-full bg-slate-900 rounded-full h-2">
+                              <div 
+                                className={`h-2 rounded-full transition-all duration-500 ${color}`} 
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        )
+                      })
+                    ) : (
+                      <p className="text-xs text-slate-550 italic py-6 text-center">Nenhum dado de telemetria registrado ainda.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Últimos Acessos e Atividades */}
+                <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4">
+                  <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-indigo-500" /> Últimos Acessos & Atividades
+                  </h3>
+                  <p className="text-xs text-slate-450">Atividades e navegações em tempo real realizadas pelos usuários.</p>
+                  
+                  <div className="divide-y divide-slate-800/80 text-xs overflow-y-auto max-h-[300px] pr-1 space-y-2 mt-2">
+                    {recentActivities.length > 0 ? (
+                      recentActivities.map(log => {
+                        const userName = log.profiles?.name || 'Sistema/Convidado'
+                        const storeName = log.stores?.name || 'Global'
+                        const formattedDate = new Date(log.created_at).toLocaleString('pt-BR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                          day: '2-digit',
+                          month: '2-digit'
+                        })
+
+                        let actionText = log.action
+                        if (log.action === 'page_view') {
+                          actionText = `Acessou ${log.details?.feature_name || 'Dashboard'}`
+                        } else if (log.action.endsWith('_INSERT')) {
+                          const tab = log.action.split('_')[0]
+                          const map: Record<string, string> = {
+                            products: 'Cadastrou Produto',
+                            sales: 'Registrou Venda',
+                            customers: 'Cadastrou Cliente',
+                            stock_movements: 'Movimentou Estoque'
+                          }
+                          actionText = `${map[tab] || 'Criou registro'} (${log.details?.name || ''})`
+                        } else if (log.action.endsWith('_UPDATE')) {
+                          const tab = log.action.split('_')[0]
+                          const map: Record<string, string> = {
+                            products: 'Editou/Excluiu Produto',
+                            customers: 'Editou Cliente'
+                          }
+                          actionText = `${map[tab] || 'Atualizou registro'} (${log.details?.name || ''})`
+                        } else if (log.action === 'user_created') {
+                          actionText = `Criou usuário: ${log.details?.createdEmail || ''}`
+                        } else if (log.action === 'user_updated') {
+                          actionText = `Configurou usuário: ${log.details?.name || ''}`
+                        } else if (log.action === 'user_deleted') {
+                          actionText = 'Deletou usuário'
+                        }
+
+                        return (
+                          <div key={log.id} className="py-2.5 first:pt-0 last:pb-0 flex flex-col gap-1">
+                            <div className="flex justify-between items-start">
+                              <span className="font-bold text-slate-300 truncate max-w-[180px]">{userName}</span>
+                              <span className="text-[9px] text-slate-500 font-mono flex-shrink-0">{formattedDate}</span>
+                            </div>
+                            <div className="flex justify-between text-[11px]">
+                              <span className="text-slate-400 truncate max-w-[200px]">{actionText}</span>
+                              <span className="text-[10px] text-indigo-400/80 italic font-medium">{storeName}</span>
+                            </div>
+                          </div>
+                        )
+                      })
+                    ) : (
+                      <p className="text-xs text-slate-555 italic py-6 text-center">Nenhuma atividade registrada.</p>
                     )}
                   </div>
                 </div>
