@@ -126,51 +126,65 @@ export default function SuperAdminPage() {
       setLoading(true)
       
       if (activeTab === 'metrics') {
+        const TEST_STORE_ID = 'b70a51e1-26ad-4236-a332-ba89cf966c76'
+
         const [usersRes, storesRes, salesRes, activitiesRes, usageRes] = await Promise.all([
-          supabase.from('profiles').select('id, name, role', { count: 'exact' }),
-          supabase.from('stores').select('id, name, plan', { count: 'exact' }),
-          supabase.from('sales').select('id, total_value'),
-          supabase.from('security_logs').select('*, profiles(name), stores(name)').order('created_at', { ascending: false }).limit(10),
-          supabase.from('security_logs').select('details').eq('action', 'page_view').order('created_at', { ascending: false }).limit(1000)
+          supabase.from('profiles').select('*, stores(name)').order('created_at', { ascending: false }),
+          supabase.from('stores').select('*').order('created_at', { ascending: false }),
+          supabase.from('sales').select('id, total_value, store_id, payment_method, created_at'),
+          supabase.from('security_logs').select('*, profiles(name), stores(name)').order('created_at', { ascending: false }).limit(50),
+          supabase.from('security_logs').select('details, store_id').eq('action', 'page_view').order('created_at', { ascending: false }).limit(1000)
         ])
 
-        // Query profiles directly to get users list
-        const { data: usersView } = await supabase
-          .from('profiles')
-          .select('*, stores(name)')
-          .order('created_at', { ascending: false })
-          .limit(10)
+        // 1. Filter out the test store from the stores list
+        const allStores = storesRes.data || []
+        const filteredStores = allStores.filter((s: any) => s.id !== TEST_STORE_ID)
+        setStores(filteredStores)
 
-        // Query stores to show recent
-        const { data: storesList } = await supabase
-          .from('stores')
-          .select('id, name, plan, plan_status, created_at')
-          .order('created_at', { ascending: false })
-          .limit(5)
+        // 2. Filter out the test store's users from the users list
+        const allUsers = usersRes.data || []
+        const filteredUsers = allUsers.filter((u: any) => u.store_id !== TEST_STORE_ID)
+        const formattedUsers = filteredUsers.map((u: any) => ({
+          id: u.id,
+          store_id: u.store_id,
+          name: u.name,
+          role: u.role,
+          status: u.status,
+          created_at: u.created_at,
+          email: u.email,
+          phone: u.phone || null,
+          store_name: u.stores?.name || null
+        }))
+        setUsers(formattedUsers)
 
-        if (usersView) {
-          const formatted = usersView.map((u: any) => ({
-            id: u.id,
-            store_id: u.store_id,
-            name: u.name,
-            role: u.role,
-            status: u.status,
-            created_at: u.created_at,
-            email: u.email,
-            phone: u.phone || null,
-            store_name: u.stores?.name || null
+        // 3. Filter out the test store's sales
+        const allSales = salesRes.data || []
+        const filteredSales = allSales
+          .filter((s: any) => s.store_id !== TEST_STORE_ID)
+          .map((s: any) => ({
+            id: s.id,
+            store_id: s.store_id,
+            total_value: Number(s.total_value) || 0,
+            payment_method: s.payment_method || 'unknown',
+            created_at: s.created_at || new Date().toISOString()
           }))
-          setUsers(formatted)
-        }
-        if (storesList) setStores(storesList as any)
+        setSales(filteredSales)
 
+        // 4. Filter out test store activities (limit to 10 for display)
         if (activitiesRes.data) {
-          setRecentActivities(activitiesRes.data as any)
+          const filteredActivities = (activitiesRes.data as any[])
+            .filter((log: any) => log.store_id !== TEST_STORE_ID)
+            .slice(0, 10)
+          setRecentActivities(filteredActivities)
         }
 
+        // 5. Filter out test store feature usage telemetry
         if (usageRes.data) {
+          const filteredUsage = (usageRes.data as any[])
+            .filter((log: any) => log.store_id !== TEST_STORE_ID)
+          
           const counts: Record<string, number> = {}
-          usageRes.data.forEach((log: any) => {
+          filteredUsage.forEach((log: any) => {
             const name = log.details?.feature_name || 'Dashboard Home'
             counts[name] = (counts[name] || 0) + 1
           })
