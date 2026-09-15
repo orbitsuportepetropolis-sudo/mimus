@@ -337,19 +337,30 @@ export default function FinancePage() {
               <tbody className="divide-y divide-slate-50 dark:divide-zinc-800/40">
                 {transactions.map(t => {
                   const isRev = t.type === 'revenue'
+                  const isStockWriteOff = t.category === 'Baixa de Estoque' || t.category === 'stock_writeoff'
                   const catLabel = 
                     t.category === 'sale' ? 'Venda PDV' :
                     t.category === 'supplier' ? 'Fornecedor' :
+                    isStockWriteOff ? 'Baixa de Estoque' :
                     t.category === 'rent' ? 'Aluguel' :
                     t.category === 'marketing' ? 'Anúncios / Ads' :
-                    t.category === 'salary' ? 'Pró-labore / Salários' : 'Outros'
+                    t.category === 'salary' ? 'Pró-labore / Salários' : 
+                    (t.category || 'Outros')
 
                   return (
                     <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-950/20">
                       <td className="py-3 font-bold text-slate-700 dark:text-zinc-300">
                         {t.description || 'Lançamento sem descrição'}
                       </td>
-                      <td className="py-3 text-slate-500 dark:text-zinc-400">{catLabel}</td>
+                      <td className="py-3 text-slate-500 dark:text-zinc-400">
+                        {isStockWriteOff ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40">
+                            Baixa de Estoque
+                          </span>
+                        ) : (
+                          catLabel
+                        )}
+                      </td>
                       <td className="py-3">
                         <span className={`px-2 py-0.5 rounded-full font-bold text-[9px] ${
                           isRev ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/30'
@@ -424,6 +435,7 @@ export default function FinancePage() {
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none"
                 >
                   <option value="supplier">Fornecedor / Mercadorias</option>
+                  <option value="Baixa de Estoque">Baixa de Estoque / Perdas</option>
                   <option value="rent">Aluguel / Condomínio</option>
                   <option value="marketing">Anúncios Instagram / Facebook Ads</option>
                   <option value="salary">Salários / Comissões</option>

@@ -86,8 +86,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
       try {
         let featureName = 'Dashboard Home'
         if (pathname.includes('/dashboard/sales')) featureName = 'PDV / Vendas'
-        else if (pathname.includes('/dashboard/products')) featureName = 'Produtos'
-        else if (pathname.includes('/dashboard/stock')) featureName = 'Estoque'
+        else if (pathname.includes('/dashboard/products') || pathname.includes('/dashboard/stock')) featureName = 'Produtos'
         else if (pathname.includes('/dashboard/customers')) featureName = 'Clientes'
         else if (pathname.includes('/dashboard/finance')) featureName = 'Financeiro'
         else if (pathname.includes('/dashboard/settings')) featureName = 'Configurações'
@@ -493,7 +492,6 @@ export default function DashboardShell({ children, profile, store, lowStockCount
     ...(profile?.role === 'super_admin' ? [{ name: 'Super Admin 👑', href: '/super-admin', icon: Sparkles }] : []),
     { name: 'PDV / Vendas', href: '/dashboard/sales', icon: ShoppingBag },
     { name: 'Produtos', href: '/dashboard/products', icon: Package },
-    { name: 'Estoque', href: '/dashboard/stock', icon: ArrowLeftRight },
     { name: 'Clientes', href: '/dashboard/customers', icon: Users },
     { name: 'Financeiro', href: '/dashboard/finance', icon: DollarSign },
     { name: 'Personalizar', href: '/dashboard/settings', icon: Settings },
@@ -562,7 +560,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
         {/* Sidebar Navigation */}
         <nav className="flex-1 px-4 py-6 space-y-1">
           {menuItems.map((item) => {
-            const isActive = pathname === item.href
+            const isActive = pathname === item.href || (item.href === '/dashboard/products' && pathname.includes('/dashboard/stock'))
             const Icon = item.icon
             return (
               <Link
@@ -639,7 +637,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
             
             <nav className="flex-1 space-y-1">
               {menuItems.map((item) => {
-                const isActive = pathname === item.href
+                const isActive = pathname === item.href || (item.href === '/dashboard/products' && pathname.includes('/dashboard/stock'))
                 const Icon = item.icon
                 return (
                   <Link

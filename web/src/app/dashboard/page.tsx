@@ -429,7 +429,7 @@ export default function DashboardPage() {
             <h3 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-500" /> Limites de Estoque Críticos
             </h3>
-            <Link href="/dashboard/stock" className="text-xs font-semibold text-slate-400 hover:text-rose-600 flex items-center gap-0.5">
+            <Link href="/dashboard/products?tab=stock" className="text-xs font-semibold text-slate-400 hover:text-rose-600 flex items-center gap-0.5">
               Ver Estoque <ChevronRight className="w-3 h-3" />
             </Link>
           </div>

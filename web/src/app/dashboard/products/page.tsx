@@ -16,8 +16,10 @@ import {
   Upload,
   Save,
   Eye,
-  History
+  History,
+  Boxes
 } from 'lucide-react'
+import StockInventoryTab from '@/components/stock-inventory-tab'
 
 interface Product {
   id: string
@@ -84,7 +86,21 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
 
   // Navigation
-  const [activeTab, setActiveTab] = useState<'list' | 'entry' | 'history'>('list')
+  const [activeTab, setActiveTab] = useState<'list' | 'stock' | 'entry' | 'history'>('list')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const tab = params.get('tab')
+      if (tab === 'stock') {
+        setActiveTab('stock')
+      } else if (tab === 'entry') {
+        setActiveTab('entry')
+      } else if (tab === 'history') {
+        setActiveTab('history')
+      }
+    }
+  }, [])
 
   // Stock Entry Form States
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0])
@@ -1363,10 +1379,10 @@ export default function ProductsPage() {
       </div>
 
       {/* Sub navigation Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-zinc-800 mb-6">
+      <div className="flex border-b border-slate-200 dark:border-zinc-800 mb-6 overflow-x-auto">
         <button
           onClick={() => setActiveTab('list')}
-          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all whitespace-nowrap ${
             activeTab === 'list'
               ? 'border-rose-600 text-rose-650 dark:text-white font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200'
@@ -1375,8 +1391,18 @@ export default function ProductsPage() {
           Lista de Produtos
         </button>
         <button
+          onClick={() => setActiveTab('stock')}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            activeTab === 'stock'
+              ? 'border-rose-600 text-rose-650 dark:text-white font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+          }`}
+        >
+          <Boxes className="w-4 h-4" /> Estoque
+        </button>
+        <button
           onClick={() => setActiveTab('entry')}
-          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all whitespace-nowrap ${
             activeTab === 'entry'
               ? 'border-rose-600 text-rose-650 dark:text-white font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200'
@@ -1386,7 +1412,7 @@ export default function ProductsPage() {
         </button>
         <button
           onClick={() => setActiveTab('history')}
-          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all whitespace-nowrap ${
             activeTab === 'history'
               ? 'border-rose-600 text-rose-650 dark:text-white font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-200'
@@ -1588,6 +1614,11 @@ export default function ProductsPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Stock Inventory & Audit View */}
+      {activeTab === 'stock' && (
+        <StockInventoryTab />
       )}
 
       {/* Stock Entry View */}
