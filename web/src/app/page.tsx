@@ -14,55 +14,64 @@ import {
   Sun, 
   Moon, 
   Menu, 
-  X,
-  Smartphone,
-  ShieldCheck,
-  Zap,
-  Globe,
-  Bell
+  X, 
+  Smartphone, 
+  ShieldCheck, 
+  Zap, 
+  Globe, 
+  Bell,
+  ChevronDown,
+  ChevronRight,
+  ArrowUpRight,
+  MessageCircle,
+  Boxes,
+  Clock,
+  Star,
+  Layers,
+  Heart,
+  Store,
+  CheckCircle2,
+  AlertTriangle,
+  Play
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export default function LandingPage() {
   const [darkMode, setDarkMode] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'sales' | 'stock' | 'catalog' | 'finance'>('sales')
-  const [showTestimonial, setShowTestimonial] = useState(true)
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
+  const [activeFeatureTab, setActiveFeatureTab] = useState<'vitrine' | 'pdv' | 'stock' | 'ai'>('vitrine')
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0)
   const [activeAICommand, setActiveAICommand] = useState(0)
-  const [isTyping, setIsTyping] = useState(false)
-  const [displayedResponse, setDisplayedResponse] = useState('')
-  const [comparisonMode, setComparisonMode] = useState<'caderno' | 'mimus'>('mimus')
-  const [vitrineActiveProduct, setVitrineActiveProduct] = useState<number>(0)
-  const [isUserInteracting, setIsUserInteracting] = useState(false)
+  const [comparisonMode, setComparisonMode] = useState<'before' | 'after'>('after')
 
   const aiCommands = [
     {
       label: 'Cadastrar Produto',
-      command: 'cadastre o produto Gloss Labial Aura Glow por R$ 39,90',
-      response: '✨ **Gloss Labial Aura Glow** cadastrado com sucesso! Preço de venda: **R$ 39,90**. Ele já está ativo na sua vitrine virtual! 🌸',
-      type: 'success'
+      command: 'Cadastre o Gloss Labial Aura Glow por R$ 39,90 com 15 unidades',
+      response: '✨ Gloss Labial Aura Glow cadastrado com sucesso! Preço: R$ 39,90. Estoque: 15 un. Já visível na sua vitrine virtual! 🌸',
+      tag: 'Catálogo'
     },
     {
-      label: 'Registrar Venda',
-      command: 'vendi 2 @Gloss Labial Aura Glow para a cliente @Letícia Costa por Pix',
-      response: '✅ **Venda Registrada!**\n• Produto: *Gloss Labial Aura Glow* (2 un.)\n• Cliente: *Letícia Costa*\n• Total: *R$ 79,80* (Pix)\n📉 Estoque atualizado automaticamente no Mimus e na Loja Integrada!',
-      type: 'sale'
+      label: 'Registrar Venda PDV',
+      command: 'Vendi 2 Gloss Aura Glow para @Camila no Pix',
+      response: '✅ Venda de R$ 79,80 registrada! Estoque atualizado automaticamente de 15 para 13 unidades.',
+      tag: 'PDV Balcão'
     },
     {
-      label: 'Consultar Estoque',
-      command: '🎙️ Áudio: "Mimus, quais cosméticos estão com estoque baixo?"',
-      response: '⚠️ **Alerta de Estoque Crítico:**\n• *Delineador Holográfico Glow* (0 un. restantes)\n• *Batom Velvet BT* (2 un. restantes)\nPeça: "IA, gere lista de compras de fornecedores"',
-      type: 'warning'
+      label: 'Alerta de Estoque',
+      command: 'Mimus, quais cosméticos precisam de reposição?',
+      response: '⚠️ 2 produtos no limite crítico: Batom Velvet BT (1 un.) e Bruma Fixadora Glow (0 un.). Lista de compras gerada!',
+      tag: 'Estoque'
     },
     {
-      label: 'Ver Faturamento',
-      command: 'quanto a loja faturou hoje?',
-      response: '📊 **Resumo Financeiro de Hoje:**\n• Faturamento: *R$ 684,20*\n• Lucro Líquido: *R$ 312,45* (+15% em relação a ontem)\n💰 Todas as vendas do PDV e WhatsApp integradas.',
-      type: 'finance'
+      label: 'Resumo Financeiro',
+      command: 'Quanto a loja faturou hoje?',
+      response: '📊 Faturamento hoje: R$ 1.485,20 (18 vendas). Lucro líquido estimado: R$ 682,40.',
+      tag: 'Financeiro'
     }
   ]
 
-  // Sync theme with localStorage & document.documentElement class
   useEffect(() => {
     const isDark = localStorage.getItem('theme') === 'dark' || 
       (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
@@ -73,42 +82,6 @@ export default function LandingPage() {
       document.documentElement.classList.remove('dark')
     }
   }, [])
-
-  // Animate chat simulation on activeAICommand change
-  useEffect(() => {
-    setIsTyping(true)
-    setDisplayedResponse('')
-    const timer = setTimeout(() => {
-      setIsTyping(false)
-      setDisplayedResponse(aiCommands[activeAICommand].response)
-    }, 1000)
-
-    return () => clearTimeout(timer)
-  }, [activeAICommand])
-
-  // Autoplay chat commands simulation
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveAICommand((prev) => (prev + 1) % aiCommands.length)
-    }, 7000)
-    return () => clearInterval(interval)
-  }, [activeAICommand])
-
-  // Autoplay mockup tabs showcase (moves mouse automatically if user is idle)
-  useEffect(() => {
-    if (isUserInteracting) return
-    const interval = setInterval(() => {
-      const tabs: ('sales' | 'stock' | 'catalog' | 'finance')[] = ['sales', 'stock', 'catalog', 'finance']
-      const currentIndex = tabs.indexOf(activeTab)
-      const nextIndex = (currentIndex + 1) % tabs.length
-      setActiveTab(tabs[nextIndex])
-    }, 4500)
-    return () => clearInterval(interval)
-  }, [activeTab, isUserInteracting])
-
-  const handleSelectAICommand = (index: number) => {
-    setActiveAICommand(index)
-  }
 
   const toggleTheme = () => {
     const nextDark = !darkMode
@@ -122,1122 +95,449 @@ export default function LandingPage() {
     }
   }
 
+  // Autoplay AI commands
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveAICommand((prev) => (prev + 1) % aiCommands.length)
+    }, 6000)
+    return () => clearInterval(interval)
+  }, [aiCommands.length])
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 dark:bg-zinc-950 dark:text-zinc-100 font-sans transition-colors duration-300 overflow-x-hidden selection:bg-rose-500 selection:text-white">
+    <div className="min-h-screen bg-[#fafafa] dark:bg-[#09090b] text-slate-900 dark:text-zinc-100 font-sans selection:bg-rose-500 selection:text-white transition-colors duration-300">
       
-      {/* BACKGROUND DECORATIONS */}
-      <div className="absolute top-0 right-0 w-[60rem] h-[60rem] bg-gradient-to-br from-rose-400/20 via-fuchsia-400/10 to-violet-500/5 dark:from-rose-950/30 dark:via-fuchsia-950/10 dark:to-transparent rounded-full blur-[140px] pointer-events-none -z-10 animate-pulse duration-[8s]" />
-      <div className="absolute top-[30rem] -left-[20rem] w-[50rem] h-[50rem] bg-gradient-to-tr from-violet-500/15 via-pink-400/10 to-transparent dark:from-purple-950/20 dark:via-rose-950/5 rounded-full blur-[150px] pointer-events-none -z-10" />
-      <div className="absolute top-[80rem] right-0 w-[45rem] h-[45rem] bg-gradient-to-l from-fuchsia-500/10 via-rose-400/5 to-transparent rounded-full blur-[130px] pointer-events-none -z-10" />
-      
-      {/* FLOATING HEADER */}
-      <motion.header 
-        initial={{ y: -60, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        className="sticky top-0 z-50 w-full bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md border-b border-slate-100 dark:border-zinc-900 transition-colors duration-300"
-      >
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            <span>Mimus</span><span className="text-rose-600">.</span>
-          </Link>
-
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm font-medium text-slate-600 hover:text-rose-600 dark:text-zinc-300 dark:hover:text-rose-400 transition-colors">Recursos</a>
-            <a href="#preview" className="text-sm font-medium text-slate-600 hover:text-rose-600 dark:text-zinc-300 dark:hover:text-rose-400 transition-colors">Demonstração</a>
-            <a href="#pricing" className="text-sm font-medium text-slate-600 hover:text-rose-600 dark:text-zinc-300 dark:hover:text-rose-400 transition-colors">Planos</a>
-            <a href="#stats" className="text-sm font-medium text-slate-600 hover:text-rose-600 dark:text-zinc-300 dark:hover:text-rose-400 transition-colors">Sobre</a>
-          </nav>
-
-          {/* Action CTAs */}
-          <div className="hidden md:flex items-center gap-4">
-            {/* Theme Toggle */}
-            <button 
-              onClick={toggleTheme}
-              className="p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 transition-all duration-200"
-              aria-label="Alternar tema"
-            >
-              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
-
-            <Link 
-              href="/login" 
-              className="text-sm font-semibold text-slate-700 dark:text-zinc-200 hover:text-rose-600 dark:hover:text-rose-400 px-4 py-2 transition-colors"
-            >
-              Entrar
-            </Link>
-            
-            <motion.div
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-            >
-              <Link 
-                href="/register" 
-                className="text-sm font-semibold text-white bg-rose-600 hover:bg-rose-500 px-5 py-2.5 rounded-xl transition-all duration-200 shadow-md shadow-rose-500/10 block"
-              >
-                Criar minha loja grátis
-              </Link>
-            </motion.div>
-          </div>
-
-          {/* Mobile Menu Buttons */}
-          <div className="flex md:hidden items-center gap-3">
-            <button 
-              onClick={toggleTheme}
-              className="p-1.5 rounded-xl text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800"
-            >
-              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
-            <button 
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-1.5 rounded-xl text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800"
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
-
-        </div>
-      </motion.header>
-
-      {/* MOBILE DRAWER */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-40 md:hidden flex flex-col bg-white dark:bg-zinc-950 p-6 animate-in slide-in-from-top duration-250">
-          <div className="flex items-center justify-between mb-8">
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">Mimus<span className="text-rose-600">.</span></span>
-            <button onClick={() => setMobileMenuOpen(false)} className="p-1 text-slate-500"><X className="w-6 h-6" /></button>
-          </div>
-          
-          <nav className="flex flex-col gap-6 text-lg font-medium mb-8">
-            <a href="#features" onClick={() => setMobileMenuOpen(false)} className="text-slate-700 dark:text-zinc-200">Recursos</a>
-            <a href="#preview" onClick={() => setMobileMenuOpen(false)} className="text-slate-700 dark:text-zinc-200">Demonstração</a>
-            <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="text-slate-700 dark:text-zinc-200">Planos</a>
-            <a href="#stats" onClick={() => setMobileMenuOpen(false)} className="text-slate-700 dark:text-zinc-200">Sobre</a>
-          </nav>
-
-          <div className="mt-auto flex flex-col gap-4">
-            <Link 
-              href="/login" 
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full py-3 text-center font-semibold text-slate-800 dark:text-white border border-slate-200 dark:border-zinc-800 rounded-xl"
-            >
-              Entrar
-            </Link>
-            <Link 
-              href="/register" 
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full py-3 text-center font-semibold text-white bg-rose-600 rounded-xl"
-            >
-              Criar minha loja grátis
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* HERO SECTION */}
-      <section className="relative pt-12 pb-24 md:pt-20 md:pb-32 px-6 overflow-hidden">
-        
-        {/* Hero Background Image with Blur Overlay */}
-        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none select-none">
-          <motion.img 
-            src="/hero_beauty_bg.png" 
-            alt="Cosmetics boutique background" 
-            className="w-full h-full object-cover opacity-[0.08] dark:opacity-[0.12] filter blur-[3px]" 
-            animate={{
-              scale: [1, 1.04, 1.01, 1.05, 1],
-              x: [0, 8, -6, 5, 0],
-              y: [0, -5, 8, -4, 0]
-            }}
-            transition={{
-              duration: 30,
-              repeat: Infinity,
-              ease: "linear"
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white dark:to-zinc-950" />
-          <motion.div 
-            className="absolute top-1/2 left-1/2 w-[45rem] h-[45rem] bg-rose-500/5 dark:bg-rose-500/10 rounded-full blur-[130px]"
-            animate={{
-              scale: [1, 1.15, 0.9, 1.05, 1],
-              x: ["-50%", "-46%", "-52%", "-48%", "-50%"],
-              y: ["-50%", "-54%", "-48%", "-52%", "-50%"]
-            }}
-            transition={{
-              duration: 20,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          />
-        </div>
-
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center relative z-10">
-          
-          {/* Left Hero Content */}
-          <div className="lg:col-span-5 flex flex-col items-center lg:items-start text-center lg:text-left space-y-6">
-            
-            {/* Sparkle Badge */}
-            <motion.div 
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1, type: "spring", stiffness: 100 }}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-500/10 dark:bg-rose-500/10 border border-rose-500/25"
-            >
-              <Sparkles className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-              <span className="text-xs font-semibold text-rose-600 dark:text-rose-400 tracking-wide uppercase">Para Lojas de Beleza e Cosméticos</span>
-            </motion.div>
-
-            <motion.h1 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2, type: "spring", stiffness: 100 }}
-              className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight text-slate-900 dark:text-white"
-            >
-              O fim do caderno.<br />A nova era da sua <span className="bg-gradient-to-r from-rose-500 via-pink-500 to-violet-500 bg-clip-text text-transparent">loja de beleza</span>.
-            </motion.h1>
-            
-            <motion.p 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="text-base sm:text-lg text-slate-600 dark:text-zinc-400 max-w-lg leading-relaxed"
-            >
-              Organize seu estoque de cosméticos, controle suas vendas em segundos e encante suas clientes com uma vitrine virtual impecável. Feito por quem entende o dia a dia da empreendedora de beleza.
-            </motion.p>
-
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto"
-            >
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full sm:w-auto">
-                <Link 
-                  href="/register" 
-                  className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold rounded-xl transition-all duration-200 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/30 flex items-center justify-center gap-2 group"
-                >
-                  Criar minha loja grátis
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </motion.div>
-              
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full sm:w-auto">
-                <a 
-                  href="#preview" 
-                  className="w-full sm:w-auto px-8 py-4 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-white font-semibold rounded-xl transition-colors duration-200 flex items-center justify-center"
-                >
-                  Ver como funciona
-                </a>
-              </motion.div>
-            </motion.div>
-
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.5 }}
-              className="text-xs text-slate-500 dark:text-zinc-400 italic font-medium pt-1 text-center lg:text-left w-full"
-            >
-              ✨ Criado por um founder para organizar a loja da própria esposa — e funcionou.
-            </motion.div>
-
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.6 }}
-              className="flex items-center gap-6 pt-4 border-t border-slate-100 dark:border-zinc-900 w-full justify-center lg:justify-start"
-            >
-              <div className="flex items-center gap-1.5">
-                <Check className="w-4 h-4 text-emerald-500" />
-                <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Sem cartão de crédito</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Check className="w-4 h-4 text-emerald-500" />
-                <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Plano grátis vitalício</span>
-              </div>
-            </motion.div>
-          </div>
-
-          {/* Right Hero Visual (Interactive Mockup Showcase) */}
-          <div className="lg:col-span-7 w-full flex flex-col">
-            
-            {/* Monitor Mockup Wrapper */}
-            <div className="w-full relative">
-              
-              {/* PC Monitor Screen frame */}
-              <div className="w-full bg-slate-900 rounded-3xl border-8 border-slate-950 dark:border-zinc-850 shadow-2xl p-1 pb-0 relative overflow-hidden">
-                
-                {/* Browser Mockup Window */}
-                <div className="w-full bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden transition-all duration-300">
-                  
-                  {/* Window Header */}
-                  <div className="px-4 py-3 bg-slate-50 dark:bg-zinc-905 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 rounded-full bg-rose-500/80" />
-                      <div className="w-3 h-3 rounded-full bg-amber-500/80" />
-                      <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
-                    </div>
-                    <div className="bg-slate-200/50 dark:bg-zinc-950 px-8 py-0.5 rounded-lg text-[10px] text-slate-505 dark:text-zinc-400 font-mono select-none">
-                      {activeTab === 'catalog' ? 'appmimus.com.br/vitrine/sua-loja' : 'appmimus.com.br/dashboard'}
-                    </div>
-                    <div className="w-8" />
-                  </div>
-
-                  {/* Tabs Selector for Mockup (Now inside Browser, styled as screen menu) */}
-                  <div className="flex bg-slate-100/80 dark:bg-zinc-950/60 p-1 rounded-xl mx-auto mt-4 border border-slate-200/40 dark:border-zinc-900/60 relative w-max max-w-[95%] overflow-x-auto select-none">
-                    
-                    {/* Virtual Mouse Pointer */}
-                    <motion.div
-                      className="absolute pointer-events-none z-20 text-rose-600 dark:text-rose-400 drop-shadow-[0_2px_8px_rgba(244,63,94,0.45)]"
-                      initial={{ x: 60, y: 14 }}
-                      animate={
-                        activeTab === 'sales' ? { x: 40, y: 14, scale: [1, 0.82, 1] } :
-                        activeTab === 'stock' ? { x: 155, y: 14, scale: [1, 0.82, 1] } :
-                        activeTab === 'catalog' ? { x: 275, y: 14, scale: [1, 0.82, 1] } :
-                        { x: 395, y: 14, scale: [1, 0.82, 1] }
-                      }
-                      transition={{
-                        x: { type: 'spring', stiffness: 100, damping: 15, delay: 0.15 },
-                        y: { type: 'spring', stiffness: 100, damping: 15, delay: 0.15 },
-                        scale: { duration: 0.35, ease: 'easeInOut', delay: 0.15 }
-                      }}
-                    >
-                      <svg className="w-4 h-4 fill-current rotate-[-15deg] drop-shadow" viewBox="0 0 24 24">
-                        <path d="M4.5 3V17.5L9.2 13L13.8 21.5L16.8 19.8L12.2 11.5L17.5 11.5L4.5 3Z" stroke="white" strokeWidth="1.5" />
-                      </svg>
-                    </motion.div>
-
-                    <button 
-                      onClick={() => { setActiveTab('sales'); setIsUserInteracting(true); }}
-                      className={`relative px-4 py-2 text-[10px] font-bold rounded-lg transition-colors z-10 ${
-                        activeTab === 'sales' 
-                          ? 'text-rose-650 dark:text-white font-extrabold' 
-                          : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800'
-                      }`}
-                    >
-                      {activeTab === 'sales' && (
-                        <motion.span 
-                          layoutId="activeTabIndicator"
-                          className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-lg shadow-sm -z-10"
-                          transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                        />
-                      )}
-                      PDV de Vendas
-                    </button>
-
-                    <button 
-                      onClick={() => { setActiveTab('stock'); setIsUserInteracting(true); }}
-                      className={`relative px-4 py-2 text-[10px] font-bold rounded-lg transition-colors z-10 ${
-                        activeTab === 'stock' 
-                          ? 'text-rose-650 dark:text-white font-extrabold' 
-                          : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800'
-                      }`}
-                    >
-                      {activeTab === 'stock' && (
-                        <motion.span 
-                          layoutId="activeTabIndicator"
-                          className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-lg shadow-sm -z-10"
-                          transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                        />
-                      )}
-                      Controle de Estoque
-                    </button>
-
-                    <button 
-                      onClick={() => { setActiveTab('catalog'); setIsUserInteracting(true); }}
-                      className={`relative px-4 py-2 text-[10px] font-bold rounded-lg transition-colors z-10 ${
-                        activeTab === 'catalog' 
-                          ? 'text-rose-650 dark:text-white font-extrabold' 
-                          : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800'
-                      }`}
-                    >
-                      {activeTab === 'catalog' && (
-                        <motion.span 
-                          layoutId="activeTabIndicator"
-                          className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-lg shadow-sm -z-10"
-                          transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                        />
-                      )}
-                      Vitrine Virtual
-                    </button>
-
-                    <button 
-                      onClick={() => { setActiveTab('finance'); setIsUserInteracting(true); }}
-                      className={`relative px-4 py-2 text-[10px] font-bold rounded-lg transition-colors z-10 ${
-                        activeTab === 'finance' 
-                          ? 'text-rose-650 dark:text-white font-extrabold' 
-                          : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800'
-                      }`}
-                    >
-                      {activeTab === 'finance' && (
-                        <motion.span 
-                          layoutId="activeTabIndicator"
-                          className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-lg shadow-sm -z-10"
-                          transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                        />
-                      )}
-                      Fluxo Financeiro
-                    </button>
-                  </div>
-
-              {/* Window Content */}
-              <div className="p-6 bg-slate-50/40 dark:bg-zinc-950/40 min-h-[340px] flex flex-col justify-between transition-all duration-300 overflow-hidden relative">
-                
-                <AnimatePresence mode="wait">
-                  {activeTab === 'sales' && (
-                    <motion.div 
-                      key="sales"
-                      initial={{ opacity: 0, x: 10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -10 }}
-                      transition={{ duration: 0.2 }}
-                      className="space-y-4 w-full"
-                    >
-                      <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-900">
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">PDV - Registro de Vendas</h4>
-                          <span className="text-[10px] text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full font-semibold">Caixa Aberto</span>
-                        </div>
-                        <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Operadora: Letícia Costa</span>
-                      </div>
-
-                      {/* Shopping items list */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 rounded-xl border border-slate-100 dark:border-zinc-800/80 shadow-sm">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-pink-500/10 flex items-center justify-center font-bold text-pink-500 text-xs">B1</div>
-                            <div>
-                              <p className="text-xs font-bold text-slate-800 dark:text-zinc-200">Batom Velvet Matte Rose</p>
-                              <p className="text-[10px] text-slate-400 dark:text-zinc-500">Bruna Tavares • R$ 49,90</p>
-                            </div>
-                          </div>
-                          <span className="text-xs font-bold text-slate-800 dark:text-white">R$ 49,90</span>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 rounded-xl border border-slate-100 dark:border-zinc-800/80 shadow-sm">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center font-bold text-purple-500 text-xs">C1</div>
-                            <div>
-                              <p className="text-xs font-bold text-slate-800 dark:text-zinc-200">Corretivo Hyaluronic Peach</p>
-                              <p className="text-[10px] text-slate-400 dark:text-zinc-500">Mimis Beauty • R$ 69,90</p>
-                            </div>
-                          </div>
-                          <span className="text-xs font-bold text-slate-800 dark:text-white">R$ 69,90</span>
-                        </div>
-                      </div>
-
-                      {/* PDV Total and Checkout */}
-                      <div className="p-4 bg-rose-500/5 dark:bg-rose-500/5 border border-rose-500/10 rounded-xl flex items-center justify-between">
-                        <div>
-                          <span className="text-[10px] text-slate-500 dark:text-zinc-400 uppercase tracking-wider font-semibold">Valor Total</span>
-                          <p className="text-xl font-extrabold text-slate-900 dark:text-white">R$ 119,80</p>
-                        </div>
-                        <button className="px-5 py-2.5 bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md shadow-rose-500/20 flex items-center gap-1.5 active:scale-[0.98] transition-transform">
-                          <ShoppingBag className="w-4 h-4" /> Finalizar Venda
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {activeTab === 'stock' && (
-                    <motion.div 
-                      key="stock"
-                      initial={{ opacity: 0, x: 10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -10 }}
-                      transition={{ duration: 0.2 }}
-                      className="space-y-4 w-full"
-                    >
-                      <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-900">
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">Gestão e Alertas Críticos</h4>
-                          <span className="text-[10px] text-slate-400 dark:text-zinc-500">Notificações automáticas de reposição</span>
-                        </div>
-                        <span className="text-[10px] text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-2.5 py-0.5 rounded-full font-bold">2 Alertas</span>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 rounded-xl border border-rose-100 dark:border-rose-900/20">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-rose-100 dark:bg-rose-950/40 text-rose-650 dark:text-rose-400 rounded-lg">
-                              <Package className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <p className="text-xs font-bold text-slate-800 dark:text-zinc-200">Delineador Holográfico Glow</p>
-                              <span className="text-[10px] text-rose-500 dark:text-rose-400 font-medium">Estoque zerado</span>
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 rounded-full">0 un. restantes</span>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 rounded-xl border border-amber-100 dark:border-amber-900/20">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-lg">
-                              <Package className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <p className="text-xs font-bold text-slate-800 dark:text-zinc-200">Base Fluida Satin 03</p>
-                              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">Vencimento próximo (12/06/2026)</span>
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 rounded-full">2 un. restantes</span>
-                        </div>
-                      </div>
-
-                      <button className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 text-slate-700 dark:text-zinc-300 text-xs font-semibold rounded-xl transition-colors text-center">
-                        Registrar Entrada de Lote de Produtos
-                      </button>
-                    </motion.div>
-                  )}
-
-                  {activeTab === 'catalog' && (
-                    <motion.div 
-                      key="catalog"
-                      initial={{ opacity: 0, x: 10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -10 }}
-                      transition={{ duration: 0.2 }}
-                      className="space-y-4 w-full"
-                    >
-                      {/* Vitrine banner */}
-                      <div className="h-28 w-full bg-gradient-to-r from-pink-500 to-rose-600 rounded-xl p-4 flex flex-col justify-center text-white relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full translate-x-4 -translate-y-4" />
-                        <span className="text-[8px] uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full font-bold w-max">Promoção de Outono</span>
-                        <h5 className="text-base font-extrabold mt-1">Coleção de Pele Perfeita</h5>
-                        <p className="text-[10px] text-white/80">Ganhe um pincel exclusivo nas compras acima de R$ 150</p>
-                      </div>
-
-                      {/* Products showcase grid */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-slate-100 dark:border-zinc-800/80 flex flex-col justify-between">
-                          <div>
-                            <div className="h-16 w-full bg-slate-100 dark:bg-zinc-950 rounded-lg flex items-center justify-center mb-2">
-                              <Sparkles className="w-6 h-6 text-rose-400" />
-                            </div>
-                            <p className="text-[10px] font-bold text-slate-800 dark:text-zinc-200 truncate">Sérum Renovador Skin</p>
-                          </div>
-                          <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-50 dark:border-zinc-800/40">
-                            <span className="text-[10px] font-extrabold text-rose-600 dark:text-rose-400">R$ 89,90</span>
-                            <span className="text-[8px] font-bold text-slate-400">Vitrine Ativa</span>
-                          </div>
-                        </div>
-
-                        <div className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-slate-100 dark:border-zinc-800/80 flex flex-col justify-between">
-                          <div>
-                            <div className="h-16 w-full bg-slate-100 dark:bg-zinc-950 rounded-lg flex items-center justify-center mb-2">
-                              <ShoppingBag className="w-6 h-6 text-rose-400" />
-                            </div>
-                            <p className="text-[10px] font-bold text-slate-800 dark:text-zinc-200 truncate">Batom Satin Hydrate</p>
-                          </div>
-                          <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-50 dark:border-zinc-800/40">
-                            <span className="text-[10px] font-extrabold text-rose-600 dark:text-rose-400">R$ 39,90</span>
-                            <span className="text-[8px] font-bold text-slate-400">Vitrine Ativa</span>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {activeTab === 'finance' && (
-                    <motion.div 
-                      key="finance"
-                      initial={{ opacity: 0, x: 10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -10 }}
-                      transition={{ duration: 0.2 }}
-                      className="space-y-4 w-full"
-                    >
-                      <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-900">
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">Resumo Financeiro Semanal</h4>
-                          <p className="text-[10px] text-slate-400 dark:text-zinc-500">Fluxo de faturamento integrado</p>
-                        </div>
-                        <span className="text-[10px] text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
-                          <TrendingUp className="w-3 h-3" /> +15.4% este mês
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 bg-white dark:bg-zinc-900 rounded-xl border border-slate-100 dark:border-zinc-800/80 shadow-sm">
-                          <span className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase tracking-wider font-semibold">Hoje</span>
-                          <p className="text-lg font-bold text-slate-800 dark:text-white">R$ 684,20</p>
-                          <span className="text-[9px] text-slate-400">8 transações</span>
-                        </div>
-
-                        <div className="p-4 bg-white dark:bg-zinc-900 rounded-xl border border-slate-100 dark:border-zinc-800/80 shadow-sm">
-                          <span className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase tracking-wider font-semibold">Este Mês</span>
-                          <p className="text-lg font-bold text-rose-650 dark:text-rose-450">R$ 14.850,00</p>
-                          <span className="text-[9px] text-slate-400">Meta mensal 75%</span>
-                        </div>
-                      </div>
-
-                      {/* Miniature chart bar representation */}
-                      <div className="flex items-end gap-1.5 h-12 w-full pt-2">
-                        <motion.div initial={{ height: 0 }} animate={{ height: "50%" }} transition={{ duration: 0.5 }} className="bg-rose-200 dark:bg-zinc-800 w-full h-6 rounded-md" />
-                        <motion.div initial={{ height: 0 }} animate={{ height: "66%" }} transition={{ duration: 0.5, delay: 0.05 }} className="bg-rose-200 dark:bg-zinc-800 w-full h-8 rounded-md" />
-                        <motion.div initial={{ height: 0 }} animate={{ height: "33%" }} transition={{ duration: 0.5, delay: 0.1 }} className="bg-rose-200 dark:bg-zinc-800 w-full h-4 rounded-md" />
-                        <motion.div initial={{ height: 0 }} animate={{ height: "83%" }} transition={{ duration: 0.5, delay: 0.15 }} className="bg-rose-300 dark:bg-zinc-700 w-full h-10 rounded-md" />
-                        <motion.div initial={{ height: 0 }} animate={{ height: "100%" }} transition={{ duration: 0.5, delay: 0.2 }} className="bg-rose-600 w-full h-12 rounded-md" />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-              </div>
-
-            </div>
-
-          </div>
-
-          {/* Monitor Stand Base */}
-          <div className="hidden lg:flex flex-col items-center -mt-1 select-none">
-            <div className="w-16 h-10 bg-slate-850 dark:bg-zinc-800 border-x border-slate-800 dark:border-zinc-700" />
-            <div className="w-44 h-3 bg-slate-800 dark:bg-zinc-700 rounded-full shadow-md" />
-          </div>
-
-        </div>
-
+      {/* BACKGROUND GLOWS (MANYCHAT STYLE SUBTLE RADIAL AMBIENCE) */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+        <div className="absolute top-[-10rem] left-1/2 -translate-x-1/2 w-[70rem] h-[35rem] bg-gradient-to-b from-rose-500/10 via-pink-500/5 to-transparent blur-[120px] dark:from-rose-600/15 dark:via-fuchsia-600/10" />
+        <div className="absolute top-[45rem] right-[-10rem] w-[45rem] h-[45rem] bg-gradient-to-l from-rose-400/8 via-pink-400/5 to-transparent blur-[140px] dark:from-rose-950/20" />
+        <div className="absolute top-[100rem] left-[-15rem] w-[50rem] h-[50rem] bg-gradient-to-r from-violet-500/8 via-fuchsia-400/5 to-transparent blur-[150px] dark:from-purple-950/20" />
       </div>
 
-    </div>
-  </section>
+      {/* TOP FLOATING PILL NAVBAR (MANYCHAT INSPIRATION) */}
+      <div className="sticky top-4 z-50 px-4 sm:px-6 max-w-7xl mx-auto">
+        <nav className="rounded-full bg-white/85 dark:bg-zinc-900/85 backdrop-blur-xl border border-slate-200/80 dark:border-zinc-800/80 shadow-lg shadow-slate-900/5 px-4 sm:px-6 py-2.5 flex items-center justify-between transition-all">
+          
+          {/* Brand Logo */}
+          <Link href="/" className="flex items-center gap-2 group">
+            <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+              Mimus<span className="text-rose-500 group-hover:scale-125 inline-block transition-transform">.</span>
+            </span>
+            <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-100 dark:border-rose-900/30">
+              Cosmetics Hub
+            </span>
+          </Link>
 
-      {/* CORE FEATURES SECTION */}
-      <section id="features" className="py-20 md:py-28 bg-white dark:bg-zinc-900 transition-colors duration-300 relative border-t border-slate-100 dark:border-zinc-900">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center space-y-4 max-w-2xl mx-auto mb-16 md:mb-24">
-            <h2 className="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest">Tudo em um só lugar</h2>
-            <p className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">A estrutura que sua loja precisa para lucrar mais</p>
-            <p className="text-slate-500 dark:text-zinc-400 text-sm md:text-base">Módulos perfeitamente integrados e adaptados para o setor de beleza e cosméticos.</p>
+          {/* Desktop Navigation Links (Uppercase pill style like Manychat) */}
+          <div className="hidden lg:flex items-center gap-6 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-300">
+            <a href="#recursos" className="hover:text-rose-600 dark:hover:text-rose-400 transition-colors">Recursos</a>
+            <a href="#ecossistema" className="hover:text-rose-600 dark:hover:text-rose-400 transition-colors">Canais</a>
+            <a href="#comparativo" className="hover:text-rose-600 dark:hover:text-rose-400 transition-colors">Antes & Depois</a>
+            <a href="#demonstracao" className="hover:text-rose-600 dark:hover:text-rose-400 transition-colors">Demonstração</a>
+            <a href="#precos" className="hover:text-rose-600 dark:hover:text-rose-400 transition-colors">Preços</a>
+            <a href="#depoimentos" className="hover:text-rose-600 dark:hover:text-rose-400 transition-colors">Depoimentos</a>
+            <a href="#faq" className="hover:text-rose-600 dark:hover:text-rose-400 transition-colors">FAQ</a>
           </div>
 
-          <motion.div 
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-100px" }}
-            variants={{
-              hidden: {},
-              visible: {
-                transition: {
-                  staggerChildren: 0.1
-                }
-              }
-            }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          {/* Navbar Actions */}
+          <div className="flex items-center gap-3">
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-full text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+              aria-label="Alternar tema claro/escuro"
+            >
+              {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+
+            {/* Login Link */}
+            <Link 
+              href="/login" 
+              className="hidden sm:inline-block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 hover:text-rose-600 dark:hover:text-rose-400 px-3 py-1.5 transition-colors"
+            >
+              Entrar
+            </Link>
+
+            {/* CTA Pill Button (Manychat style rounded-full) */}
+            <Link
+              href="/register"
+              className="px-5 py-2 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wide shadow-md shadow-rose-600/25 hover:shadow-rose-600/40 active:scale-95 transition-all flex items-center gap-1.5"
+            >
+              <span>Comece já</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+
+            {/* Mobile Hamburger */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-full text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 lg:hidden"
+              aria-label="Abrir menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
+
+        </nav>
+      </div>
+
+      {/* MOBILE MENU DRAWER */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed inset-x-4 top-20 z-40 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-2xl lg:hidden flex flex-col gap-4 text-sm font-semibold uppercase tracking-wider"
           >
+            <a href="#recursos" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b border-slate-100 dark:border-zinc-800">Recursos</a>
+            <a href="#ecossistema" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b border-slate-100 dark:border-zinc-800">Canais de Venda</a>
+            <a href="#comparativo" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b border-slate-100 dark:border-zinc-800">Antes & Depois</a>
+            <a href="#demonstracao" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b border-slate-100 dark:border-zinc-800">Demonstração</a>
+            <a href="#precos" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b border-slate-100 dark:border-zinc-800">Planos & Preços</a>
+            <a href="#depoimentos" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b border-slate-100 dark:border-zinc-800">Depoimentos</a>
+            <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b border-slate-100 dark:border-zinc-800">Perguntas Frequentes</a>
             
-            {/* Card 1: Vitrine Virtual (Grande: col-span-2) */}
-            <motion.div 
-              variants={{
-                hidden: { opacity: 0, y: 20 },
-                visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100, damping: 20 } }
-              }}
-              className="group col-span-1 lg:col-span-2 p-8 rounded-3xl border border-slate-100 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 hover:border-rose-500/20 dark:hover:border-rose-500/20 transition-all duration-300 hover:shadow-xl hover:shadow-rose-500/[0.02] flex flex-col md:flex-row justify-between gap-6 overflow-hidden relative"
+            <div className="pt-2 flex flex-col gap-2.5">
+              <Link 
+                href="/login" 
+                className="w-full py-2.5 text-center font-bold text-xs uppercase tracking-wider text-slate-800 dark:text-white border border-slate-200 dark:border-zinc-800 rounded-full"
+              >
+                Entrar na minha conta
+              </Link>
+              <Link 
+                href="/register" 
+                className="w-full py-2.5 text-center font-bold text-xs uppercase tracking-wider text-white bg-rose-600 rounded-full shadow-lg shadow-rose-600/30"
+              >
+                Criar loja grátis agora
+              </Link>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* HERO SECTION (MANYCHAT HIGH-IMPACT ARCHITECTURE) */}
+      <section className="pt-16 pb-20 md:pt-24 md:pb-28 px-4 sm:px-6 relative overflow-hidden">
+        <div className="max-w-5xl mx-auto text-center space-y-6">
+          
+          {/* Social Proof Pill Badge */}
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-50 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/50 shadow-sm"
+          >
+            <Heart className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 fill-rose-500" />
+            <span className="text-[11px] font-bold text-rose-700 dark:text-rose-300 uppercase tracking-wider">
+              Amado por centenas de lojistas e marcas de beleza
+            </span>
+          </motion.div>
+
+          {/* Headline Manychat Style: bold, emotional, punchy */}
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.08]"
+          >
+            Faça cada produto, venda e cliente <span className="bg-gradient-to-r from-rose-600 via-pink-600 to-fuchsia-600 bg-clip-text text-transparent">valer a pena</span>.
+          </motion.h1>
+
+          {/* Subtitle */}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="text-base sm:text-xl text-slate-600 dark:text-zinc-400 max-w-3xl mx-auto leading-relaxed font-normal"
+          >
+            A plataforma tudo-em-um para lojas de cosméticos e maquiagem. Tenha controle total do estoque, venda no balcão e no WhatsApp com vitrine virtual, e acompanhe seu lucro real com inteligência artificial.
+          </motion.p>
+
+          {/* Dual Pill CTA Buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-2"
+          >
+            <Link
+              href="/register"
+              className="w-full sm:w-auto px-8 py-4 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-sm uppercase tracking-wider shadow-xl shadow-rose-600/30 hover:shadow-rose-600/45 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
             >
-              <div className="flex-1 flex flex-col justify-between z-10">
-                <div>
-                  <div className="w-12 h-12 rounded-xl bg-pink-500/10 text-pink-600 flex items-center justify-center font-bold mb-6 group-hover:scale-115 transition-transform duration-300">
-                    <Globe className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Sua Vitrine Virtual no WhatsApp</h3>
-                  <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed max-w-sm">
-                    Suas clientes navegam por um catálogo digital impecável (estilo Sephora), adicionam os cosméticos ao carrinho e enviam o pedido fechado direto no seu WhatsApp.
-                  </p>
-                </div>
-                <div className="mt-6">
-                  <span className="text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-3 py-1.5 rounded-full">
-                    Aparência Profissional
-                  </span>
-                </div>
-              </div>
+              <span>Comece já gratuitamente</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
 
-              {/* Simulated Mobile Vitrine (Right Side) */}
-              <div className="flex-shrink-0 w-full md:w-64 bg-slate-50 dark:bg-zinc-950/60 rounded-2xl p-4 border border-slate-200/50 dark:border-zinc-800/50 shadow-inner relative overflow-hidden h-60 flex flex-col justify-between">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-200/40 dark:border-zinc-900">
-                  <span className="text-[10px] font-bold text-slate-800 dark:text-white">🌸 Sua Vitrine de Beleza</span>
-                  <span className="text-[9px] text-slate-400 bg-slate-200/50 dark:bg-zinc-900 px-2 py-0.5 rounded-full">Online</span>
-                </div>
-
-                <div className="my-auto space-y-2.5">
-                  <div className="flex gap-2 items-center p-2 bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800/80 rounded-xl">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-tr from-pink-500 to-rose-400 flex items-center justify-center text-white font-extrabold text-[10px]">BT</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold text-slate-850 dark:text-zinc-200 truncate">Batom Velvet Matte</p>
-                      <p className="text-[9px] text-rose-500 font-semibold">R$ 49,90</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 items-center p-2 bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800/80 rounded-xl opacity-90">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-tr from-purple-500 to-indigo-400 flex items-center justify-center text-white font-extrabold text-[10px]">GL</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold text-slate-850 dark:text-zinc-200 truncate">Gloss Aura Glow</p>
-                      <p className="text-[9px] text-rose-500 font-semibold">R$ 39,90</p>
-                    </div>
-                  </div>
-                </div>
-
-                <button className="w-full py-2 bg-emerald-600 text-white font-bold text-[10px] rounded-xl flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all">
-                  <ShoppingBag className="w-3.5 h-3.5" /> Enviar Pedido via WhatsApp
-                </button>
-              </div>
-            </motion.div>
-
-            {/* Card 2: Estoque Inteligente (Normal: col-span-1) */}
-            <motion.div 
-              variants={{
-                hidden: { opacity: 0, y: 20 },
-                visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100, damping: 20 } }
-              }}
-              className="group p-8 rounded-3xl border border-slate-100 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 hover:border-rose-500/20 dark:hover:border-rose-500/20 transition-all duration-300 hover:shadow-xl hover:shadow-rose-500/[0.02] flex flex-col justify-between"
+            <a
+              href="#demonstracao"
+              className="w-full sm:w-auto px-8 py-4 rounded-full bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-zinc-200 font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm"
             >
-              <div>
-                <div className="w-12 h-12 rounded-xl bg-pink-500/10 text-pink-600 flex items-center justify-center font-bold mb-6 group-hover:scale-115 transition-transform duration-300">
-                  <Package className="w-6 h-6" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Estoque Sem Erros</h3>
-                <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
-                  Dê adeus ao sumiço de batons e bases. Cadastre seus cosméticos e o estoque é baixado automaticamente a cada venda do PDV ou WhatsApp.
-                </p>
-              </div>
+              <Play className="w-3.5 h-3.5 fill-current text-rose-500" />
+              <span>Ver demonstração</span>
+            </a>
+          </motion.div>
 
-              {/* Alert Mockup */}
-              <div className="mt-6 p-3 bg-rose-50 dark:bg-rose-950/20 rounded-2xl border border-rose-100 dark:border-rose-900/30 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-bold text-slate-800 dark:text-zinc-200 truncate max-w-[120px]">Batom Matte Aura</p>
-                  <span className="text-[8px] text-rose-500 dark:text-rose-455 font-semibold">Reposição Crítica</span>
-                </div>
-                <span className="text-[9px] font-bold text-rose-600 bg-rose-500/10 px-2 py-1 rounded-full">
-                  1 un. restante
-                </span>
-              </div>
-            </motion.div>
-
-            {/* Card 3: CRM de Ouro (Normal: col-span-1) */}
-            <motion.div 
-              variants={{
-                hidden: { opacity: 0, y: 20 },
-                visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100, damping: 20 } }
-              }}
-              className="group p-8 rounded-3xl border border-slate-100 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 hover:border-rose-500/20 dark:hover:border-rose-500/20 transition-all duration-300 hover:shadow-xl hover:shadow-rose-500/[0.02] flex flex-col justify-between"
-            >
-              <div>
-                <div className="w-12 h-12 rounded-xl bg-pink-500/10 text-pink-600 flex items-center justify-center font-bold mb-6 group-hover:scale-115 transition-transform duration-300">
-                  <Users className="w-6 h-6" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Relacionamento de Ouro</h3>
-                <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
-                  Guarde as preferências das suas clientes, como tom favorito de base ou fragrâncias preferidas, e envie cupons no aniversário dela com um clique.
-                </p>
-              </div>
-
-              {/* Customer Preference Mockup */}
-              <div className="mt-6 p-3 bg-slate-50 dark:bg-zinc-950/60 rounded-2xl border border-slate-200/50 dark:border-zinc-800/50 space-y-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-extrabold text-slate-900 dark:text-white">Letícia Souza</p>
-                  <span className="text-[8px] bg-rose-500/10 text-rose-600 font-bold px-1.5 py-0.5 rounded-full">VIP</span>
-                </div>
-                <p className="text-[9px] text-slate-400 dark:text-zinc-500">✨ Gosto: Tons Matte Nudes • Pele Oleosa</p>
-              </div>
-            </motion.div>
-
-            {/* Card 4: Calculadora de Lucro (Grande: col-span-2) */}
-            <motion.div 
-              variants={{
-                hidden: { opacity: 0, y: 20 },
-                visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100, damping: 20 } }
-              }}
-              className="group col-span-1 lg:col-span-2 p-8 rounded-3xl border border-slate-100 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 hover:border-rose-500/20 dark:hover:border-rose-500/20 transition-all duration-300 hover:shadow-xl hover:shadow-rose-500/[0.02] flex flex-col md:flex-row justify-between gap-6 overflow-hidden relative"
-            >
-              <div className="flex-1 flex flex-col justify-between z-10">
-                <div>
-                  <div className="w-12 h-12 rounded-xl bg-pink-500/10 text-pink-600 flex items-center justify-center font-bold mb-6 group-hover:scale-115 transition-transform duration-300">
-                    <DollarSign className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Saiba exatamente o seu lucro líquido</h3>
-                  <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed max-w-sm">
-                    Faturamento não é lucro. O Mimus calcula o custo unitário de fornecedores e desconta do preço de venda, mostrando o lucro real e a margem líquida da sua loja automaticamente.
-                  </p>
-                </div>
-                <div className="mt-6">
-                  <span className="text-xs font-semibold text-violet-600 dark:text-violet-400 bg-violet-500/10 px-3 py-1.5 rounded-full">
-                    Gestão Financeira Descomplicada
-                  </span>
-                </div>
-              </div>
-
-              {/* Profit Margin Widget */}
-              <div className="flex-shrink-0 w-full md:w-64 bg-slate-50 dark:bg-zinc-950/60 rounded-2xl p-4 border border-slate-200/50 dark:border-zinc-800/50 shadow-inner flex flex-col justify-between h-56">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Cálculo de Margem Real</span>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 dark:text-zinc-400">Preço de Venda:</span>
-                    <span className="font-bold text-slate-900 dark:text-white">R$ 80,00</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-rose-500">
-                    <span>Preço de Custo (BT):</span>
-                    <span>- R$ 40,00</span>
-                  </div>
-                  <div className="border-t border-slate-200 dark:border-zinc-900 my-1 pt-1 flex items-center justify-between text-xs font-bold text-emerald-600">
-                    <span>Lucro Líquido:</span>
-                    <span>+ R$ 40,00</span>
-                  </div>
-                </div>
-
-                <div className="bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/20 text-center">
-                  <span className="text-[9px] uppercase tracking-wider text-emerald-600 font-bold">Sua Margem: 50.0% Lucro</span>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Card 5: Sincronização Online (Normal: col-span-1) */}
-            <motion.div 
-              variants={{
-                hidden: { opacity: 0, y: 20 },
-                visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100, damping: 20 } }
-              }}
-              className="group p-8 rounded-3xl border border-slate-100 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 hover:border-rose-500/20 dark:hover:border-rose-500/20 transition-all duration-300 hover:shadow-xl hover:shadow-rose-500/[0.02] flex flex-col justify-between"
-            >
-              <div>
-                <div className="w-12 h-12 rounded-xl bg-pink-500/10 text-pink-600 flex items-center justify-center font-bold mb-6 group-hover:scale-115 transition-transform duration-300">
-                  <Zap className="w-6 h-6" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Estoque Físico & Online</h3>
-                <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
-                  Conecte o estoque do Mimus com o seu e-commerce da Loja Integrada. Se vendeu no físico ou no online, a quantidade atualiza em tempo real.
-                </p>
-              </div>
-
-              {/* Connection Status Mockup */}
-              <div className="mt-6 p-3 bg-emerald-500/5 dark:bg-emerald-500/5 rounded-2xl border border-emerald-500/20 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                  <span className="text-[10px] text-emerald-600 font-extrabold uppercase">Sincronizado</span>
-                </div>
-                <span className="text-[9px] text-slate-400 font-mono">Loja Integrada API</span>
-              </div>
-            </motion.div>
-
+          {/* Trust points */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            className="pt-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-semibold text-slate-500 dark:text-zinc-400"
+          >
+            <span className="flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5 text-emerald-500" /> Grátis para começar
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5 text-emerald-500" /> Sem cartão de crédito
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5 text-emerald-500" /> Vitrine no ar em 2 minutos
+            </span>
           </motion.div>
 
         </div>
-      </section>
 
-      {/* CADERNO VS MIMUS COMPARISON */}
-      <section className="py-20 md:py-28 px-6 bg-slate-50 dark:bg-zinc-950 transition-colors duration-300 relative overflow-hidden border-t border-slate-100 dark:border-zinc-900">
-        <div className="absolute top-1/2 left-1/2 w-[35rem] h-[35rem] bg-pink-500/5 dark:bg-pink-500/10 rounded-full blur-[100px] pointer-events-none -translate-x-1/2 -translate-y-1/2 -z-10" />
-        
-        <div className="max-w-4xl mx-auto text-center space-y-6 mb-12">
-          <h2 className="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest">A Escolha é Sua</h2>
-          <p className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">Como você quer gerenciar sua loja hoje?</p>
-          <p className="text-slate-500 dark:text-zinc-400 text-sm max-w-lg mx-auto">Compare a rotina tradicional e exaustiva do caderno com a tranquilidade de usar o Mimus.</p>
-          
-          {/* Toggle Switch */}
-          <div className="inline-flex bg-slate-100 dark:bg-zinc-900 p-1.5 rounded-2xl border border-slate-200/60 dark:border-zinc-800/80 mt-4 relative">
-            <button 
-              onClick={() => setComparisonMode('caderno')}
-              className={`relative px-6 py-2.5 text-xs font-bold rounded-xl transition-all duration-300 z-10 flex items-center gap-2 ${
-                comparisonMode === 'caderno' 
-                  ? 'text-rose-650 dark:text-rose-455' 
-                  : 'text-slate-500 dark:text-zinc-500 hover:text-slate-800'
-              }`}
-            >
-              {comparisonMode === 'caderno' && (
-                <motion.span 
-                  layoutId="activeComparisonIndicator"
-                  className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-xl shadow-sm -z-10"
-                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                />
-              )}
-              <span>O Caos do Caderno</span>
-            </button>
-            <button 
-              onClick={() => setComparisonMode('mimus')}
-              className={`relative px-6 py-2.5 text-xs font-bold rounded-xl transition-all duration-300 z-10 flex items-center gap-2 ${
-                comparisonMode === 'mimus' 
-                  ? 'text-white' 
-                  : 'text-slate-500 dark:text-zinc-500 hover:text-slate-800'
-              }`}
-            >
-              {comparisonMode === 'mimus' && (
-                <motion.span 
-                  layoutId="activeComparisonIndicator"
-                  className="absolute inset-0 bg-gradient-to-r from-rose-600 to-pink-500 rounded-xl shadow-md -z-10"
-                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                />
-              )}
-              <span>A Elegância do Mimus</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Content Showcase container */}
-        <div className="max-w-3xl mx-auto bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/60 dark:border-zinc-800/80 shadow-xl overflow-hidden min-h-[300px]">
-          <AnimatePresence mode="wait">
-            {comparisonMode === 'caderno' ? (
-              <motion.div 
-                key="caderno"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.25 }}
-                className="p-8 md:p-12 space-y-6 bg-amber-50/10 dark:bg-zinc-900/40"
-              >
-                <div className="flex items-center gap-3 pb-4 border-b border-amber-200/20">
-                  <span className="text-2xl">📓</span>
-                  <div>
-                    <h4 className="text-lg font-bold text-slate-800 dark:text-zinc-200">Rotina no Caderno & Anotações</h4>
-                    <p className="text-xs text-amber-600 dark:text-amber-500 font-medium">Anotando tudo correndo entre um cliente e outro</p>
-                  </div>
+        {/* HERO INTERACTIVE SHOWCASE (MANYCHAT STYLE PRODUCT HERO FRAME) */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.3 }}
+          className="max-w-6xl mx-auto mt-12 sm:mt-16 relative"
+        >
+          {/* Outer glow frame */}
+          <div className="rounded-[2.5rem] p-2 sm:p-4 bg-gradient-to-b from-slate-200/80 via-slate-100/40 to-transparent dark:from-zinc-800/80 dark:via-zinc-900/40 border border-slate-200/60 dark:border-zinc-800 shadow-2xl">
+            <div className="rounded-[2rem] bg-white dark:bg-zinc-950 border border-slate-100 dark:border-zinc-800 overflow-hidden shadow-inner p-4 sm:p-8 space-y-6">
+              
+              {/* Fake Window Controls */}
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-850 pb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-rose-400/80" />
+                  <div className="w-3 h-3 rounded-full bg-amber-400/80" />
+                  <div className="w-3 h-3 rounded-full bg-emerald-400/80" />
+                  <span className="ml-2 text-xs font-bold text-slate-400 font-mono">app.mimus.com.br/dashboard</span>
                 </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-                  <div className="lg:col-span-7 space-y-4">
-                    <div className="flex items-start gap-3">
-                      <span className="text-rose-500 text-sm mt-0.5">✖</span>
-                      <p className="text-sm text-slate-600 dark:text-zinc-400">
-                        <strong>Estoque furado:</strong> Vende um batom na correria do WhatsApp, esquece de dar baixa e depois precisa pedir desculpas para a cliente porque acabou.
-                      </p>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <span className="text-rose-500 text-sm mt-0.5">✖</span>
-                      <p className="text-sm text-slate-600 dark:text-zinc-400">
-                        <strong>Clientes esquecidas:</strong> O aniversário da sua melhor cliente passa em branco porque a data estava salva em uma folha antiga que você não viu.
-                      </p>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <span className="text-rose-500 text-sm mt-0.5">✖</span>
-                      <p className="text-sm text-slate-600 dark:text-zinc-400">
-                        <strong>Margem incerta:</strong> Você vê a conta bancária subir e descer, mas não sabe se o preço cobrado cobre o custo real das mercadorias.
-                      </p>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <span className="text-rose-500 text-sm mt-0.5">✖</span>
-                      <p className="text-sm text-slate-600 dark:text-zinc-400">
-                        <strong>WhatsApp bagunçado:</strong> Perder horas rolando o chat para achar quais cores de esmalte a cliente comprou na última visita.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Real Notebook Polaroid Image */}
-                  <div className="lg:col-span-5 flex justify-center">
-                    <div className="bg-white dark:bg-zinc-950 p-3 pb-8 rounded-2xl shadow-xl border border-slate-200/50 dark:border-zinc-800/80 rotate-[-3deg] hover:rotate-0 transition-transform duration-300 max-w-[240px]">
-                      <div className="w-full h-44 rounded-lg overflow-hidden bg-slate-100 dark:bg-zinc-900">
-                        <img 
-                          src="/mulher_escrevendo_caderno.png" 
-                          alt="Empreendedora escrevendo no caderno"
-                          className="w-full h-full object-cover" 
-                        />
-                      </div>
-                      <p className="text-center font-mono text-[9px] text-slate-400 mt-4 leading-none select-none">
-                        ⚠️ Sua rotina atual?
-                      </p>
-                    </div>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Loja Aberta • 100% Sincronizado
+                  </span>
                 </div>
-              </motion.div>
-            ) : (
-              <motion.div 
-                key="mimus"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.25 }}
-                className="p-8 md:p-12 space-y-6 bg-gradient-to-br from-rose-500/[0.02] via-pink-500/[0.01] to-violet-500/[0.02] dark:bg-zinc-900/40"
-              >
-                <div className="flex items-center gap-3 pb-4 border-b border-rose-100 dark:border-zinc-800">
-                  <span className="text-2xl">✨</span>
-                  <div>
-                    <h4 className="text-lg font-bold text-slate-900 dark:text-white">Rotina com Mimus</h4>
-                    <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">Gestão integrada e controle absoluto em segundos</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-                  <div className="lg:col-span-7 space-y-4">
-                    <div className="flex items-start gap-3">
-                      <span className="text-emerald-500 text-sm mt-0.5">✔</span>
-                      <p className="text-sm text-slate-655 dark:text-zinc-350">
-                        <strong>Baixa automática:</strong> Vendeu? O Mimus atualiza o estoque físico e a Loja Integrada imediatamente. Sem furos, sem estresse.
-                      </p>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <span className="text-emerald-500 text-sm mt-0.5">✔</span>
-                      <p className="text-sm text-slate-655 dark:text-zinc-350">
-                        <strong>Lembretes inteligentes:</strong> O sistema avisa os aniversários do dia. Mande um cupom de desconto em segundos e garanta uma nova venda.
-                      </p>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <span className="text-emerald-500 text-sm mt-0.5">✔</span>
-                      <p className="text-sm text-slate-655 dark:text-zinc-350">
-                        <strong>Lucro na tela:</strong> Margem líquida calculada automaticamente. Saiba exatamente qual produto gera mais resultado para sua loja.
-                      </p>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <span className="text-emerald-500 text-sm mt-0.5">✔</span>
-                      <p className="text-sm text-slate-655 dark:text-zinc-350">
-                        <strong>Histórico unificado:</strong> Um clique no perfil da cliente e você vê tudo o que ela já comprou, preferências de tons de maquiagem e ticket médio.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Mimus App Preview Card (Right side) */}
-                  <div className="lg:col-span-5 flex justify-center">
-                    <div className="bg-white dark:bg-zinc-950 p-3 pb-8 rounded-2xl shadow-xl border border-slate-200/50 dark:border-zinc-800/80 rotate-[3deg] hover:rotate-0 transition-transform duration-300 max-w-[240px]">
-                      <div className="w-full h-44 rounded-lg overflow-hidden bg-slate-100 dark:bg-zinc-900">
-                        <img 
-                          src="/mulher_usando_sistema.png" 
-                          alt="Empreendedora usando o Mimus"
-                          className="w-full h-full object-cover" 
-                        />
-                      </div>
-                      <p className="text-center font-mono text-[9px] text-rose-600 dark:text-rose-455 mt-4 leading-none select-none">
-                        ✨ Sua nova realidade!
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </section>
-
-      {/* SIMULATED CLIENT VITRINE */}
-      <section id="preview" className="py-20 md:py-28 bg-white dark:bg-zinc-900 transition-colors duration-300 relative border-t border-slate-100 dark:border-zinc-900">
-        <div className="max-w-7xl mx-auto px-6">
-          
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            
-            {/* Left Column: Interactive info & selectors */}
-            <div className="lg:col-span-5 space-y-6 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/25">
-                <Sparkles className="w-4 h-4 text-rose-600 dark:text-rose-455" />
-                <span className="text-xs font-semibold text-rose-600 dark:text-rose-455 tracking-wide uppercase">Vitrine de Alta Conversão</span>
               </div>
-              <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white leading-tight">
-                Sua marca com a presença digital que ela merece.
-              </h2>
-              <p className="text-slate-500 dark:text-zinc-400 text-sm md:text-base leading-relaxed">
-                Suas clientes acessam sua vitrine direto pelo celular. Sem precisar baixar aplicativos ou fazer logins complicados. Elas selecionam o produto, montam o carrinho e te mandam o pedido pronto.
-              </p>
 
-              {/* Product interactive selectors */}
-              <div className="space-y-3 pt-4">
-                {[
-                  { name: "Batom Velvet Matte", price: "R$ 49,90", desc: "Toque aveludado com secagem confortável." },
-                  { name: "Gloss Aura Glow", price: "R$ 39,90", desc: "Brilho holográfico e hidratação intensa." },
-                  { name: "Base Fluida Hydra", price: "R$ 89,90", desc: "Acabamento natural com ácido hialurônico." },
-                  { name: "Perfume Rose L'Amour", price: "R$ 189,90", desc: "Fragrância importada de longa duração." }
-                ].map((prod, idx) => (
-                  <button 
-                    key={idx}
-                    onClick={() => setVitrineActiveProduct(idx)}
-                    className={`w-full text-left p-4 rounded-2xl border transition-all duration-200 flex justify-between items-center ${
-                      vitrineActiveProduct === idx 
-                        ? 'border-rose-500 bg-rose-500/[0.03] dark:bg-rose-500/[0.02] shadow-sm' 
-                        : 'border-slate-100 hover:border-slate-200 dark:border-zinc-800 dark:hover:border-zinc-800 bg-transparent'
-                    }`}
-                  >
-                    <div>
-                      <p className={`text-xs font-bold ${vitrineActiveProduct === idx ? 'text-rose-600 dark:text-rose-400' : 'text-slate-800 dark:text-zinc-200'}`}>
-                        {prod.name}
-                      </p>
-                      <p className="text-[10px] text-slate-400 dark:text-zinc-500 mt-0.5">{prod.desc}</p>
-                    </div>
-                    <span className="text-xs font-bold text-slate-900 dark:text-white">{prod.price}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Right Column: Simulated Mobile Mockup */}
-            <div className="lg:col-span-7 flex justify-center">
-              <div className="w-[320px] h-[600px] bg-white dark:bg-zinc-950 rounded-[40px] border-[8px] border-slate-900 dark:border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+              {/* Showcase Grid inside Mockup */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                 
-                {/* iPhone Dynamic Island */}
-                <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-28 h-5 bg-slate-900 dark:bg-zinc-800 rounded-full z-30 flex items-center justify-between px-3">
-                  <div className="w-1.5 h-1.5 rounded-full bg-slate-800" />
-                  <div className="w-2.5 h-1 bg-slate-850 rounded-full" />
-                </div>
+                {/* Left: Live AI Assistant Simulator */}
+                <div className="lg:col-span-7 bg-slate-50/70 dark:bg-zinc-900/60 p-5 rounded-2xl border border-slate-200/60 dark:border-zinc-800 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center shadow-md shadow-rose-500/20">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-white">Mimus AI Assistente</h4>
+                        <span className="text-[10px] text-slate-400">Comandos inteligentes por texto e áudio</span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                      {aiCommands[activeAICommand].tag}
+                    </span>
+                  </div>
 
-                {/* Store Header */}
-                <div className="pt-9 pb-3 px-4 border-b border-slate-100 dark:border-zinc-900 bg-slate-50/50 dark:bg-zinc-900/50 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-rose-500/10 text-rose-600 flex items-center justify-center text-xs font-extrabold">M</div>
-                    <div>
-                      <h4 className="text-[10px] font-bold text-slate-800 dark:text-white">Mimus Beauty Store</h4>
-                      <p className="text-[7px] text-emerald-500 font-semibold flex items-center gap-0.5">
-                        <span className="w-1 h-1 rounded-full bg-emerald-500 animate-ping" /> Online agora
-                      </p>
+                  {/* Chat interaction simulation */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-start gap-2.5 justify-end">
+                      <div className="max-w-md p-3 rounded-2xl rounded-tr-none bg-rose-600 text-white text-xs font-medium shadow-sm">
+                        💬 "{aiCommands[activeAICommand].command}"
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-600 flex items-center justify-center shrink-0 mt-1">
+                        <Sparkles className="w-3 h-3" />
+                      </div>
+                      <div className="max-w-md p-3.5 rounded-2xl rounded-tl-none bg-white dark:bg-zinc-800 border border-slate-200/60 dark:border-zinc-700 text-slate-800 dark:text-zinc-200 text-xs shadow-sm space-y-1">
+                        <p>{aiCommands[activeAICommand].response}</p>
+                      </div>
                     </div>
                   </div>
-                  <ShoppingBag className="w-4 h-4 text-slate-400" />
-                </div>
 
-                {/* Store Catalog Content */}
-                <div className="flex-1 p-4 overflow-y-auto space-y-4">
-                  {/* Category tabs */}
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 select-none scrollbar-none">
-                    <span className="text-[8px] font-bold bg-rose-600 text-white px-2.5 py-1 rounded-full whitespace-nowrap">Maquiagem</span>
-                    <span className="text-[8px] font-bold bg-slate-100 dark:bg-zinc-900 text-slate-600 dark:text-zinc-300 px-2.5 py-1 rounded-full whitespace-nowrap">Perfumes</span>
-                    <span className="text-[8px] font-bold bg-slate-100 dark:bg-zinc-900 text-slate-600 dark:text-zinc-300 px-2.5 py-1 rounded-full whitespace-nowrap">Skincare</span>
-                  </div>
-
-                  {/* Banner */}
-                  <div className="bg-gradient-to-r from-pink-500 via-rose-500 to-violet-600 p-3.5 rounded-2xl text-white relative overflow-hidden">
-                    <span className="text-[6px] uppercase tracking-wider bg-white/20 px-1.5 py-0.5 rounded-full font-bold">Lançamento</span>
-                    <h5 className="text-[11px] font-extrabold mt-1">Coleção Outono Elegante</h5>
-                    <p className="text-[7px] text-white/80">Frete grátis em compras acima de R$ 150</p>
-                  </div>
-
-                  {/* Products Grid */}
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { name: "Batom Velvet Matte", price: "R$ 49,90", image: "from-pink-400 to-rose-500" },
-                      { name: "Gloss Aura Glow", price: "R$ 39,90", image: "from-purple-400 to-pink-500" },
-                      { name: "Base Fluida Hydra", price: "R$ 89,90", image: "from-amber-200 to-rose-300" },
-                      { name: "Perfume Rose L'Amour", price: "R$ 189,90", image: "from-fuchsia-400 to-violet-600" }
-                    ].map((item, idx) => (
-                      <div 
-                        key={idx}
-                        className={`p-2.5 rounded-2xl border transition-all duration-200 ${
-                          vitrineActiveProduct === idx 
-                            ? 'border-rose-500 bg-rose-500/[0.02] dark:bg-rose-500/[0.01]' 
-                            : 'border-slate-100 dark:border-zinc-900'
+                  {/* AI Command selectors */}
+                  <div className="pt-2 flex flex-wrap gap-2 border-t border-slate-200/60 dark:border-zinc-800">
+                    {aiCommands.map((cmd, idx) => (
+                      <button
+                        key={cmd.label}
+                        onClick={() => setActiveAICommand(idx)}
+                        className={`text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all ${
+                          activeAICommand === idx
+                            ? 'bg-rose-600 text-white shadow-sm'
+                            : 'bg-white dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-100'
                         }`}
                       >
-                        <div className={`h-20 w-full bg-gradient-to-tr ${item.image} rounded-xl mb-2 flex items-center justify-center text-white/20 font-black text-xl`}>
-                          ✨
-                        </div>
-                        <h6 className="text-[9px] font-bold text-slate-800 dark:text-zinc-200 truncate">{item.name}</h6>
-                        <div className="flex justify-between items-center mt-1">
-                          <span className="text-[8px] font-extrabold text-slate-900 dark:text-white">{item.price}</span>
-                          <span className="text-[7px] text-rose-600 dark:text-rose-455 font-bold">Ver +</span>
-                        </div>
-                      </div>
+                        {cmd.label}
+                      </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Simulated Floating Cart Drawer */}
-                <div className="p-4 bg-slate-50 dark:bg-zinc-900 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between">
-                  <div>
-                    <span className="text-[7px] text-slate-400 uppercase tracking-wider font-semibold block">Item Selecionado</span>
-                    <span className="text-[9px] font-bold text-slate-800 dark:text-white">
-                      {[
-                        "Batom Velvet Matte",
-                        "Gloss Aura Glow",
-                        "Base Fluida Hydra",
-                        "Perfume Rose L'Amour"
-                      ][vitrineActiveProduct]}
+                {/* Right: Live Floating Widgets (Sales, Stock, Vitrine) */}
+                <div className="lg:col-span-5 space-y-3.5">
+                  
+                  {/* Widget 1: Faturamento Hoje */}
+                  <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 shadow-sm flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                        <TrendingUp className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Faturamento Hoje</span>
+                        <h4 className="text-base font-extrabold text-slate-900 dark:text-white">R$ 1.485,20</h4>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full">
+                      +28% vs ontem
                     </span>
                   </div>
-                  <button className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-[8px] rounded-lg shadow-sm flex items-center gap-1 active:scale-95 transition-transform">
-                    Adicionar no WhatsApp <ArrowRight className="w-2.5 h-2.5" />
-                  </button>
+
+                  {/* Widget 2: Alerta de Estoque Crítico */}
+                  <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 shadow-sm flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                        <Boxes className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Controle de Estoque</span>
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200">Gloss Labial Aura Glow</h4>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300">
+                      12 un. em estoque
+                    </span>
+                  </div>
+
+                  {/* Widget 3: Pedido Recebido via Vitrine */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/30 dark:to-pink-950/20 border border-rose-200/70 dark:border-rose-900/40 shadow-sm flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shadow-md shadow-rose-600/20">
+                        <ShoppingBag className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-extrabold text-rose-600 dark:text-rose-400">Novo Pedido na Vitrine!</span>
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-white">R$ 119,80 • Letícia F.</h4>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded-full">
+                      Pix Pago
+                    </span>
+                  </div>
+
                 </div>
 
               </div>
+
+            </div>
+          </div>
+        </motion.div>
+      </section>
+
+      {/* ECOSYSTEM / CHANNELS SECTION ("ENCONTRE SUAS CLIENTES ONDE ELAS ESTIVEREM") */}
+      <section id="ecossistema" className="py-20 md:py-28 px-4 sm:px-6 border-t border-slate-200/60 dark:border-zinc-800/80">
+        <div className="max-w-6xl mx-auto space-y-12">
+          
+          <div className="text-center max-w-3xl mx-auto space-y-4">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-rose-600 dark:text-rose-400">
+              Ecossistema Completo de Vendas
+            </span>
+            <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
+              Tudo o que a sua loja de beleza precisa em um só lugar.
+            </h2>
+            <p className="text-sm sm:text-base text-slate-600 dark:text-zinc-400">
+              Chega de usar três aplicativos diferentes e uma planilha que vive travando. O Mimus integra cada etapa do seu negócio.
+            </p>
+          </div>
+
+          {/* 6 Core Channels Grid (Manychat style card grid) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            
+            {/* Card 1: Vitrine Virtual */}
+            <div className="p-7 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 hover:border-rose-500/50 hover:shadow-xl transition-all duration-300 group space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Globe className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-600">Instagram & WhatsApp</span>
+                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white mt-1">Vitrine Virtual na Bio</h3>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
+                Catálogo online com fotos em alta qualidade, preços, variações de tons e botão de pedido direto no seu WhatsApp pronto para envio.
+              </p>
+            </div>
+
+            {/* Card 2: PDV de Balcão */}
+            <div className="p-7 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 hover:border-rose-500/50 hover:shadow-xl transition-all duration-300 group space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-pink-50 dark:bg-pink-950/50 text-pink-600 dark:text-pink-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <ShoppingBag className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-pink-600">Venda Rápida</span>
+                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white mt-1">PDV em 5 Segundos</h3>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
+                Atenda sua cliente no balcão sem filas. Leitor de código de barras, cálculo de troco, Pix automático e comprovante personalizado.
+              </p>
+            </div>
+
+            {/* Card 3: Estoque Inteligente */}
+            <div className="p-7 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 hover:border-rose-500/50 hover:shadow-xl transition-all duration-300 group space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Boxes className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-600">Contagem & Baixa</span>
+                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white mt-1">Controle de Estoque & Baixa</h3>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
+                Faça a contagem física dos seus materiais, identifique divergências e dê baixa em massa refletindo instantaneamente no Financeiro.
+              </p>
+            </div>
+
+            {/* Card 4: Financeiro */}
+            <div className="p-7 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 hover:border-rose-500/50 hover:shadow-xl transition-all duration-300 group space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <DollarSign className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600">Fluxo de Caixa</span>
+                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white mt-1">Financeiro & Lucro Real</h3>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
+                Lançamento rápido de receitas e despesas, controle de fornecedores, fretes e painel de faturamento diário sem segredos contábeis.
+              </p>
+            </div>
+
+            {/* Card 5: Mimus AI */}
+            <div className="p-7 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 hover:border-rose-500/50 hover:shadow-xl transition-all duration-300 group space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Sparkles className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600">Inteligência Artificial</span>
+                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white mt-1">Mimus AI Integrada</h3>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
+                Cadastre batons, paletas e perfumes apenas enviando um áudio ou foto. A inteligência artificial preenche título, preço e categoria.
+              </p>
+            </div>
+
+            {/* Card 6: CRM de Clientes */}
+            <div className="p-7 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 hover:border-rose-500/50 hover:shadow-xl transition-all duration-300 group space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Users className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">Fidelização</span>
+                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white mt-1">Histórico & Recompra</h3>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
+                Saiba quais clientes mais compram, quais produtos estão acabando e receba lembretes para reengajar no WhatsApp com novidades.
+              </p>
             </div>
 
           </div>
@@ -1245,205 +545,590 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* MIMUS AI SECTION */}
-      <section id="mimus-ai" className="py-20 md:py-28 px-6 bg-slate-50 dark:bg-zinc-950 transition-colors duration-300 relative overflow-hidden border-t border-slate-100 dark:border-zinc-900">
-        
-        {/* Glow decoration */}
-        <div className="absolute top-1/2 left-1/2 w-[40rem] h-[40rem] bg-rose-500/5 dark:bg-rose-500/10 rounded-full blur-[120px] pointer-events-none -translate-x-1/2 -translate-y-1/2" />
-
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+      {/* BEFORE & AFTER COMPARISON SECTION ("SUA LOJA: ANTES & DEPOIS" - MANYCHAT SIGNATURE STYLE) */}
+      <section id="comparativo" className="py-20 md:py-28 px-4 sm:px-6 bg-slate-100/70 dark:bg-zinc-900/40 border-y border-slate-200/60 dark:border-zinc-800">
+        <div className="max-w-5xl mx-auto space-y-12">
           
-          {/* Left details */}
-          <div className="lg:col-span-5 flex flex-col items-center lg:items-start text-center lg:text-left space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/25">
-              <Sparkles className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-              <span className="text-xs font-semibold text-rose-600 dark:text-rose-400 tracking-wide uppercase">Diferencial Exclusivo</span>
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-rose-600 dark:text-rose-400">
+              A Virada de Chave
+            </span>
+            <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
+              Sua loja: antes & depois do Mimus
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400">
+              Veja o que muda na sua rotina quando você troca o caderno pela gestão inteligente.
+            </p>
+          </div>
+
+          {/* Side by side comparison cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            {/* Antes: O Caos do Caderno */}
+            <div className="p-8 rounded-3xl bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 shadow-sm space-y-6 relative overflow-hidden">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-850 pb-4">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-rose-600 bg-rose-50 dark:bg-rose-950/60 px-3 py-1 rounded-full">
+                  Sem o Mimus
+                </span>
+                <span className="text-xs text-slate-400 font-semibold">Só dor de cabeça</span>
+              </div>
+
+              <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
+                Caderno rasurado, produtos vencendo e incerteza no lucro
+              </h3>
+
+              <ul className="space-y-4 text-xs text-slate-600 dark:text-zinc-400">
+                <li className="flex items-start gap-3">
+                  <X className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                  <span>Você anota vendas em folhas de papel e perde o controle do fiado.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <X className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                  <span>Cliente pede produto no WhatsApp e você precisa ir correndo na caixa ver se tem.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <X className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                  <span>Descobre que cosméticos venceram ou sumiram sem saber quem vendeu.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <X className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                  <span>Passa o domingo inteiro somando notinhas para tentar saber quanto sobrou.</span>
+                </li>
+              </ul>
             </div>
 
-            <h2 className="text-3xl sm:text-4.5xl font-extrabold tracking-tight leading-tight text-slate-900 dark:text-white">
-              Sua loja gerenciada apenas por <span className="bg-gradient-to-r from-rose-600 to-pink-500 bg-clip-text text-transparent">comando de voz ou texto</span>
+            {/* Depois: A Paz com o Mimus */}
+            <div className="p-8 rounded-3xl bg-gradient-to-b from-rose-50/60 via-white to-white dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-950 border-2 border-rose-500/80 shadow-xl shadow-rose-600/10 space-y-6 relative overflow-hidden">
+              <div className="flex items-center justify-between border-b border-rose-100 dark:border-zinc-800 pb-4">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-white bg-rose-600 px-3 py-1 rounded-full shadow-sm">
+                  Com o Mimus
+                </span>
+                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">Mais lucro e liberdade</span>
+              </div>
+
+              <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
+                Vitrine vendendo 24h, estoque sincronizado e financeiro no azul
+              </h3>
+
+              <ul className="space-y-4 text-xs text-slate-700 dark:text-zinc-300">
+                <li className="flex items-start gap-3">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <span>Sua vitrine virtual no Instagram vende enquanto você descansa.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <span>Estoque baixa sozinho no momento em que a venda é concluída.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <span>Contagem física e baixa de estoque em massa lançada direto no Financeiro.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <span>Painel exibe faturamento, despesas e lucro líquido com precisão de centavos.</span>
+                </li>
+              </ul>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      {/* INTERACTIVE TOUR / DEMO SECTION ("VEJA COMO FUNCIONA NA PRÁTICA") */}
+      <section id="demonstracao" className="py-20 md:py-28 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto space-y-12">
+          
+          <div className="text-center max-w-3xl mx-auto space-y-3">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-rose-600 dark:text-rose-400">
+              Interface Intuitiva
+            </span>
+            <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
+              Veja o Mimus funcionando na prática
             </h2>
+            <p className="text-sm text-slate-600 dark:text-zinc-400">
+              Desenvolvido especificamente para ser fácil e rápido no celular ou computador.
+            </p>
+          </div>
+
+          {/* Tour Tabs Bar */}
+          <div className="flex flex-wrap items-center justify-center gap-2 max-w-3xl mx-auto">
+            <button
+              onClick={() => setActiveFeatureTab('vitrine')}
+              className={`px-5 py-2.5 rounded-full text-xs font-extrabold uppercase tracking-wide transition-all ${
+                activeFeatureTab === 'vitrine'
+                  ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30'
+                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-slate-900'
+              }`}
+            >
+              1. Vitrine & Catálogo
+            </button>
+            <button
+              onClick={() => setActiveFeatureTab('pdv')}
+              className={`px-5 py-2.5 rounded-full text-xs font-extrabold uppercase tracking-wide transition-all ${
+                activeFeatureTab === 'pdv'
+                  ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30'
+                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-slate-900'
+              }`}
+            >
+              2. Venda Rápida (PDV)
+            </button>
+            <button
+              onClick={() => setActiveFeatureTab('stock')}
+              className={`px-5 py-2.5 rounded-full text-xs font-extrabold uppercase tracking-wide transition-all ${
+                activeFeatureTab === 'stock'
+                  ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30'
+                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-slate-900'
+              }`}
+            >
+              3. Estoque & Baixa
+            </button>
+            <button
+              onClick={() => setActiveFeatureTab('ai')}
+              className={`px-5 py-2.5 rounded-full text-xs font-extrabold uppercase tracking-wide transition-all ${
+                activeFeatureTab === 'ai'
+                  ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30'
+                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-slate-900'
+              }`}
+            >
+              4. Inteligência Artificial
+            </button>
+          </div>
+
+          {/* Interactive Screen Preview */}
+          <div className="p-4 sm:p-8 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-xl max-w-4xl mx-auto">
+            {activeFeatureTab === 'vitrine' && (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-zinc-800 pb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Vitrine Virtual na Bio do Instagram</h3>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400">Sua loja 24h no ar com link direto para o WhatsApp</p>
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-600 dark:bg-rose-950 dark:text-rose-400">
+                    www.appmimus.com.br/store/sua-loja
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-950 border border-slate-100 dark:border-zinc-800 space-y-2">
+                    <div className="h-32 rounded-xl bg-rose-100/60 dark:bg-rose-950/40 flex items-center justify-center text-rose-500 font-bold text-xs">
+                      Gloss Aura Glow
+                    </div>
+                    <span className="font-bold text-xs block text-slate-800 dark:text-white">Gloss Labial Aura Glow</span>
+                    <span className="text-rose-600 font-extrabold text-xs block">R$ 39,90</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-950 border border-slate-100 dark:border-zinc-800 space-y-2">
+                    <div className="h-32 rounded-xl bg-pink-100/60 dark:bg-pink-950/40 flex items-center justify-center text-pink-500 font-bold text-xs">
+                      Batom Velvet BT
+                    </div>
+                    <span className="font-bold text-xs block text-slate-800 dark:text-white">Batom Líquido Velvet BT</span>
+                    <span className="text-rose-600 font-extrabold text-xs block">R$ 49,90</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-950 border border-slate-100 dark:border-zinc-800 space-y-2">
+                    <div className="h-32 rounded-xl bg-purple-100/60 dark:bg-purple-950/40 flex items-center justify-center text-purple-500 font-bold text-xs">
+                      Bruma Fixadora
+                    </div>
+                    <span className="font-bold text-xs block text-slate-800 dark:text-white">Bruma Fixadora Iluminadora</span>
+                    <span className="text-rose-600 font-extrabold text-xs block">R$ 55,00</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeFeatureTab === 'pdv' && (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">PDV Balcão Ágil</h3>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400">Finalize vendas em segundos sem complicações</p>
+                  </div>
+                  <span className="text-xs font-bold text-emerald-600">Leitor de Barras Ativo</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-950 border border-slate-100 dark:border-zinc-800 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs text-slate-400 font-semibold block">Itens no Carrinho (2 un.)</span>
+                    <strong className="text-base text-slate-800 dark:text-white">Gloss Aura Glow + Batom Velvet</strong>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-slate-400 block">Total a Pagar</span>
+                    <strong className="text-lg text-emerald-600">R$ 89,80</strong>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <button className="py-3 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 font-bold text-xs text-center">Pix (QR Code)</button>
+                  <button className="py-3 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 font-bold text-xs text-center">Cartão Crédito</button>
+                  <button className="py-3 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 font-bold text-xs text-center">Dinheiro</button>
+                </div>
+              </div>
+            )}
+
+            {activeFeatureTab === 'stock' && (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Contagem Física & Baixa em Massa</h3>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400">Divergências ajustadas com débito automático no Financeiro</p>
+                  </div>
+                  <span className="text-xs font-extrabold text-rose-600">Baixa de Estoque</span>
+                </div>
+
+                <div className="border border-slate-100 dark:border-zinc-800 rounded-xl overflow-hidden text-xs">
+                  <div className="grid grid-cols-4 p-2.5 bg-slate-100 dark:bg-zinc-850 font-bold text-slate-500">
+                    <span>Produto</span>
+                    <span className="text-center">Estoque Sistema</span>
+                    <span className="text-center">Contagem Real</span>
+                    <span className="text-right">Saída Financeiro</span>
+                  </div>
+                  <div className="grid grid-cols-4 p-3 border-t border-slate-100 dark:border-zinc-800 items-center">
+                    <span className="font-bold">Base Líquida Matte Vivai</span>
+                    <span className="text-center">24 un.</span>
+                    <span className="text-center font-bold text-rose-600">20 un. (-4 un.)</span>
+                    <span className="text-right font-bold text-rose-600">-R$ 40,00</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeFeatureTab === 'ai' && (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Mimus AI Assistente 24h</h3>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400">Cadastre produtos e consulte números pelo WhatsApp</p>
+                  </div>
+                  <span className="text-xs font-bold text-rose-600">Gemini Pro Integrado</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-rose-50/70 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 text-xs space-y-2">
+                  <p className="font-bold text-rose-700 dark:text-rose-300">
+                    🎙️ Você envia um áudio no WhatsApp:
+                  </p>
+                  <p className="italic text-slate-600 dark:text-zinc-400">
+                    "Oi Mimus, chegaram 10 batons BT na cor Bruna por 45 reais cada um."
+                  </p>
+                  <p className="font-bold text-emerald-600 dark:text-emerald-400 pt-1">
+                    ✨ Mimus AI responde em 2 segundos: "Produto cadastrado com sucesso e estoque atualizado!"
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+      </section>
+
+      {/* 3 STEPS ONBOARDING (MANYCHAT STYLE "TUDO RODANDO EM 3 PASSOS") */}
+      <section className="py-20 md:py-28 px-4 sm:px-6 bg-slate-100/60 dark:bg-zinc-900/30 border-t border-slate-200/60 dark:border-zinc-800">
+        <div className="max-w-5xl mx-auto space-y-12">
+          
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-rose-600 dark:text-rose-400">
+              Facilidade Absoluta
+            </span>
+            <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
+              Tudo no ar e rodando em apenas 3 passos
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400">
+              Você não precisa de técnico nem de semanas de treinamento.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             
-            <p className="text-base text-slate-600 dark:text-zinc-400 max-w-lg leading-relaxed">
-              O Mimus AI é a forma mais rápida de controlar sua loja no dia a dia corrido. Sem formulários longos ou tabelas confusas: basta enviar uma mensagem como se estivesse no WhatsApp.
+            {/* Step 1 */}
+            <div className="p-8 rounded-3xl bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 shadow-sm space-y-4 relative">
+              <span className="w-10 h-10 rounded-full bg-rose-600 text-white font-extrabold text-sm flex items-center justify-center shadow-md shadow-rose-600/30">
+                1
+              </span>
+              <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
+                Crie sua conta grátis
+              </h3>
+              <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
+                Leva menos de 1 minuto com seu e-mail ou Google. Sem necessidade de cartão de crédito.
+              </p>
+            </div>
+
+            {/* Step 2 */}
+            <div className="p-8 rounded-3xl bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 shadow-sm space-y-4 relative">
+              <span className="w-10 h-10 rounded-full bg-rose-600 text-white font-extrabold text-sm flex items-center justify-center shadow-md shadow-rose-600/30">
+                2
+              </span>
+              <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
+                Cadastre seus cosméticos
+              </h3>
+              <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
+                Adicione seus produtos com foto e preço, importe por planilha CSV ou use nossa IA por áudio.
+              </p>
+            </div>
+
+            {/* Step 3 */}
+            <div className="p-8 rounded-3xl bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 shadow-sm space-y-4 relative">
+              <span className="w-10 h-10 rounded-full bg-rose-600 text-white font-extrabold text-sm flex items-center justify-center shadow-md shadow-rose-600/30">
+                3
+              </span>
+              <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
+                Comece a faturar
+              </h3>
+              <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
+                Cole o link da vitrine na bio do seu Instagram, use o PDV de balcão e veja suas vendas crescerem.
+              </p>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      {/* TESTIMONIALS / SOCIAL PROOF (MANYCHAT INFLUENCER/CREATOR CARD STYLE) */}
+      <section id="depoimentos" className="py-20 md:py-28 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto space-y-12">
+          
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-rose-600 dark:text-rose-400">
+              Histórias de Sucesso
+            </span>
+            <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
+              O que dizem as lojistas de beleza
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400">
+              Empreendedoras reais que transformaram suas lojas com o Mimus.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* Testimonial 1 */}
+            <div className="p-7 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-rose-500 to-pink-500 text-white font-black text-sm flex items-center justify-center">
+                  TD
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">Toque Delicado</h4>
+                  <span className="text-[10px] text-slate-400">@toquedelicado • Cosméticos & Make</span>
+                </div>
+              </div>
+              <div className="flex gap-1 text-amber-400">
+                {[...Array(5)].map((_, i) => <Star key={i} className="w-3.5 h-3.5 fill-current" />)}
+              </div>
+              <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
+                "O Mimus mudou a nossa vida na loja. Eu perdia noites somando papel e ainda tinha produto sumindo do estoque. Hoje a vitrine vende no WhatsApp e eu sei o lucro de cada dia!"
+              </p>
+            </div>
+
+            {/* Testimonial 2 */}
+            <div className="p-7 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-purple-500 to-rose-500 text-white font-black text-sm flex items-center justify-center">
+                  AG
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">Aura Glow Beauty</h4>
+                  <span className="text-[10px] text-slate-400">@auraglow.make • 38k seguidores</span>
+                </div>
+              </div>
+              <div className="flex gap-1 text-amber-400">
+                {[...Array(5)].map((_, i) => <Star key={i} className="w-3.5 h-3.5 fill-current" />)}
+              </div>
+              <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
+                "A baixa de estoque em massa e o reflexo automático no financeiro são sensacionais. Nós economizamos mais de R$ 2.500 no mês só evitando perdas e compras desnecessárias."
+              </p>
+            </div>
+
+            {/* Testimonial 3 */}
+            <div className="p-7 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-pink-500 to-amber-500 text-white font-black text-sm flex items-center justify-center">
+                  BC
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">Bella Cosméticos</h4>
+                  <span className="text-[10px] text-slate-400">@bellacosmeticos • Loja Física e Online</span>
+                </div>
+              </div>
+              <div className="flex gap-1 text-amber-400">
+                {[...Array(5)].map((_, i) => <Star key={i} className="w-3.5 h-3.5 fill-current" />)}
+              </div>
+              <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
+                "O PDV é muito rápido. No balcão eu finalizo a venda em 5 segundos no celular e o comprovante já vai pelo WhatsApp. Minhas clientes adoram o capricho da vitrine!"
+              </p>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      {/* PRICING PLANS (MANYCHAT PRICING ARCHITECTURE) */}
+      <section id="precos" className="py-20 md:py-28 px-4 sm:px-6 bg-slate-100/60 dark:bg-zinc-900/40 border-t border-slate-200/60 dark:border-zinc-800">
+        <div className="max-w-6xl mx-auto space-y-12">
+          
+          <div className="text-center max-w-2xl mx-auto space-y-4">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-rose-600 dark:text-rose-400">
+              Planos Transparentes
+            </span>
+            <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
+              Escolha o plano ideal para você
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400">
+              Sem contratos de fidelidade. Cancele ou altere seu plano quando quiser.
             </p>
 
-            <div className="space-y-4 w-full">
-              <div className="flex gap-3 text-left">
-                <div className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Check className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800 dark:text-zinc-200">🎙️ Suporte a Comandos de Voz</h4>
-                  <p className="text-xs text-slate-500 dark:text-zinc-400">Grave áudios rápidos registrando vendas ou entradas enquanto atende sua cliente.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-3 text-left">
-                <div className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Check className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800 dark:text-zinc-200">🏷️ Marcações Inteligentes</h4>
-                  <p className="text-xs text-slate-500 dark:text-zinc-400">Use @ para marcar produtos e clientes e associar transações de forma precisa.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-3 text-left">
-                <div className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Check className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800 dark:text-zinc-200">📊 Resumos de Negócios na Hora</h4>
-                  <p className="text-xs text-slate-500 dark:text-zinc-400">Pergunte quanto faturou, o lucro do mês ou quais produtos estão acabando.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Link 
-                  href="/register" 
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-md transition-all"
-                >
-                  Experimentar Mimus AI Grátis <ArrowRight className="w-4 h-4" />
-                </Link>
-              </motion.div>
+            {/* Monthly / Yearly Toggle */}
+            <div className="inline-flex items-center gap-2 p-1.5 rounded-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 shadow-sm mt-2">
+              <button
+                onClick={() => setBillingCycle('monthly')}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  billingCycle === 'monthly'
+                    ? 'bg-rose-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
+                }`}
+              >
+                Mensal
+              </button>
+              <button
+                onClick={() => setBillingCycle('yearly')}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  billingCycle === 'yearly'
+                    ? 'bg-rose-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
+                }`}
+              >
+                <span>Anual</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-extrabold uppercase bg-emerald-500 text-white">
+                  -20% OFF
+                </span>
+              </button>
             </div>
           </div>
 
-          {/* Right chat simulation */}
-          <div className="lg:col-span-7 w-full flex flex-col space-y-4">
+          {/* Pricing Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
             
-            {/* Quick Action Tabs */}
-            <div className="flex flex-wrap gap-2 justify-center lg:justify-start relative">
-              {aiCommands.map((cmd, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleSelectAICommand(idx)}
-                  className={`relative px-4 py-2 rounded-xl text-xs font-bold transition-colors border ${
-                    activeAICommand === idx
-                      ? 'border-transparent text-white shadow-md shadow-rose-500/10 z-10'
-                      : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
-                  }`}
-                >
-                  {activeAICommand === idx && (
-                    <motion.span
-                      layoutId="activeAICommandIndicator"
-                      className="absolute inset-0 bg-rose-600 rounded-xl -z-10"
-                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                    />
-                  )}
-                  {cmd.label}
-                </button>
-              ))}
+            {/* Plan 1: Gratuito */}
+            <div className="p-8 rounded-3xl bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 shadow-sm flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Gratuito</span>
+                <div>
+                  <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">R$ 0</span>
+                  <span className="text-xs text-slate-400 font-semibold"> /mês</span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">
+                  Ideal para quem está começando a vender e precisa de organização inicial.
+                </p>
+
+                <ul className="space-y-3 pt-4 border-t border-slate-100 dark:border-zinc-800 text-xs text-slate-600 dark:text-zinc-300">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500" /> Até 25 produtos cadastrados
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500" /> Vitrine Virtual básica
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500" /> PDV Balcão simplificado
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500" /> Controle de estoque essencial
+                  </li>
+                </ul>
+              </div>
+
+              <Link
+                href="/register"
+                className="w-full py-3 rounded-full border border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-900 font-bold text-xs uppercase tracking-wider text-center transition-colors"
+              >
+                Começar Grátis
+              </Link>
             </div>
 
-            {/* Chatbot Window */}
-            <div className="w-full bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/60 dark:border-zinc-800 shadow-2xl overflow-hidden min-h-[380px] flex flex-col justify-between">
-              
-              {/* Window Header */}
-              <div className="px-6 py-4 bg-slate-50 dark:bg-zinc-900/60 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center relative">
-                    <Sparkles className="w-5 h-5 text-rose-650 dark:text-rose-455 text-rose-600 dark:text-rose-400" />
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-900 animate-pulse" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-800 dark:text-white">Bianca • Mimus AI</h4>
-                    <span className="text-[10px] text-slate-400 dark:text-zinc-500">Sua Assistente Virtual Inteligente</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-slate-200 dark:bg-zinc-800" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-slate-200 dark:bg-zinc-800" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-slate-200 dark:bg-zinc-800" />
-                </div>
+            {/* Plan 2: Pro (Featured Manychat Style) */}
+            <div className="p-8 rounded-3xl bg-white dark:bg-zinc-900 border-2 border-rose-500 shadow-2xl shadow-rose-600/15 flex flex-col justify-between space-y-6 relative">
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-rose-600 text-white font-extrabold text-[10px] uppercase tracking-widest shadow-md">
+                Mais Escolhido
               </div>
 
-              {/* Chat Body */}
-              <div className="p-6 flex-1 bg-slate-50/20 dark:bg-zinc-950/20 flex flex-col justify-end space-y-4 overflow-hidden">
-                
-                {/* User Message Bubble */}
-                <motion.div 
-                  key={`user-msg-${activeAICommand}`}
-                  initial={{ opacity: 0, scale: 0.95, y: 15, x: 10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-                  transition={{ type: "spring", stiffness: 350, damping: 25 }}
-                  className="self-end max-w-[85%] bg-rose-600 text-white rounded-2xl rounded-tr-none px-4 py-3 shadow-md text-sm font-medium"
-                >
-                  <p className="font-mono text-xs opacity-90 mb-0.5">Sua Mensagem</p>
-                  <p className="leading-relaxed">
-                    {aiCommands[activeAICommand].command}
-                  </p>
-                </motion.div>
-
-                {/* AI Response Bubble */}
-                <motion.div 
-                  key={`ai-msg-${activeAICommand}`}
-                  initial={{ opacity: 0, scale: 0.95, y: 15, x: -10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-                  transition={{ type: "spring", stiffness: 350, damping: 25, delay: 0.15 }}
-                  className="self-start max-w-[85%] bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 text-slate-800 dark:text-zinc-200 rounded-2xl rounded-tl-none px-4 py-3.5 shadow-md text-sm min-h-[140px] flex flex-col justify-center"
-                >
-                  <p className="font-bold text-xs text-rose-500 dark:text-rose-455 mb-1">Bianca</p>
-                  
-                  {isTyping ? (
-                    <div className="flex items-center gap-1.5 py-2">
-                      <motion.span
-                        className="w-2 h-2 bg-slate-400 dark:bg-zinc-650 rounded-full"
-                        animate={{ y: [0, -6, 0] }}
-                        transition={{ repeat: Infinity, duration: 0.6, ease: "easeInOut", delay: 0 }}
-                      />
-                      <motion.span
-                        className="w-2 h-2 bg-slate-400 dark:bg-zinc-650 rounded-full"
-                        animate={{ y: [0, -6, 0] }}
-                        transition={{ repeat: Infinity, duration: 0.6, ease: "easeInOut", delay: 0.15 }}
-                      />
-                      <motion.span
-                        className="w-2 h-2 bg-slate-400 dark:bg-zinc-650 rounded-full"
-                        animate={{ y: [0, -6, 0] }}
-                        transition={{ repeat: Infinity, duration: 0.6, ease: "easeInOut", delay: 0.3 }}
-                      />
-                    </div>
-                  ) : (
-                    <div className="leading-relaxed whitespace-pre-line text-xs md:text-sm font-medium">
-                      {displayedResponse.split('\n').map((line, lIdx) => {
-                        const isBullet = line.trim().startsWith('•')
-                        
-                        return (
-                          <div key={lIdx} className={isBullet ? 'pl-3' : ''}>
-                            {line.split('**').map((part, pIdx) => {
-                              if (pIdx % 2 === 1) {
-                                return <strong key={pIdx} className="font-extrabold text-slate-900 dark:text-white">{part}</strong>
-                              }
-                              return part.split('*').map((subpart, sIdx) => {
-                                if (sIdx % 2 === 1) {
-                                  return <em key={sIdx} className="font-semibold italic text-rose-600 dark:text-rose-455 font-mono text-xs">{subpart}</em>
-                                }
-                                return subpart
-                              })
-                            })}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </motion.div>
-
-              </div>
-
-              {/* Chat Input Mockup */}
-              <div className="p-4 bg-slate-50 dark:bg-zinc-900/60 border-t border-slate-100 dark:border-zinc-800 flex items-center gap-3">
-                <div className="flex-1 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-850 px-4 py-2.5 rounded-2xl text-xs text-slate-400 dark:text-zinc-500 flex items-center justify-between">
-                  <span>Experimente digitar um comando...</span>
-                  <Sparkles className="w-4 h-4 text-slate-350 dark:text-zinc-700" />
+              <div className="space-y-4">
+                <span className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Plano Pro</span>
+                <div>
+                  <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">
+                    R$ {billingCycle === 'monthly' ? '49,90' : '39,90'}
+                  </span>
+                  <span className="text-xs text-slate-400 font-semibold"> /mês</span>
                 </div>
-                <button className="w-10 h-10 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-500/10 active:scale-95 transition-all">
-                  <ArrowRight className="w-5 h-5" />
-                </button>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">
+                  A solução completa para lojistas que querem vender mais e ter controle total.
+                </p>
+
+                <ul className="space-y-3 pt-4 border-t border-slate-100 dark:border-zinc-800 text-xs text-slate-700 dark:text-zinc-200 font-medium">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-rose-500" /> <strong>Produtos ilimitados</strong>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-rose-500" /> <strong>Vitrine Virtual Personalizada</strong>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-rose-500" /> PDV Completo com Pix e Recibo
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-rose-500" /> Baixa em Massa no Estoque & Financeiro
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-rose-500" /> <strong>Mimus AI Assistente 24h</strong>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-rose-500" /> Suporte Prioritário no WhatsApp
+                  </li>
+                </ul>
               </div>
 
+              <Link
+                href="/register"
+                className="w-full py-3.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs uppercase tracking-wider text-center shadow-lg shadow-rose-600/30 transition-all hover:scale-[1.02]"
+              >
+                Testar 14 Dias Grátis
+              </Link>
+            </div>
+
+            {/* Plan 3: Equipe / Elite */}
+            <div className="p-8 rounded-3xl bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 shadow-sm flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Equipe / Elite</span>
+                <div>
+                  <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">
+                    R$ {billingCycle === 'monthly' ? '97,00' : '79,00'}
+                  </span>
+                  <span className="text-xs text-slate-400 font-semibold"> /mês</span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">
+                  Para franquias e lojas com múltiplos operadores e vendedoras.
+                </p>
+
+                <ul className="space-y-3 pt-4 border-t border-slate-100 dark:border-zinc-800 text-xs text-slate-600 dark:text-zinc-300">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500" /> Tudo do Plano Pro incluso
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500" /> Até 5 operadores de equipe
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500" /> Controle de permissões por funcionário
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500" /> Relatórios gerenciais avançados
+                  </li>
+                </ul>
+              </div>
+
+              <Link
+                href="/register"
+                className="w-full py-3 rounded-full border border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-900 font-bold text-xs uppercase tracking-wider text-center transition-colors"
+              >
+                Contratar Equipe
+              </Link>
             </div>
 
           </div>
@@ -1451,221 +1136,134 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* TESTIMONIAL SECTION */}
-      <section id="testimonials" className="py-20 md:py-28 px-6 bg-rose-500/[0.02] dark:bg-rose-500/[0.01] transition-colors duration-300 border-t border-slate-100 dark:border-zinc-900">
-        <div className="max-w-7xl mx-auto space-y-12">
-          <div className="text-center space-y-4 max-w-2xl mx-auto">
-            <h2 className="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest">Histórias Reais</h2>
-            <p className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">Quem usa o Mimus aprova</p>
-            <p className="text-slate-500 dark:text-zinc-400 text-sm">Veja a experiência de quem transformou a gestão da sua loja de beleza.</p>
-          </div>
-
-          <div className="max-w-2xl mx-auto bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-slate-100 dark:border-zinc-800/80 shadow-xl space-y-6 flex flex-col md:flex-row gap-8 items-center">
-            <div className="w-full md:w-1/2 rounded-2xl overflow-hidden border border-slate-100 dark:border-zinc-800 flex items-center justify-center bg-slate-50 dark:bg-zinc-950 max-h-[300px] shadow-inner">
-              <img 
-                src="/leticia_aura_glow.png" 
-                onError={(e) => {
-                  // Fallback visual elegance if the generated image is not loaded
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  const parent = target.parentElement;
-                  if (parent) {
-                    const fallbackDiv = document.createElement('div');
-                    fallbackDiv.className = 'w-full h-full min-h-[220px] bg-gradient-to-tr from-pink-500 to-rose-600 flex flex-col items-center justify-center text-white p-6 text-center';
-                    fallbackDiv.innerHTML = '<span class="text-3xl mb-2">✨</span><span class="text-sm font-bold">Aura Glow Cosméticos</span><span class="text-[10px] opacity-80">Sucesso com o Mimus</span>';
-                    parent.appendChild(fallbackDiv);
-                  }
-                }}
-                alt="Letícia Costa - Aura Glow" 
-                className="w-full h-full object-cover aspect-square" 
-              />
-            </div>
-            <div className="w-full md:w-1/2 space-y-4 text-left">
-              <span className="text-[10px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                Caso de Sucesso 🏆
-              </span>
-              <p className="text-sm text-slate-650 dark:text-zinc-350 leading-relaxed italic">
-                "O Mimus salvou a minha rotina de vendas na Aura Glow. Antes eu perdia muito tempo anotando tudo em cadernos e esquecia de dar baixa no estoque. Agora eu controlo minhas vendas e finanças em segundos pelo celular, e minhas clientes amam comprar pela vitrine do WhatsApp! O assistente por inteligência artificial é surreal de prático."
-              </p>
-              <div>
-                <h4 className="font-bold text-slate-800 dark:text-white text-sm">Letícia Costa</h4>
-                <p className="text-xs text-slate-400 font-medium">Proprietária da Aura Glow • Petrópolis - RJ</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* PRICING SECTION */}
-      <section id="pricing" className="py-20 md:py-28 px-6 bg-slate-50 dark:bg-zinc-950 transition-colors duration-300">
-        <div className="max-w-7xl mx-auto">
+      {/* FAQ SECTION (MANYCHAT ACCORDION PATTERN) */}
+      <section id="faq" className="py-20 md:py-28 px-4 sm:px-6">
+        <div className="max-w-3xl mx-auto space-y-10">
           
-          <div className="text-center space-y-4 max-w-xl mx-auto mb-16 md:mb-20">
-            <h2 className="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest">Valores Justos</h2>
-            <p className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">Planos simples para o seu tamanho</p>
-            <p className="text-slate-500 dark:text-zinc-400 text-sm">Comece de graça e faça o upgrade apenas quando sua loja crescer.</p>
+          <div className="text-center space-y-3">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-rose-600 dark:text-rose-400">
+              Tire Suas Dúvidas
+            </span>
+            <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
+              Perguntas frequentes
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400">
+              Respostas claras para as principais dúvidas de quem está começando com o Mimus.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <div className="space-y-3">
+            {[
+              {
+                q: 'Preciso cadastrar cartão de crédito para testar?',
+                a: 'Não! Você pode criar sua conta gratuitamente sem informar dados de cartão. O teste do plano Pro é liberado de imediato e sem nenhum compromisso.'
+              },
+              {
+                q: 'Como funciona a vitrine virtual para vender no WhatsApp?',
+                a: 'Você recebe um link exclusivo (ex: appmimus.com.br/store/sualoja) para colocar na sua bio do Instagram. As clientes escolhem os produtos, tons e quantidades, e o pedido chega formatado direto no seu WhatsApp pronto para envio e cobrança.'
+              },
+              {
+                q: 'Como funciona a baixa de estoque com reflexo no financeiro?',
+                a: 'Na aba Estoque, você realiza a contagem física dos produtos. Havendo divergência, você confirma a baixa em massa e o sistema subtrai o estoque e gera a despesa correspondente na categoria "Baixa de Estoque" no Financeiro.'
+              },
+              {
+                q: 'Posso usar o Mimus no celular?',
+                a: 'Sim! A plataforma é 100% responsiva e otimizada para funcionar perfeitamente em celulares (Android e iPhone), tablets e computadores, sem precisar instalar nada pesado.'
+              },
+              {
+                q: 'Consigo importar meus produtos por planilha?',
+                a: 'Sim! Você pode importar em lote por arquivo CSV ou adicionar produtos instantaneamente por voz ou texto usando a Mimus AI.'
+              },
+              {
+                q: 'Como funciona o cancelamento?',
+                a: 'Você tem total liberdade. Não há fidelidade nem multas. Pode cancelar ou alterar seu plano a qualquer momento pelo painel.'
+              }
+            ].map((faq, idx) => {
+              const isOpen = openFaqIndex === idx
+              return (
+                <div 
+                  key={idx}
+                  className="rounded-2xl border border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden transition-all"
+                >
+                  <button
+                    onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                    className="w-full p-5 text-left flex items-center justify-between text-sm font-bold text-slate-900 dark:text-white hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                  >
+                    <span>{faq.q}</span>
+                    <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-rose-600' : 'text-slate-400'}`} />
+                  </button>
+                  {isOpen && (
+                    <div className="px-5 pb-5 text-xs text-slate-600 dark:text-zinc-400 leading-relaxed border-t border-slate-100 dark:border-zinc-800/60 pt-3">
+                      {faq.a}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+        </div>
+      </section>
+
+      {/* FINAL HIGH-IMPACT CTA BANNER (MANYCHAT SIGNATURE ENDING) */}
+      <section className="py-16 md:py-24 px-4 sm:px-6">
+        <div className="max-w-5xl mx-auto rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-zinc-900 to-rose-950 text-white p-8 sm:p-14 text-center space-y-6 shadow-2xl relative overflow-hidden">
+          
+          <div className="relative z-10 max-w-2xl mx-auto space-y-4">
+            <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30">
+              <Sparkles className="w-3.5 h-3.5" /> Pronta para o próximo nível?
+            </span>
             
-            {/* Free Plan */}
-            <motion.div 
-              whileHover={{ y: -8, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              className="bg-white dark:bg-zinc-900 border border-slate-200/60 dark:border-zinc-800 rounded-3xl p-8 shadow-sm flex flex-col justify-between relative overflow-hidden transition-colors"
-            >
-              <div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Plano Grátis</h3>
-                <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">Essencial para iniciar seu negócio</p>
-                <div className="my-6">
-                  <span className="text-4xl font-extrabold text-slate-900 dark:text-white">R$ 0</span>
-                  <span className="text-sm text-slate-400 dark:text-zinc-500">/ sempre grátis</span>
-                </div>
-                <div className="border-t border-slate-100 dark:border-zinc-800 pt-6 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-600 dark:text-zinc-300">Até 10 produtos cadastrados</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-600 dark:text-zinc-300">1 usuária (você)</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-600 dark:text-zinc-300">Vitrine virtual básica</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-600 dark:text-zinc-300">PDV e controle de estoque essenciais</span>
-                  </div>
-                </div>
-              </div>
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Link 
-                  href="/register" 
-                  className="w-full text-center font-bold text-xs py-3.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 text-slate-800 dark:text-white rounded-xl mt-8 transition-colors block"
-                >
-                  Ativar Plano Grátis
-                </Link>
-              </motion.div>
-            </motion.div>
+            <h2 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight">
+              Transforme a gestão da sua loja de beleza hoje mesmo.
+            </h2>
+            
+            <p className="text-sm text-slate-300 leading-relaxed">
+              Junte-se a centenas de lojistas que abandonaram o caderno e ganharam tempo, controle e faturamento com o Mimus.
+            </p>
 
-            {/* Pro Plan */}
-            <motion.div 
-              whileHover={{ y: -8, boxShadow: "0 20px 25px -5px rgba(244, 63, 94, 0.15)" }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              className="bg-white dark:bg-zinc-900 border-2 border-rose-500 dark:border-rose-600 rounded-3xl p-8 shadow-xl flex flex-col justify-between relative overflow-hidden transition-colors"
-            >
-              <div className="absolute top-0 right-0 bg-rose-500 text-white text-[9px] uppercase tracking-widest font-extrabold px-5 py-1.5 rounded-bl-xl">
-                Mais Recomendado
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Plano Pro</h3>
-                <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">Aceleração total para sua loja</p>
-                <div className="my-6">
-                  <span className="text-4xl font-extrabold text-slate-900 dark:text-white">R$ 49,00</span>
-                  <span className="text-sm text-slate-400 dark:text-zinc-500">/ mês</span>
-                </div>
-                <div className="border-t border-slate-100 dark:border-zinc-800 pt-6 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-600 dark:text-zinc-300">Produtos cadastrados ilimitados</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-600 dark:text-zinc-300">Equipe e colaboradoras ilimitadas</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-600 dark:text-zinc-300">Vitrine premium com banners personalizados</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-600 dark:text-zinc-300">Domínio personalizado para a vitrine</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-slate-600 dark:text-zinc-300">Relatórios avançados de lucro e vendas</span>
-                  </div>
-                </div>
-              </div>
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Link 
-                  href="/register" 
-                  className="w-full text-center font-bold text-xs py-3.5 px-4 bg-rose-600 hover:bg-rose-500 text-white rounded-xl mt-8 transition-colors shadow-lg shadow-rose-500/20 block"
-                >
-                  Experimentar Versão Pro
-                </Link>
-              </motion.div>
-            </motion.div>
-
+            <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3.5">
+              <Link
+                href="/register"
+                className="w-full sm:w-auto px-8 py-4 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-sm uppercase tracking-wider shadow-xl shadow-rose-600/30 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                <span>Criar minha loja grátis</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              
+              <Link
+                href="/login"
+                className="w-full sm:w-auto px-8 py-4 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-sm uppercase tracking-wider transition-all text-center"
+              >
+                Já sou cliente
+              </Link>
+            </div>
           </div>
 
         </div>
       </section>
-       {/* STATS SECTION */}
-      <section id="stats" className="py-20 md:py-24 bg-white dark:bg-zinc-900 border-y border-slate-100 dark:border-zinc-900 text-slate-800 dark:text-white transition-colors duration-300">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-          <div className="space-y-1">
-            <h4 className="text-4xl font-extrabold text-rose-600 dark:text-rose-400">100%</h4>
-            <p className="text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Feito para Você</p>
-          </div>
-          <div className="space-y-1">
-            <h4 className="text-4xl font-extrabold text-rose-600 dark:text-rose-400">R$ 0</h4>
-            <p className="text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Para começar</p>
-          </div>
-          <div className="space-y-1">
-            <h4 className="text-4xl font-extrabold text-rose-600 dark:text-rose-400">+ Prático</h4>
-            <p className="text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Que o caderno</p>
-          </div>
-          <div className="space-y-1">
-            <h4 className="text-4xl font-extrabold text-rose-600 dark:text-rose-400">10h</h4>
-            <p className="text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Salvas por semana</p>
-          </div>
-        </div>
-      </section>
-
-      {/* TRUST CTA SECTION */}
-      <section className="py-20 md:py-28 px-6 text-center bg-gradient-to-b from-transparent to-rose-50/20 dark:to-rose-950/10">
-        <div className="max-w-3xl mx-auto space-y-8">
-          <h2 className="text-3xl md:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight">Pronta para profissionalizar seu negócio de beleza?</h2>
-          <p className="text-base md:text-lg text-slate-500 dark:text-zinc-400 max-w-xl mx-auto leading-relaxed">
-            Cadastre-se grátis e tenha o controle total da sua loja. É simples, rápido e feito para você organizar a sua rotina de vendas.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link 
-              href="/register" 
-              className="w-full sm:w-auto px-8 py-4 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl transition-all duration-200 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/30 flex items-center justify-center gap-2 group active:scale-[0.98]"
-            >
-              Criar minha loja grátis
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </Link>
-            <Link 
-              href="/login" 
-              className="w-full sm:w-auto px-8 py-4 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-white font-semibold rounded-xl transition-colors duration-200 flex items-center justify-center"
-            >
-              Fazer Login
-            </Link>
-          </div>
-        </div>
-      </section>
-
 
       {/* FOOTER */}
-      <footer className="py-12 border-t border-slate-100 dark:border-zinc-900 bg-white dark:bg-zinc-950 text-slate-500 dark:text-zinc-500 transition-colors duration-300">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
+      <footer className="border-t border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-950 py-12 px-4 sm:px-6 text-xs text-slate-500 dark:text-zinc-500">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-slate-800 dark:text-white">Mimus<span className="text-rose-600">.</span></span>
-            <span className="text-xs text-slate-400 dark:text-zinc-600">| Gestão para Cosméticos e Maquiagem</span>
-          </div>
-          
-          <div className="flex items-center gap-6 text-xs font-semibold">
-            <Link href="/terms" className="hover:text-rose-600 dark:hover:text-rose-450 transition-colors">Termos de Uso</Link>
-            <Link href="/privacy" className="hover:text-rose-600 dark:hover:text-rose-450 transition-colors">Políticas de Privacidade</Link>
-            <Link href="/suporte" className="hover:text-rose-600 dark:hover:text-rose-450 transition-colors">Suporte</Link>
+            <span className="text-lg font-black text-slate-900 dark:text-white">
+              Mimus<span className="text-rose-500">.</span>
+            </span>
+            <span>• A plataforma inteligente para lojas de cosméticos.</span>
           </div>
 
-          <p className="text-[11px]">&copy; {new Date().getFullYear()} Mimus Software Ltda. Todos os direitos reservados.</p>
+          <div className="flex flex-wrap items-center gap-6 font-semibold">
+            <Link href="/termos" className="hover:text-rose-600 transition-colors">Termos de Uso</Link>
+            <Link href="/privacidade" className="hover:text-rose-600 transition-colors">Privacidade</Link>
+            <Link href="/suporte" className="hover:text-rose-600 transition-colors">Suporte</Link>
+            <Link href="/login" className="hover:text-rose-600 transition-colors">Entrar</Link>
+          </div>
+        </div>
+
+        <div className="max-w-6xl mx-auto pt-6 mt-6 border-t border-slate-100 dark:border-zinc-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-400">
+          <span>© {new Date().getFullYear()} Mimus Tecnologia. Todos os direitos reservados.</span>
+          <span>Feito com 💖 para empreendedoras de beleza.</span>
         </div>
       </footer>
 
