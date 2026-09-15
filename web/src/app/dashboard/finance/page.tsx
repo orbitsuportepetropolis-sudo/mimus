@@ -31,6 +31,7 @@ interface Transaction {
   category: string
   description: string | null
   date: string
+  sale_id?: string | null
   created_at: string
 }
 
@@ -43,11 +44,30 @@ export default function FinancePage() {
   const [formLoading, setFormLoading] = useState(false)
 
   // Form State
+  const [transactionType, setTransactionType] = useState<'revenue' | 'expense'>('expense')
   const [value, setValue] = useState('')
   const [category, setCategory] = useState('supplier')
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [formError, setFormError] = useState<string | null>(null)
+
+  function handleOpenExpense() {
+    setTransactionType('expense')
+    setCategory('supplier')
+    setValue('')
+    setDescription('')
+    setFormError(null)
+    setModalOpen(true)
+  }
+
+  function handleOpenRevenue() {
+    setTransactionType('revenue')
+    setCategory('sale')
+    setValue('')
+    setDescription('')
+    setFormError(null)
+    setModalOpen(true)
+  }
 
   // Computed Stats
   const [totals, setTotals] = useState({
@@ -167,12 +187,12 @@ export default function FinancePage() {
 
       if (!profile) throw new Error('Loja não encontrada')
 
-      // Insert transaction as manual expense
+      // Insert transaction
       const { error } = await supabase
         .from('financial_transactions')
         .insert([{
           store_id: profile.store_id,
-          type: 'expense',
+          type: transactionType,
           value: val,
           category,
           description: description || null,
@@ -183,11 +203,11 @@ export default function FinancePage() {
 
       setModalOpen(false)
       setValue('')
-      setCategory('supplier')
+      setCategory(transactionType === 'revenue' ? 'sale' : 'supplier')
       setDescription('')
       await loadFinancialData()
     } catch (err: any) {
-      setFormError(err.message || 'Erro ao registrar despesa.')
+      setFormError(err.message || `Erro ao registrar ${transactionType === 'revenue' ? 'receita' : 'despesa'}.`)
     } finally {
       setFormLoading(false)
     }
@@ -235,12 +255,20 @@ export default function FinancePage() {
             Monitore suas receitas de vendas e gerencie despesas operacionais da loja.
           </p>
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-500/10 transition-all self-start sm:self-auto"
-        >
-          <Plus className="w-4.5 h-4.5" /> Registrar Saída
-        </button>
+        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+          <button
+            onClick={handleOpenRevenue}
+            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/15 transition-all"
+          >
+            <Plus className="w-4.5 h-4.5" /> Lançar Receita
+          </button>
+          <button
+            onClick={handleOpenExpense}
+            className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-500/15 transition-all"
+          >
+            <Plus className="w-4.5 h-4.5" /> Registrar Saída
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -340,6 +368,10 @@ export default function FinancePage() {
                   const isStockWriteOff = t.category === 'Baixa de Estoque' || t.category === 'stock_writeoff'
                   const catLabel = 
                     t.category === 'sale' ? 'Venda PDV' :
+                    t.category === 'service' ? 'Serviços' :
+                    t.category === 'investment' ? 'Aporte de Capital' :
+                    t.category === 'cashback' ? 'Rendimento / Bonificação' :
+                    t.category === 'other_revenue' ? 'Outras Receitas' :
                     t.category === 'supplier' ? 'Fornecedor' :
                     isStockWriteOff ? 'Baixa de Estoque' :
                     t.category === 'rent' ? 'Aluguel' :
@@ -375,16 +407,16 @@ export default function FinancePage() {
                         {new Date(t.date + 'T00:00:00').toLocaleDateString('pt-BR')}
                       </td>
                       <td className="py-3 text-right">
-                        {!isRev ? (
+                        {!t.sale_id ? (
                           <button
                             onClick={() => handleDeleteTransaction(t.id)}
-                            className="p-1 rounded text-slate-400 hover:text-rose-600"
-                            title="Excluir despesa"
+                            className="p-1 rounded text-slate-400 hover:text-rose-600 transition-colors"
+                            title="Excluir lançamento"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         ) : (
-                          <span className="text-slate-300 text-[10px]">-</span>
+                          <span className="text-slate-300 text-[10px]" title="Gerado automaticamente por venda PDV">-</span>
                         )}
                       </td>
                     </tr>
@@ -402,9 +434,55 @@ export default function FinancePage() {
           <div className="bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
             
             <div className="flex items-center justify-between border-b border-slate-50 dark:border-zinc-850 pb-2">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-white">Registrar Saída / Despesa</h3>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                {transactionType === 'revenue' ? (
+                  <>
+                    <TrendingUp className="w-4 h-4 text-emerald-500" /> Lançar Receita / Entrada
+                  </>
+                ) : (
+                  <>
+                    <TrendingDown className="w-4 h-4 text-rose-500" /> Registrar Saída / Despesa
+                  </>
+                )}
+              </h3>
               <button onClick={() => setModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Type selector toggle */}
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 dark:bg-zinc-800/80 rounded-xl">
+              <button
+                type="button"
+                onClick={() => {
+                  setTransactionType('revenue')
+                  if (category === 'supplier' || category === 'Baixa de Estoque' || category === 'rent' || category === 'marketing' || category === 'salary' || category === 'other') {
+                    setCategory('sale')
+                  }
+                }}
+                className={`py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  transactionType === 'revenue'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5" /> Receita (Entrada)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTransactionType('expense')
+                  if (category === 'sale' || category === 'service' || category === 'investment' || category === 'cashback' || category === 'other_revenue') {
+                    setCategory('supplier')
+                  }
+                }}
+                className={`py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  transactionType === 'expense'
+                    ? 'bg-rose-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
+                }`}
+              >
+                <TrendingDown className="w-3.5 h-3.5" /> Despesa (Saída)
               </button>
             </div>
 
@@ -415,10 +493,13 @@ export default function FinancePage() {
             <form onSubmit={handleSubmit} className="space-y-4 text-xs font-medium">
               
               <div>
-                <label className="block text-slate-400 dark:text-zinc-500 mb-1">Valor da Despesa (R$) *</label>
+                <label className="block text-slate-400 dark:text-zinc-500 mb-1">
+                  Valor da {transactionType === 'revenue' ? 'Receita' : 'Despesa'} (R$) *
+                </label>
                 <input
                   type="number"
                   step="0.01"
+                  min="0.01"
                   required
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
@@ -429,18 +510,32 @@ export default function FinancePage() {
 
               <div>
                 <label className="block text-slate-400 dark:text-zinc-500 mb-1">Categoria *</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none"
-                >
-                  <option value="supplier">Fornecedor / Mercadorias</option>
-                  <option value="Baixa de Estoque">Baixa de Estoque / Perdas</option>
-                  <option value="rent">Aluguel / Condomínio</option>
-                  <option value="marketing">Anúncios Instagram / Facebook Ads</option>
-                  <option value="salary">Salários / Comissões</option>
-                  <option value="other">Outras despesas operacionais</option>
-                </select>
+                {transactionType === 'revenue' ? (
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none"
+                  >
+                    <option value="sale">Venda Avulsa / PDV / Balcão</option>
+                    <option value="service">Prestação de Serviços</option>
+                    <option value="investment">Aporte / Entrada de Capital</option>
+                    <option value="cashback">Rendimento / Bonificação</option>
+                    <option value="other_revenue">Outras Receitas</option>
+                  </select>
+                ) : (
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none"
+                  >
+                    <option value="supplier">Fornecedor / Mercadorias</option>
+                    <option value="Baixa de Estoque">Baixa de Estoque / Perdas</option>
+                    <option value="rent">Aluguel / Condomínio</option>
+                    <option value="marketing">Anúncios Instagram / Facebook Ads</option>
+                    <option value="salary">Salários / Comissões</option>
+                    <option value="other">Outras despesas operacionais</option>
+                  </select>
+                )}
               </div>
 
               <div>
@@ -461,7 +556,11 @@ export default function FinancePage() {
                   required
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Ex: Compra de batons BT e paletas de sombra"
+                  placeholder={
+                    transactionType === 'revenue'
+                      ? 'Ex: Venda avulsa no balcão, consultoria de maquiagem...'
+                      : 'Ex: Compra de batons BT e paletas de sombra...'
+                  }
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none"
                 />
               </div>
@@ -477,10 +576,14 @@ export default function FinancePage() {
                 <button
                   type="submit"
                   disabled={formLoading}
-                  className="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold flex items-center gap-1.5"
+                  className={`px-4 py-2 rounded-xl text-white font-bold flex items-center gap-1.5 transition-all shadow-sm ${
+                    transactionType === 'revenue'
+                      ? 'bg-emerald-600 hover:bg-emerald-500'
+                      : 'bg-rose-600 hover:bg-rose-500'
+                  }`}
                 >
                   {formLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Lançar Saída
+                  {transactionType === 'revenue' ? 'Lançar Receita' : 'Lançar Saída'}
                 </button>
               </div>
 

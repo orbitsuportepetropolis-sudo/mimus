@@ -25,10 +25,10 @@ export default async function DashboardLayout({
     .from('profiles')
     .select('name, role, store_id')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
-  if (!profile) {
-    redirect('/login')
+  if (!profile || !profile.store_id) {
+    redirect('/onboarding')
   }
 
   let activeProfile = { ...profile }
