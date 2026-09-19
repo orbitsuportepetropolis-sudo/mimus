@@ -118,7 +118,12 @@ export default function LandingPage() {
         <nav className="rounded-full bg-white/85 dark:bg-zinc-900/85 backdrop-blur-xl border border-slate-200/80 dark:border-zinc-800/80 shadow-lg shadow-slate-900/5 px-4 sm:px-6 py-2.5 flex items-center justify-between transition-all">
           
           {/* Brand Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <img 
+              src="/logo-mimus.png" 
+              alt="Mimus Logo" 
+              className="w-8 h-8 rounded-xl object-contain shadow-sm group-hover:scale-105 transition-transform" 
+            />
             <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
               Mimus<span className="text-rose-500 group-hover:scale-125 inline-block transition-transform">.</span>
             </span>
@@ -214,95 +219,178 @@ export default function LandingPage() {
         )}
       </AnimatePresence>
 
-      {/* HERO SECTION (MANYCHAT HIGH-IMPACT ARCHITECTURE) */}
-      <section className="pt-16 pb-20 md:pt-24 md:pb-28 px-4 sm:px-6 relative overflow-hidden">
-        <div className="max-w-5xl mx-auto text-center space-y-6">
+      {/* HERO SECTION (MANYCHAT HIGH-IMPACT ARCHITECTURE - WOMAN PHOTO BACKGROUND) */}
+      <section className="relative min-h-[90vh] sm:min-h-[94vh] flex items-center overflow-hidden px-4 sm:px-8 lg:px-12 pt-20 pb-16 sm:py-24">
+        
+        {/* FULL BACKGROUND PHOTO OF THE ENTREPRENEUR (EXACT MANYCHAT PATTERN) */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src="/pexels-kawerodriguess-16846879.jpg"
+            alt="Empreendedora de beleza gerenciando estoque e vendas na loja"
+            className="w-full h-full object-cover object-[78%_center] sm:object-[72%_center] lg:object-[64%_center]"
+          />
+          {/* Dark Gradient Overlay for Maximum Readability on Left Side (Manychat style) */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/85 md:via-black/60 to-black/35 md:to-transparent pointer-events-none" />
+          {/* Top and Bottom Vignettes */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#fafafa] dark:from-[#09090b] via-transparent to-black/60 pointer-events-none" />
+          {/* Ambient Glow */}
+          <div className="absolute top-1/4 left-8 w-96 h-96 bg-rose-600/25 blur-[140px] pointer-events-none" />
+        </div>
+
+        {/* HERO CONTENT */}
+        <div className="relative z-10 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
           
-          {/* Social Proof Pill Badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-50 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/50 shadow-sm"
-          >
-            <Heart className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 fill-rose-500" />
-            <span className="text-[11px] font-bold text-rose-700 dark:text-rose-300 uppercase tracking-wider">
-              Amado por centenas de lojistas e marcas de beleza
-            </span>
-          </motion.div>
-
-          {/* Headline Manychat Style: bold, emotional, punchy */}
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.08]"
-          >
-            Faça cada produto, venda e cliente <span className="bg-gradient-to-r from-rose-600 via-pink-600 to-fuchsia-600 bg-clip-text text-transparent">valer a pena</span>.
-          </motion.h1>
-
-          {/* Subtitle */}
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-base sm:text-xl text-slate-600 dark:text-zinc-400 max-w-3xl mx-auto leading-relaxed font-normal"
-          >
-            A plataforma tudo-em-um para lojas de cosméticos e maquiagem. Tenha controle total do estoque, venda no balcão e no WhatsApp com vitrine virtual, e acompanhe seu lucro real com inteligência artificial.
-          </motion.p>
-
-          {/* Dual Pill CTA Buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-2"
-          >
-            <Link
-              href="/register"
-              className="w-full sm:w-auto px-8 py-4 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-sm uppercase tracking-wider shadow-xl shadow-rose-600/30 hover:shadow-rose-600/45 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+          {/* Left Column: Bold Typography, CTA & Trust Badges */}
+          <div className="lg:col-span-7 space-y-6 sm:space-y-7 text-left">
+            
+            {/* Social Proof Pill Badge with Avatars */}
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-black/50 backdrop-blur-md border border-white/20 text-white shadow-lg"
             >
-              <span>Comece já gratuitamente</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+              <div className="flex -space-x-2 overflow-hidden">
+                <img src="/leticia_aura_glow.png" alt="Lojista parceira" className="inline-block h-6 w-6 rounded-full ring-2 ring-white/30 object-cover" />
+                <img src="/depoimento.jpg" alt="Lojista parceira" className="inline-block h-6 w-6 rounded-full ring-2 ring-white/30 object-cover" />
+                <img src="/mulher_usando_sistema.png" alt="Lojista parceira" className="inline-block h-6 w-6 rounded-full ring-2 ring-white/30 object-cover" />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-500" />
+                <span className="text-[11px] font-bold text-rose-200 uppercase tracking-wider">
+                  Amado por mais de 500 lojistas de beleza
+                </span>
+              </div>
+            </motion.div>
 
-            <a
-              href="#demonstracao"
-              className="w-full sm:w-auto px-8 py-4 rounded-full bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-zinc-200 font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm"
+            {/* Massive Bold Headline (Exact Manychat aesthetic) */}
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-white leading-[1.04]"
             >
-              <Play className="w-3.5 h-3.5 fill-current text-rose-500" />
-              <span>Ver demonstração</span>
-            </a>
-          </motion.div>
+              Faça cada produto, venda e cliente <span className="bg-gradient-to-r from-rose-400 via-pink-400 to-rose-300 bg-clip-text text-transparent">valer a pena.</span>
+            </motion.h1>
 
-          {/* Trust points */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="pt-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-semibold text-slate-500 dark:text-zinc-400"
-          >
-            <span className="flex items-center gap-1.5">
-              <Check className="w-3.5 h-3.5 text-emerald-500" /> Grátis para começar
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Check className="w-3.5 h-3.5 text-emerald-500" /> Sem cartão de crédito
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Check className="w-3.5 h-3.5 text-emerald-500" /> Vitrine no ar em 2 minutos
-            </span>
-          </motion.div>
+            {/* Subtitle */}
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="text-base sm:text-xl text-zinc-200 max-w-xl leading-relaxed font-normal"
+            >
+              A plataforma tudo-em-um para lojas de cosméticos e maquiagem. Tenha controle total do estoque, venda no balcão e no WhatsApp com vitrine virtual, e acompanhe seu lucro real com inteligência artificial.
+            </motion.p>
+
+            {/* CTA Button Row (Manychat bright neon magenta/rose pill style) */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 pt-2"
+            >
+              <Link
+                href="/register"
+                className="px-9 py-4 rounded-full bg-gradient-to-r from-rose-600 via-pink-600 to-rose-600 hover:from-rose-500 hover:to-pink-500 text-white font-black text-xs sm:text-sm uppercase tracking-wider shadow-2xl shadow-rose-600/50 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 text-center"
+              >
+                <span>Comece agora</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+
+              <a
+                href="#demonstracao"
+                className="px-7 py-4 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white font-bold text-xs sm:text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm text-center"
+              >
+                <Play className="w-3.5 h-3.5 fill-current text-rose-400" />
+                <span>Ver demonstração</span>
+              </a>
+            </motion.div>
+
+            {/* Trust Badges (Manychat Partners style: Meta, PDV, 4.9 Stars) */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="pt-6 sm:pt-10 flex flex-wrap items-center gap-6 sm:gap-8 text-xs font-bold text-zinc-300 border-t border-white/10"
+            >
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-rose-400" />
+                <span>Instagram & WhatsApp</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <ShoppingBag className="w-4 h-4 text-emerald-400" />
+                <span>PDV & Vitrine 24h</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex text-amber-400">
+                  {[...Array(5)].map((_, i) => <Star key={i} className="w-3.5 h-3.5 fill-current" />)}
+                </div>
+                <span className="text-white font-extrabold">4.9/5 Avaliação</span>
+              </div>
+            </motion.div>
+
+          </div>
+
+          {/* Right Column: Floating Notification Bubbles Over the Woman & Laptop (Manychat signature style) */}
+          <div className="lg:col-span-5 relative hidden lg:flex flex-col items-end justify-center space-y-4 pointer-events-none">
+            
+            {/* Floating Card 1: Pedido no WhatsApp */}
+            <motion.div
+              initial={{ opacity: 0, x: 25, scale: 0.95 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              transition={{ duration: 0.8, delay: 0.3 }}
+              className="p-4 rounded-3xl bg-black/70 backdrop-blur-xl border border-white/20 text-white shadow-2xl max-w-xs space-y-2 pointer-events-auto"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-rose-600 flex items-center justify-center text-white shadow-sm shadow-rose-600/40">
+                    <ShoppingBag className="w-3 h-3" />
+                  </div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-300">
+                    Vitrine • WhatsApp
+                  </span>
+                </div>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              </div>
+              <p className="text-xs font-semibold text-zinc-100">
+                "Novo pedido recebido! Gloss Aura Glow + Batom BT Velvet (R$ 119,80 no Pix)"
+              </p>
+              <div className="flex items-center justify-between text-[10px] text-emerald-400 font-bold pt-1.5 border-t border-white/10">
+                <span>Pix Confirmado ⚡</span>
+                <span>Estoque baixado</span>
+              </div>
+            </motion.div>
+
+            {/* Floating Card 2: Mimus AI Assistente */}
+            <motion.div
+              initial={{ opacity: 0, x: 25, scale: 0.95 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              transition={{ duration: 0.8, delay: 0.5 }}
+              className="p-4 rounded-3xl bg-black/70 backdrop-blur-xl border border-white/20 text-white shadow-2xl max-w-xs space-y-2 pointer-events-auto"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-purple-500 to-rose-500 flex items-center justify-center text-white shadow-sm">
+                  <Sparkles className="w-3 h-3" />
+                </div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-300">
+                  Mimus AI Assistente
+                </span>
+              </div>
+              <p className="text-xs text-zinc-200">
+                ✨ Faturamento hoje: <strong className="text-white">R$ 1.485,20</strong> (18 vendas). Lucro líquido: <strong className="text-emerald-400">R$ 682,40</strong> (+28%).
+              </p>
+            </motion.div>
+
+          </div>
 
         </div>
 
-        {/* HERO INTERACTIVE SHOWCASE (MANYCHAT STYLE PRODUCT HERO FRAME) */}
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.3 }}
-          className="max-w-6xl mx-auto mt-12 sm:mt-16 relative"
-        >
-          {/* Outer glow frame */}
+      </section>
+
+      {/* LIVE INTERACTIVE DEMO SHOWCASE (PRODUCT SIMULATOR) */}
+      <section className="py-12 px-4 sm:px-6 relative -mt-8 z-20">
+        <div className="max-w-6xl mx-auto">
           <div className="rounded-[2.5rem] p-2 sm:p-4 bg-gradient-to-b from-slate-200/80 via-slate-100/40 to-transparent dark:from-zinc-800/80 dark:via-zinc-900/40 border border-slate-200/60 dark:border-zinc-800 shadow-2xl">
             <div className="rounded-[2rem] bg-white dark:bg-zinc-950 border border-slate-100 dark:border-zinc-800 overflow-hidden shadow-inner p-4 sm:p-8 space-y-6">
               
@@ -321,14 +409,14 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              {/* Showcase Grid inside Mockup */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Showcase Grid: AI Simulator + Live Metrics */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                 
-                {/* Left: Live AI Assistant Simulator */}
-                <div className="lg:col-span-7 bg-slate-50/70 dark:bg-zinc-900/60 p-5 rounded-2xl border border-slate-200/60 dark:border-zinc-800 space-y-4">
+                {/* AI Simulator Box */}
+                <div className="lg:col-span-7 bg-slate-50/80 dark:bg-zinc-900/60 p-5 rounded-2xl border border-slate-200/70 dark:border-zinc-800 space-y-4 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center shadow-md shadow-rose-500/20">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center shadow-md shadow-rose-500/20">
                         <Sparkles className="w-4 h-4" />
                       </div>
                       <div>
@@ -336,13 +424,13 @@ export default function LandingPage() {
                         <span className="text-[10px] text-slate-400">Comandos inteligentes por texto e áudio</span>
                       </div>
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
                       {aiCommands[activeAICommand].tag}
                     </span>
                   </div>
 
                   {/* Chat interaction simulation */}
-                  <div className="space-y-2.5">
+                  <div className="space-y-2.5 min-h-[95px]">
                     <div className="flex items-start gap-2.5 justify-end">
                       <div className="max-w-md p-3 rounded-2xl rounded-tr-none bg-rose-600 text-white text-xs font-medium shadow-sm">
                         💬 "{aiCommands[activeAICommand].command}"
@@ -353,22 +441,22 @@ export default function LandingPage() {
                       <div className="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-600 flex items-center justify-center shrink-0 mt-1">
                         <Sparkles className="w-3 h-3" />
                       </div>
-                      <div className="max-w-md p-3.5 rounded-2xl rounded-tl-none bg-white dark:bg-zinc-800 border border-slate-200/60 dark:border-zinc-700 text-slate-800 dark:text-zinc-200 text-xs shadow-sm space-y-1">
+                      <div className="max-w-md p-3 rounded-2xl rounded-tl-none bg-white dark:bg-zinc-800 border border-slate-200/60 dark:border-zinc-700 text-slate-800 dark:text-zinc-200 text-xs shadow-sm">
                         <p>{aiCommands[activeAICommand].response}</p>
                       </div>
                     </div>
                   </div>
 
                   {/* AI Command selectors */}
-                  <div className="pt-2 flex flex-wrap gap-2 border-t border-slate-200/60 dark:border-zinc-800">
+                  <div className="pt-2 flex flex-wrap gap-1.5 border-t border-slate-200/60 dark:border-zinc-800">
                     {aiCommands.map((cmd, idx) => (
                       <button
                         key={cmd.label}
                         onClick={() => setActiveAICommand(idx)}
-                        className={`text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all ${
+                        className={`text-[10px] sm:text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all ${
                           activeAICommand === idx
-                            ? 'bg-rose-600 text-white shadow-sm'
-                            : 'bg-white dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-100'
+                            ? 'bg-rose-600 text-white shadow-sm scale-105'
+                            : 'bg-white dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-700'
                         }`}
                       >
                         {cmd.label}
@@ -377,54 +465,54 @@ export default function LandingPage() {
                   </div>
                 </div>
 
-                {/* Right: Live Floating Widgets (Sales, Stock, Vitrine) */}
-                <div className="lg:col-span-5 space-y-3.5">
+                {/* Right: Quick Metric Widgets Grid */}
+                <div className="lg:col-span-5 flex flex-col justify-between space-y-3">
                   
-                  {/* Widget 1: Faturamento Hoje */}
+                  {/* Widget: Faturamento Hoje */}
                   <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 shadow-sm flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
                         <TrendingUp className="w-5 h-5" />
                       </div>
                       <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-400">Faturamento Hoje</span>
-                        <h4 className="text-base font-extrabold text-slate-900 dark:text-white">R$ 1.485,20</h4>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Faturamento Hoje</span>
+                        <h4 className="text-base font-black text-slate-900 dark:text-white">R$ 1.485,20</h4>
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full">
                       +28% vs ontem
                     </span>
                   </div>
 
-                  {/* Widget 2: Alerta de Estoque Crítico */}
+                  {/* Widget: Estoque Crítico */}
                   <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 shadow-sm flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
-                        <Boxes className="w-5 h-5" />
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                        <Boxes className="w-4 h-4" />
                       </div>
                       <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-400">Controle de Estoque</span>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Controle de Estoque</span>
                         <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200">Gloss Labial Aura Glow</h4>
                       </div>
                     </div>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300">
                       12 un. em estoque
                     </span>
                   </div>
 
-                  {/* Widget 3: Pedido Recebido via Vitrine */}
+                  {/* Widget: Pedido Vitrine */}
                   <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/30 dark:to-pink-950/20 border border-rose-200/70 dark:border-rose-900/40 shadow-sm flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shadow-md shadow-rose-600/20">
                         <ShoppingBag className="w-5 h-5" />
                       </div>
                       <div>
-                        <span className="text-[10px] uppercase font-extrabold text-rose-600 dark:text-rose-400">Novo Pedido na Vitrine!</span>
+                        <span className="text-[10px] uppercase font-extrabold text-rose-600 dark:text-rose-400 block">Novo Pedido na Vitrine!</span>
                         <h4 className="text-xs font-bold text-slate-800 dark:text-white">R$ 119,80 • Letícia F.</h4>
                       </div>
                     </div>
                     <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded-full">
-                      Pix Pago
+                      Pix Pago ⚡
                     </span>
                   </div>
 
@@ -434,7 +522,7 @@ export default function LandingPage() {
 
             </div>
           </div>
-        </motion.div>
+        </div>
       </section>
 
       {/* ECOSYSTEM / CHANNELS SECTION ("ENCONTRE SUAS CLIENTES ONDE ELAS ESTIVEREM") */}
@@ -565,69 +653,103 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             
             {/* Antes: O Caos do Caderno */}
-            <div className="p-8 rounded-3xl bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 shadow-sm space-y-6 relative overflow-hidden">
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-850 pb-4">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-rose-600 bg-rose-50 dark:bg-rose-950/60 px-3 py-1 rounded-full">
-                  Sem o Mimus
-                </span>
-                <span className="text-xs text-slate-400 font-semibold">Só dor de cabeça</span>
+            <div className="p-7 sm:p-8 rounded-3xl bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 shadow-sm space-y-5 relative overflow-hidden flex flex-col justify-between">
+              <div className="space-y-5">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-850 pb-4">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-rose-600 bg-rose-50 dark:bg-rose-950/60 px-3 py-1 rounded-full">
+                    Sem o Mimus
+                  </span>
+                  <span className="text-xs text-slate-400 font-semibold">Só dor de cabeça</span>
+                </div>
+
+                {/* Photo: Rotina no Papel */}
+                <div className="relative h-44 sm:h-52 rounded-2xl overflow-hidden border border-rose-100 dark:border-rose-950/40 group">
+                  <img 
+                    src="/mulher_escrevendo_caderno.png" 
+                    alt="Anotando vendas e estoque manualmente no caderno" 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 filter saturate-[0.9]"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-3.5">
+                    <span className="text-[11px] font-bold text-rose-200 bg-rose-950/80 px-2.5 py-1 rounded-lg backdrop-blur-sm border border-rose-800/40 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                      Anotações manuais, perdas e horas perdidas
+                    </span>
+                  </div>
+                </div>
+
+                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
+                  Caderno rasurado, produtos vencendo e incerteza no lucro
+                </h3>
+
+                <ul className="space-y-3.5 text-xs text-slate-600 dark:text-zinc-400">
+                  <li className="flex items-start gap-3">
+                    <X className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                    <span>Você anota vendas em folhas de papel e perde o controle do fiado.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <X className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                    <span>Cliente pede produto no WhatsApp e você precisa ir correndo na caixa ver se tem.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <X className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                    <span>Descobre que cosméticos venceram ou sumiram sem saber quem vendeu.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <X className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                    <span>Passa o domingo inteiro somando notinhas para tentar saber quanto sobrou.</span>
+                  </li>
+                </ul>
               </div>
-
-              <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
-                Caderno rasurado, produtos vencendo e incerteza no lucro
-              </h3>
-
-              <ul className="space-y-4 text-xs text-slate-600 dark:text-zinc-400">
-                <li className="flex items-start gap-3">
-                  <X className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                  <span>Você anota vendas em folhas de papel e perde o controle do fiado.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <X className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                  <span>Cliente pede produto no WhatsApp e você precisa ir correndo na caixa ver se tem.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <X className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                  <span>Descobre que cosméticos venceram ou sumiram sem saber quem vendeu.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <X className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                  <span>Passa o domingo inteiro somando notinhas para tentar saber quanto sobrou.</span>
-                </li>
-              </ul>
             </div>
 
             {/* Depois: A Paz com o Mimus */}
-            <div className="p-8 rounded-3xl bg-gradient-to-b from-rose-50/60 via-white to-white dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-950 border-2 border-rose-500/80 shadow-xl shadow-rose-600/10 space-y-6 relative overflow-hidden">
-              <div className="flex items-center justify-between border-b border-rose-100 dark:border-zinc-800 pb-4">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-white bg-rose-600 px-3 py-1 rounded-full shadow-sm">
-                  Com o Mimus
-                </span>
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">Mais lucro e liberdade</span>
+            <div className="p-7 sm:p-8 rounded-3xl bg-gradient-to-b from-rose-50/60 via-white to-white dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-950 border-2 border-rose-500/80 shadow-xl shadow-rose-600/10 space-y-5 relative overflow-hidden flex flex-col justify-between">
+              <div className="space-y-5">
+                <div className="flex items-center justify-between border-b border-rose-100 dark:border-zinc-800 pb-4">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-white bg-rose-600 px-3 py-1 rounded-full shadow-sm">
+                    Com o Mimus
+                  </span>
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">Mais lucro e liberdade</span>
+                </div>
+
+                {/* Photo: Gestão Moderna */}
+                <div className="relative h-44 sm:h-52 rounded-2xl overflow-hidden border border-emerald-200 dark:border-emerald-950/40 group">
+                  <img 
+                    src="/mulher_usando_sistema.png" 
+                    alt="Lojista com tablet e painel inteligente de cosméticos" 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-3.5">
+                    <span className="text-[11px] font-bold text-emerald-200 bg-emerald-950/80 px-2.5 py-1 rounded-lg backdrop-blur-sm border border-emerald-800/40 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      Dashboard em tempo real & faturamento crescendo
+                    </span>
+                  </div>
+                </div>
+
+                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
+                  Vitrine vendendo 24h, estoque sincronizado e financeiro no azul
+                </h3>
+
+                <ul className="space-y-3.5 text-xs text-slate-700 dark:text-zinc-300">
+                  <li className="flex items-start gap-3">
+                    <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span>Sua vitrine virtual no Instagram vende enquanto você descansa.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span>Estoque baixa sozinho no momento em que a venda é concluída.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span>Contagem física e baixa de estoque em massa lançada direto no Financeiro.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span>Painel exibe faturamento, despesas e lucro líquido com precisão de centavos.</span>
+                  </li>
+                </ul>
               </div>
-
-              <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
-                Vitrine vendendo 24h, estoque sincronizado e financeiro no azul
-              </h3>
-
-              <ul className="space-y-4 text-xs text-slate-700 dark:text-zinc-300">
-                <li className="flex items-start gap-3">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                  <span>Sua vitrine virtual no Instagram vende enquanto você descansa.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                  <span>Estoque baixa sozinho no momento em que a venda é concluída.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                  <span>Contagem física e baixa de estoque em massa lançada direto no Financeiro.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                  <span>Painel exibe faturamento, despesas e lucro líquido com precisão de centavos.</span>
-                </li>
-              </ul>
             </div>
 
           </div>
@@ -709,26 +831,50 @@ export default function LandingPage() {
                   </span>
                 </div>
 
+                {/* Store Header Banner inside Vitrine Demo */}
+                <div className="relative h-28 sm:h-36 rounded-2xl overflow-hidden border border-rose-100 dark:border-rose-950/40">
+                  <img 
+                    src="/hero_beauty_bg.png" 
+                    alt="Vitrine Virtual Fleur Beauté" 
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent flex items-center p-5">
+                    <div className="space-y-1">
+                      <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white shadow-sm">
+                        Vitrine Ativa 24h
+                      </span>
+                      <h4 className="text-base sm:text-lg font-black text-white">Fleur Beauté & Cosméticos</h4>
+                      <p className="text-xs text-zinc-200">Envios para todo o Brasil • Pedidos diretos no WhatsApp</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-950 border border-slate-100 dark:border-zinc-800 space-y-2">
-                    <div className="h-32 rounded-xl bg-rose-100/60 dark:bg-rose-950/40 flex items-center justify-center text-rose-500 font-bold text-xs">
-                      Gloss Aura Glow
+                    <div className="h-32 rounded-xl bg-gradient-to-br from-rose-100 to-pink-100 dark:from-rose-950/40 dark:to-pink-950/30 flex flex-col items-center justify-center text-rose-500 font-bold text-xs p-2 text-center">
+                      <Sparkles className="w-6 h-6 mb-1 text-rose-500" />
+                      <span>Gloss Aura Glow</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Efeito Vinílico</span>
                     </div>
                     <span className="font-bold text-xs block text-slate-800 dark:text-white">Gloss Labial Aura Glow</span>
                     <span className="text-rose-600 font-extrabold text-xs block">R$ 39,90</span>
                   </div>
 
                   <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-950 border border-slate-100 dark:border-zinc-800 space-y-2">
-                    <div className="h-32 rounded-xl bg-pink-100/60 dark:bg-pink-950/40 flex items-center justify-center text-pink-500 font-bold text-xs">
-                      Batom Velvet BT
+                    <div className="h-32 rounded-xl bg-gradient-to-br from-pink-100 to-rose-200 dark:from-pink-950/40 dark:to-rose-900/30 flex flex-col items-center justify-center text-pink-600 font-bold text-xs p-2 text-center">
+                      <Heart className="w-6 h-6 mb-1 text-pink-500" />
+                      <span>Batom Velvet BT</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Acabamento Matte</span>
                     </div>
                     <span className="font-bold text-xs block text-slate-800 dark:text-white">Batom Líquido Velvet BT</span>
                     <span className="text-rose-600 font-extrabold text-xs block">R$ 49,90</span>
                   </div>
 
                   <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-950 border border-slate-100 dark:border-zinc-800 space-y-2">
-                    <div className="h-32 rounded-xl bg-purple-100/60 dark:bg-purple-950/40 flex items-center justify-center text-purple-500 font-bold text-xs">
-                      Bruma Fixadora
+                    <div className="h-32 rounded-xl bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-950/40 dark:to-pink-950/30 flex flex-col items-center justify-center text-purple-600 font-bold text-xs p-2 text-center">
+                      <Sun className="w-6 h-6 mb-1 text-purple-500" />
+                      <span>Bruma Fixadora</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Glow & Hidratação</span>
                     </div>
                     <span className="font-bold text-xs block text-slate-800 dark:text-white">Bruma Fixadora Iluminadora</span>
                     <span className="text-rose-600 font-extrabold text-xs block">R$ 55,00</span>
@@ -901,33 +1047,37 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            {/* Testimonial 1 */}
-            <div className="p-7 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+            {/* Testimonial 1: Carolina Cosméticos */}
+            <div className="p-7 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 shadow-sm space-y-4 hover:border-rose-300 dark:hover:border-rose-900/50 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-rose-500 to-pink-500 text-white font-black text-sm flex items-center justify-center">
-                  TD
-                </div>
+                <img 
+                  src="/depoimento.jpg" 
+                  alt="Carolina Mendes - Carolina Cosméticos" 
+                  className="w-12 h-12 rounded-full object-cover ring-2 ring-rose-500/40 shadow-sm shrink-0" 
+                />
                 <div>
-                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">Toque Delicado</h4>
-                  <span className="text-[10px] text-slate-400">@toquedelicado • Cosméticos & Make</span>
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">Carolina Mendes</h4>
+                  <span className="text-[10px] text-slate-400">@carolinacosmetics • Loja & Skincare</span>
                 </div>
               </div>
               <div className="flex gap-1 text-amber-400">
                 {[...Array(5)].map((_, i) => <Star key={i} className="w-3.5 h-3.5 fill-current" />)}
               </div>
               <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
-                "O Mimus mudou a nossa vida na loja. Eu perdia noites somando papel e ainda tinha produto sumindo do estoque. Hoje a vitrine vende no WhatsApp e eu sei o lucro de cada dia!"
+                "O Mimus mudou a nossa rotina na loja. Eu perdia noites somando papel e ainda tinha produto sumindo do estoque. Hoje a vitrine vende no WhatsApp e eu sei o lucro exato de cada dia!"
               </p>
             </div>
 
-            {/* Testimonial 2 */}
-            <div className="p-7 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+            {/* Testimonial 2: Letícia Rossi - Aura Glow Beauty */}
+            <div className="p-7 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 shadow-sm space-y-4 hover:border-rose-300 dark:hover:border-rose-900/50 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-purple-500 to-rose-500 text-white font-black text-sm flex items-center justify-center">
-                  AG
-                </div>
+                <img 
+                  src="/leticia_aura_glow.png" 
+                  alt="Letícia Rossi - Aura Glow Beauty" 
+                  className="w-12 h-12 rounded-full object-cover ring-2 ring-rose-500/40 shadow-sm shrink-0" 
+                />
                 <div>
-                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">Aura Glow Beauty</h4>
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">Letícia Rossi</h4>
                   <span className="text-[10px] text-slate-400">@auraglow.make • 38k seguidores</span>
                 </div>
               </div>
@@ -939,14 +1089,16 @@ export default function LandingPage() {
               </p>
             </div>
 
-            {/* Testimonial 3 */}
-            <div className="p-7 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 shadow-sm space-y-4">
+            {/* Testimonial 3: Beatriz Castro - Bella Cosméticos */}
+            <div className="p-7 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 shadow-sm space-y-4 hover:border-rose-300 dark:hover:border-rose-900/50 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-pink-500 to-amber-500 text-white font-black text-sm flex items-center justify-center">
-                  BC
-                </div>
+                <img 
+                  src="/pexels-kawerodriguess-16846873.jpg" 
+                  alt="Beatriz Castro - Bella Cosméticos" 
+                  className="w-12 h-12 rounded-full object-cover ring-2 ring-rose-500/40 shadow-sm shrink-0" 
+                />
                 <div>
-                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">Bella Cosméticos</h4>
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">Beatriz Castro</h4>
                   <span className="text-[10px] text-slate-400">@bellacosmeticos • Loja Física e Online</span>
                 </div>
               </div>
@@ -1207,8 +1359,16 @@ export default function LandingPage() {
 
       {/* FINAL HIGH-IMPACT CTA BANNER (MANYCHAT SIGNATURE ENDING) */}
       <section className="py-16 md:py-24 px-4 sm:px-6">
-        <div className="max-w-5xl mx-auto rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-zinc-900 to-rose-950 text-white p-8 sm:p-14 text-center space-y-6 shadow-2xl relative overflow-hidden">
+        <div className="max-w-5xl mx-auto rounded-[2.5rem] bg-gradient-to-br from-slate-950 via-zinc-900 to-rose-950 text-white p-8 sm:p-14 text-center space-y-6 shadow-2xl relative overflow-hidden">
           
+          {/* Subtle Boutique Ambience Background */}
+          <img 
+            src="/hero_beauty_bg.png" 
+            alt="Boutique de beleza" 
+            className="absolute inset-0 w-full h-full object-cover object-center opacity-15 mix-blend-overlay pointer-events-none" 
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-zinc-950/80 to-transparent pointer-events-none" />
+
           <div className="relative z-10 max-w-2xl mx-auto space-y-4">
             <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30">
               <Sparkles className="w-3.5 h-3.5" /> Pronta para o próximo nível?
