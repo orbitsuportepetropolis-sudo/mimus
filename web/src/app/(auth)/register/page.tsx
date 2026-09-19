@@ -17,6 +17,7 @@ function RegisterForm() {
 
   const [name, setName] = useState('')
   const [storeName, setStoreName] = useState('')
+  const [instagram, setInstagram] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [phone, setPhone] = useState('')
@@ -30,7 +31,15 @@ function RegisterForm() {
     setError(null)
 
     try {
-      const metaData: Record<string, any> = { name, phone }
+      const cleanInstagram = instagram.trim()
+        ? (instagram.trim().startsWith('@') ? instagram.trim() : `@${instagram.trim()}`)
+        : null
+
+      const metaData: Record<string, any> = { 
+        name, 
+        phone,
+        instagram: cleanInstagram
+      }
       
       // If operator registration link is used, attach store_id and role
       if (inviteStoreId) {
@@ -161,20 +170,42 @@ function RegisterForm() {
               </div>
 
               {!inviteStoreId && (
-                <div>
-                  <label htmlFor="storeName" className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400 mb-1">
-                    Nome da sua Loja
-                  </label>
-                  <input
-                    id="storeName"
-                    type="text"
-                    required
-                    value={storeName}
-                    onChange={(e) => setStoreName(e.target.value)}
-                    placeholder="Ex: Mimus Makeup, Bella Cosméticos"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent text-sm transition-all duration-200"
-                  />
-                </div>
+                <>
+                  <div>
+                    <label htmlFor="storeName" className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400 mb-1">
+                      Nome da sua Loja
+                    </label>
+                    <input
+                      id="storeName"
+                      type="text"
+                      required
+                      value={storeName}
+                      onChange={(e) => setStoreName(e.target.value)}
+                      placeholder="Ex: Mimus Makeup, Bella Cosméticos"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent text-sm transition-all duration-200"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="instagram" className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400 mb-1">
+                      @ do Instagram
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400 dark:text-zinc-500 select-none">
+                        @
+                      </span>
+                      <input
+                        id="instagram"
+                        type="text"
+                        required
+                        value={instagram}
+                        onChange={(e) => setInstagram(e.target.value.replace(/^@+/, ''))}
+                        placeholder="sualoja"
+                        className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent text-sm transition-all duration-200"
+                      />
+                    </div>
+                  </div>
+                </>
               )}
 
               <div>

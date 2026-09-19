@@ -51,27 +51,34 @@ export async function POST(request: NextRequest) {
     const adminClient = getAdminClient()
 
     if (action === 'create') {
-      const { email, password, name, phone, role = 'admin', storeId } = body
+      const { email, password, name, phone, instagram, role = 'admin', storeId } = body
 
       if (!email || !password || !name) {
         return NextResponse.json({ error: 'E-mail, senha e nome são obrigatórios' }, { status: 400 })
       }
+
+      const cleanInstagram = instagram?.trim()
+        ? (instagram.trim().startsWith('@') ? instagram.trim() : `@${instagram.trim()}`)
+        : null
 
       // 1. Create auth user
       const { data: authUser, error: authErr } = await adminClient.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
-        user_metadata: { name, role, store_id: storeId, phone }
+        user_metadata: { name, role, store_id: storeId, phone, instagram: cleanInstagram }
       })
 
       if (authErr) throw authErr
 
       // 2. Insert profile manually if handle_new_user trigger wasn't triggered
       // Note: The handle_new_user trigger should run automatically, but we can verify/update.
+      const profileData: Record<string, any> = { role, name, status: 'active', store_id: storeId || null, phone: phone || null }
+      if (cleanInstagram) profileData.instagram = cleanInstagram
+
       const { error: profileErr } = await adminClient
         .from('profiles')
-        .update({ role, name, status: 'active', store_id: storeId || null, phone: phone || null })
+        .update(profileData)
         .eq('id', authUser.user.id)
 
       // Log the user creation
@@ -87,16 +94,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, user: authUser.user })
 
     } else if (action === 'edit') {
-      const { userId, name, role, status, phone } = body
+      const { userId, name, role, status, phone, instagram } = body
 
       if (!userId) {
         return NextResponse.json({ error: 'userId é obrigatório' }, { status: 400 })
       }
 
+      const updateData: Record<string, any> = { name, role, status, phone }
+      if (instagram !== undefined) {
+        updateData.instagram = instagram?.trim()
+          ? (instagram.trim().startsWith('@') ? instagram.trim() : `@${instagram.trim()}`)
+          : null
+      }
+
       // Update profile
       const { error: updateErr } = await adminClient
         .from('profiles')
-        .update({ name, role, status, phone })
+        .update(updateData)
         .eq('id', userId)
 
       if (updateErr) throw updateErr

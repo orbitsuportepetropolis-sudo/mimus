@@ -46,27 +46,34 @@ export async function GET(request: Request) {
           const fullName = user.user_metadata?.full_name || user.user_metadata?.name || ''
           const firstName = fullName ? fullName.split(' ')[0] : 'Lojista'
           const defaultStoreName = user.user_metadata?.store_name || `Loja de ${firstName}`
+          const userInstagram = user.user_metadata?.instagram || null
 
           // Cria loja para a nova conta
+          const storePayload: Record<string, any> = { name: defaultStoreName }
+          if (userInstagram) storePayload.instagram = userInstagram
+
           const { data: newStore, error: storeErr } = await supabase
             .from('stores')
-            .insert([{ name: defaultStoreName }])
+            .insert([storePayload])
             .select('id')
             .single()
 
           if (newStore?.id) {
             storeId = newStore.id
 
+            const profilePayload: Record<string, any> = {
+              id: user.id,
+              store_id: newStore.id,
+              name: fullName || user.email?.split('@')[0] || 'Lojista',
+              role: 'admin',
+              email: user.email,
+              status: 'active'
+            }
+            if (userInstagram) profilePayload.instagram = userInstagram
+
             await supabase
               .from('profiles')
-              .upsert([{
-                id: user.id,
-                store_id: newStore.id,
-                name: fullName || user.email?.split('@')[0] || 'Lojista',
-                role: 'admin',
-                email: user.email,
-                status: 'active'
-              }])
+              .upsert([profilePayload])
           } else {
             console.error('Erro ao criar loja automática:', storeErr)
           }
