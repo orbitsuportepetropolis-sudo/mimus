@@ -39,7 +39,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 export default function LandingPage() {
   const [darkMode, setDarkMode] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [activeFeatureTab, setActiveFeatureTab] = useState<'vitrine' | 'pdv' | 'stock' | 'ai'>('vitrine')
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0)
   const [activeAICommand, setActiveAICommand] = useState(0)
@@ -1117,170 +1116,110 @@ export default function LandingPage() {
 
       {/* PRICING PLANS (MANYCHAT PRICING ARCHITECTURE) */}
       <section id="precos" className="py-20 md:py-28 px-4 sm:px-6 bg-slate-100/60 dark:bg-zinc-900/40 border-t border-slate-200/60 dark:border-zinc-800">
-        <div className="max-w-6xl mx-auto space-y-12">
+        <div className="max-w-4xl mx-auto space-y-10">
           
           <div className="text-center max-w-2xl mx-auto space-y-4">
             <span className="text-xs font-extrabold uppercase tracking-widest text-rose-600 dark:text-rose-400">
-              Planos Transparentes
+              Investimento Simples e Transparente
             </span>
             <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
-              Escolha o plano ideal para você
+              Tudo o que sua loja precisa por um valor único
             </h2>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400">
-              Sem contratos de fidelidade. Cancele ou altere seu plano quando quiser.
+              Sem contratos de fidelidade, sem pegadinhas e sem taxas sobre as suas vendas.
             </p>
-
-            {/* Monthly / Yearly Toggle */}
-            <div className="inline-flex items-center gap-2 p-1.5 rounded-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 shadow-sm mt-2">
-              <button
-                onClick={() => setBillingCycle('monthly')}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-                  billingCycle === 'monthly'
-                    ? 'bg-rose-600 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-                }`}
-              >
-                Mensal
-              </button>
-              <button
-                onClick={() => setBillingCycle('yearly')}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  billingCycle === 'yearly'
-                    ? 'bg-rose-600 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-                }`}
-              >
-                <span>Anual</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-extrabold uppercase bg-emerald-500 text-white">
-                  -20% OFF
-                </span>
-              </button>
-            </div>
           </div>
 
-          {/* Pricing Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
-            
-            {/* Plan 1: Gratuito */}
-            <div className="p-8 rounded-3xl bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 shadow-sm flex flex-col justify-between space-y-6">
-              <div className="space-y-4">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Gratuito</span>
-                <div>
-                  <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">R$ 0</span>
-                  <span className="text-xs text-slate-400 font-semibold"> /mês</span>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-zinc-400">
-                  Ideal para quem está começando a vender e precisa de organização inicial.
-                </p>
-
-                <ul className="space-y-3 pt-4 border-t border-slate-100 dark:border-zinc-800 text-xs text-slate-600 dark:text-zinc-300">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-500" /> Até 25 produtos cadastrados
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-500" /> Vitrine Virtual básica
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-500" /> PDV Balcão simplificado
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-500" /> Controle de estoque essencial
-                  </li>
-                </ul>
-              </div>
-
-              <Link
-                href="/register"
-                className="w-full py-3 rounded-full border border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-900 font-bold text-xs uppercase tracking-wider text-center transition-colors"
-              >
-                Começar Grátis
-              </Link>
+          {/* Single Featured Plan Card (R$ 49/mês) */}
+          <div className="max-w-2xl mx-auto rounded-3xl bg-white dark:bg-zinc-900 border-2 border-rose-500 shadow-2xl shadow-rose-600/15 p-8 sm:p-10 relative space-y-8">
+            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-rose-600 text-white font-extrabold text-[11px] uppercase tracking-widest shadow-md">
+              Acesso Completo
             </div>
 
-            {/* Plan 2: Pro (Featured Manychat Style) */}
-            <div className="p-8 rounded-3xl bg-white dark:bg-zinc-900 border-2 border-rose-500 shadow-2xl shadow-rose-600/15 flex flex-col justify-between space-y-6 relative">
-              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-rose-600 text-white font-extrabold text-[10px] uppercase tracking-widest shadow-md">
-                Mais Escolhido
-              </div>
-
-              <div className="space-y-4">
-                <span className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Plano Pro</span>
-                <div>
-                  <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">
-                    R$ {billingCycle === 'monthly' ? '49,90' : '39,90'}
-                  </span>
-                  <span className="text-xs text-slate-400 font-semibold"> /mês</span>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-zinc-400">
-                  A solução completa para lojistas que querem vender mais e ter controle total.
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 dark:border-zinc-800 pb-6">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block">
+                  Plano Mimus Pro
+                </span>
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">
+                  Tudo Incluso
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+                  Vitrine, PDV, estoque, financeiro e inteligência artificial.
                 </p>
-
-                <ul className="space-y-3 pt-4 border-t border-slate-100 dark:border-zinc-800 text-xs text-slate-700 dark:text-zinc-200 font-medium">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-rose-500" /> <strong>Produtos ilimitados</strong>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-rose-500" /> <strong>Vitrine Virtual Personalizada</strong>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-rose-500" /> PDV Completo com Pix e Recibo
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-rose-500" /> Baixa em Massa no Estoque & Financeiro
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-rose-500" /> <strong>Mimus AI Assistente 24h</strong>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-rose-500" /> Suporte Prioritário no WhatsApp
-                  </li>
-                </ul>
               </div>
 
-              <Link
-                href="/register"
-                className="w-full py-3.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs uppercase tracking-wider text-center shadow-lg shadow-rose-600/30 transition-all hover:scale-[1.02]"
-              >
-                Testar 14 Dias Grátis
-              </Link>
+              <div className="sm:text-right">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white">
+                    R$ 49
+                  </span>
+                  <span className="text-sm font-bold text-slate-500 dark:text-zinc-400">/mês</span>
+                </div>
+                <span className="text-[11px] text-slate-400 font-medium block mt-0.5">
+                  Pix ou Cartão • Cancele quando quiser
+                </span>
+              </div>
             </div>
 
-            {/* Plan 3: Equipe / Elite */}
-            <div className="p-8 rounded-3xl bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800 shadow-sm flex flex-col justify-between space-y-6">
-              <div className="space-y-4">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Equipe / Elite</span>
-                <div>
-                  <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">
-                    R$ {billingCycle === 'monthly' ? '97,00' : '79,00'}
-                  </span>
-                  <span className="text-xs text-slate-400 font-semibold"> /mês</span>
+            {/* Included Features Grid */}
+            <div className="space-y-3">
+              <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider block">
+                O que está incluso na sua assinatura:
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs text-slate-700 dark:text-zinc-200">
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4 h-4 text-rose-500 shrink-0" />
+                  <span><strong>Produtos ilimitados</strong> no catálogo</span>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-zinc-400">
-                  Para franquias e lojas com múltiplos operadores e vendedoras.
-                </p>
-
-                <ul className="space-y-3 pt-4 border-t border-slate-100 dark:border-zinc-800 text-xs text-slate-600 dark:text-zinc-300">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-500" /> Tudo do Plano Pro incluso
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-500" /> Até 5 operadores de equipe
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-500" /> Controle de permissões por funcionário
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-500" /> Relatórios gerenciais avançados
-                  </li>
-                </ul>
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4 h-4 text-rose-500 shrink-0" />
+                  <span><strong>Vitrine Virtual Personalizada</strong> (link na bio)</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4 h-4 text-rose-500 shrink-0" />
+                  <span><strong>PDV de Balcão ágil</strong> com Pix e recibo</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4 h-4 text-rose-500 shrink-0" />
+                  <span><strong>Baixa em Massa no Estoque</strong> & Financeiro</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4 h-4 text-rose-500 shrink-0" />
+                  <span><strong>Mimus AI Assistente 24h</strong> no WhatsApp</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4 h-4 text-rose-500 shrink-0" />
+                  <span><strong>0% de comissão</strong> sobre suas vendas</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4 h-4 text-rose-500 shrink-0" />
+                  <span><strong>Relatórios em tempo real</strong> de lucro e vendas</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4 h-4 text-rose-500 shrink-0" />
+                  <span><strong>Suporte Prioritário</strong> direto no WhatsApp</span>
+                </div>
               </div>
+            </div>
 
+            {/* CTA Button and Guarantees */}
+            <div className="pt-2 space-y-4">
               <Link
                 href="/register"
-                className="w-full py-3 rounded-full border border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-900 font-bold text-xs uppercase tracking-wider text-center transition-colors"
+                className="w-full py-4 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-sm uppercase tracking-wider text-center shadow-xl shadow-rose-600/30 transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
               >
-                Contratar Equipe
+                <span>Experimentar 14 Dias Grátis</span>
+                <ArrowRight className="w-4 h-4" />
               </Link>
+
+              <div className="flex flex-wrap items-center justify-center gap-4 text-[11px] text-slate-500 dark:text-zinc-400 text-center">
+                <span>✓ Teste gratuito de 14 dias</span>
+                <span>•</span>
+                <span>✓ Não precisa de cartão para começar</span>
+                <span>•</span>
+                <span>✓ Ativação imediata</span>
+              </div>
             </div>
 
           </div>
