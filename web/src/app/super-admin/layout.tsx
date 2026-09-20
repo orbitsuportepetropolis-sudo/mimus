@@ -84,11 +84,11 @@ export default async function SuperAdminLayout({
             <LayoutDashboard className="w-4 h-4" /> Ir para Dashboard
           </Link>
 
-          <form action="/api/super-admin/impersonate/stop" method="GET">
+          <form action="/api/auth/logout" method="POST">
             <button
               type="submit"
-              className="p-2.5 rounded-xl bg-slate-800 hover:bg-rose-950/40 hover:text-rose-400 text-slate-400 transition-colors"
-              title="Sair"
+              className="p-2.5 rounded-xl bg-slate-800 hover:bg-rose-950/40 hover:text-rose-400 text-slate-400 transition-colors cursor-pointer"
+              title="Sair do Super Admin"
             >
               <LogOut className="w-4.5 h-4.5" />
             </button>
