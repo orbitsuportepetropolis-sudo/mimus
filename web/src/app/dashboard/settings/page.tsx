@@ -16,7 +16,11 @@ import {
   ArrowRight,
   Globe,
   Store,
-  Percent
+  Percent,
+  MessageCircle,
+  Copy,
+  ExternalLink,
+  Check
 } from 'lucide-react'
 
 const GOOGLE_FONTS = [
@@ -55,6 +59,11 @@ export default function SettingsPage() {
   const [couponFirstPurchaseActive, setCouponFirstPurchaseActive] = useState(false)
   const [couponFirstPurchaseCode, setCouponFirstPurchaseCode] = useState('BEMVINDA')
   const [couponFirstPurchasePct, setCouponFirstPurchasePct] = useState('10')
+
+  // Storefront & WhatsApp States
+  const [whatsapp, setWhatsapp] = useState('')
+  const [origin, setOrigin] = useState('')
+  const [copiedLink, setCopiedLink] = useState(false)
 
 interface BannerConfig {
   title: string
@@ -95,6 +104,9 @@ interface BannerConfig {
 
   useEffect(() => {
     loadStoreSettings()
+    if (typeof window !== 'undefined') {
+      setOrigin(window.location.origin)
+    }
   }, [])
 
   async function loadStoreSettings() {
@@ -111,6 +123,18 @@ interface BannerConfig {
 
       if (profile) {
         setStoreId(profile.store_id)
+
+        // Load storefront integration (WhatsApp)
+        const { data: storefront } = await supabase
+          .from('integrations')
+          .select('*')
+          .eq('store_id', profile.store_id)
+          .eq('provider', 'storefront')
+          .maybeSingle()
+
+        if (storefront?.credentials?.whatsapp) {
+          setWhatsapp(storefront.credentials.whatsapp)
+        }
 
         const { data: store } = await supabase
           .from('stores')
@@ -361,6 +385,34 @@ interface BannerConfig {
         throw error
       }
 
+      // Save storefront WhatsApp in integrations table
+      if (storeId) {
+        const { data: current } = await supabase
+          .from('integrations')
+          .select('id')
+          .eq('store_id', storeId)
+          .eq('provider', 'storefront')
+
+        const storefrontPayload = {
+          store_id: storeId,
+          provider: 'storefront',
+          credentials: { whatsapp },
+          active: true,
+          updated_at: new Date().toISOString()
+        }
+
+        if (current && current.length > 0) {
+          await supabase
+            .from('integrations')
+            .update(storefrontPayload)
+            .eq('id', current[0].id)
+        } else {
+          await supabase
+            .from('integrations')
+            .insert([storefrontPayload])
+        }
+      }
+
       setMessage({ type: 'success', text: 'Configurações da loja salvas com sucesso!' })
       setTimeout(() => setMessage(null), 3000)
     } catch (err: any) {
@@ -524,6 +576,74 @@ interface BannerConfig {
                     <option key={f.value} value={f.value}>{f.name} ({f.type})</option>
                   ))}
                 </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Card: Vitrine Virtual & WhatsApp */}
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm space-y-4">
+            <h2 className="text-sm font-bold text-slate-700 dark:text-zinc-200 border-b border-slate-50 dark:border-zinc-800/60 pb-2 flex items-center gap-2">
+              <Store className="w-4 h-4 text-rose-500" /> Vitrine Virtual & Pedidos no WhatsApp
+            </h2>
+
+            <div className="space-y-4 text-xs font-semibold">
+              {/* Divulgação Link */}
+              {storeId && (
+                <div className="p-4 bg-rose-50/40 dark:bg-zinc-950/60 border border-rose-100/60 dark:border-zinc-800 rounded-xl space-y-2">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-400 block uppercase tracking-wider">
+                    Link de Divulgação da Vitrine:
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={`${origin}/store/${storeId}`}
+                      className="flex-1 bg-white dark:bg-zinc-900 px-3 py-2 rounded-lg border border-rose-200 dark:border-zinc-800 text-rose-600 dark:text-rose-400 font-bold select-all focus:outline-none text-[11px]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${origin}/store/${storeId}`)
+                        setCopiedLink(true)
+                        setTimeout(() => setCopiedLink(false), 2500)
+                      }}
+                      className="px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold shadow-sm transition-all flex items-center gap-1.5 flex-shrink-0"
+                    >
+                      {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedLink ? 'Copiado!' : 'Copiar'}
+                    </button>
+                    <a
+                      href={`/store/${storeId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-2 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 text-[11px] font-bold transition-all flex items-center gap-1 flex-shrink-0"
+                      title="Abrir vitrine em nova aba"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-normal">
+                    Compartilhe este link na bio do Instagram, WhatsApp ou anúncios para suas clientes comprarem.
+                  </p>
+                </div>
+              )}
+
+              {/* WhatsApp Input */}
+              <div>
+                <label className="block text-slate-400 dark:text-zinc-500 mb-1 flex items-center gap-1.5">
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
+                  WhatsApp para Receber Pedidos (DDI + DDD + Número)
+                </label>
+                <input
+                  type="text"
+                  value={whatsapp}
+                  onChange={(e) => setWhatsapp(e.target.value.replace(/[^\d+]/g, ''))}
+                  placeholder="Ex: 5511999999999"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 font-mono text-[11px]"
+                />
+                <p className="text-[10px] text-slate-400 dark:text-zinc-500 mt-1 font-normal">
+                  Insira o código do país + DDD + Celular (Ex: 55 para Brasil + DDD + celular sem espaços ou traços).
+                </p>
               </div>
             </div>
           </div>
@@ -941,43 +1061,8 @@ interface BannerConfig {
 
             </div>
           </div>
-
         </div>
 
-      {/* Próximos Canais (SaaS) */}
-      <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-100 dark:border-zinc-800 shadow-sm space-y-4">
-        <h2 className="text-sm font-bold text-slate-700 dark:text-zinc-200 border-b border-slate-50 dark:border-zinc-800/60 pb-2 flex items-center gap-2">
-          <Globe className="w-4 h-4 text-rose-500" /> Próximos Canais de Venda (SaaS)
-        </h2>
-        <p className="text-xs text-slate-400 dark:text-zinc-500">
-          Integre o Mimus às plataformas abaixo para sincronizar produtos e pedidos automaticamente.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 opacity-60">
-          {/* Nuvemshop */}
-          <div className="p-3 rounded-xl bg-slate-50/50 dark:bg-zinc-950/40 border border-slate-100 dark:border-zinc-800 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded bg-indigo-500 text-white font-bold flex items-center justify-center text-[10px]">N</span>
-              <span className="font-semibold text-slate-700 dark:text-zinc-300">Nuvemshop</span>
-            </div>
-            <span className="text-[9px] bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 px-2 py-0.5 rounded-full font-bold">Em Breve</span>
-          </div>
-          {/* Shopify */}
-          <div className="p-3 rounded-xl bg-slate-50/50 dark:bg-zinc-950/40 border border-slate-100 dark:border-zinc-800 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded bg-emerald-600 text-white font-bold flex items-center justify-center text-[10px]">S</span>
-              <span className="font-semibold text-slate-700 dark:text-zinc-300">Shopify</span>
-            </div>
-            <span className="text-[9px] bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 px-2 py-0.5 rounded-full font-bold">Em Breve</span>
-          </div>
-          {/* Mercado Livre */}
-          <div className="p-3 rounded-xl bg-slate-50/50 dark:bg-zinc-950/40 border border-slate-100 dark:border-zinc-800 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded bg-yellow-400 text-slate-800 font-bold flex items-center justify-center text-[10px]">ML</span>
-              <span className="font-semibold text-slate-700 dark:text-zinc-300">Mercado Livre</span>
-            </div>
-            <span className="text-[9px] bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 px-2 py-0.5 rounded-full font-bold">Em Breve</span>
-          </div>
-        </div>
       </div>
 
     </div>
