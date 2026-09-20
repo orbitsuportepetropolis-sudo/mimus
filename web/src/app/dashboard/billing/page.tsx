@@ -424,7 +424,7 @@ export default function BillingPage() {
             </div>
             <div className="h-px bg-slate-50 dark:bg-zinc-800 my-4" />
             <ul className="space-y-2.5 text-xs text-slate-600 dark:text-zinc-300">
-              <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500 flex-shrink-0" /> Limite de até 50 produtos ({productCount}/50 cadastrados)</li>
+              <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500 flex-shrink-0" /> Limite de até 10 produtos ({productCount}/10 cadastrados)</li>
               <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500 flex-shrink-0" /> 1 usuário administrador</li>
               <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500 flex-shrink-0" /> Vitrine virtual pública</li>
               <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500 flex-shrink-0" /> Controle de vendas básico</li>

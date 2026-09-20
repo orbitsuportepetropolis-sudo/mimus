@@ -21,7 +21,7 @@ export type StorePlan = 'free' | 'pro' | 'enterprise'
 export type StoreEnvironment = 'PRODUCTION' | 'TEST' | 'INTERNAL' | 'DEMO' | 'PENDING_REVIEW'
 
 export type PlanFeature = 
-  | 'unlimited_products'    // Free tem limite de 50 produtos; Pro é ilimitado
+  | 'unlimited_products'    // Free tem limite de 10 produtos; Pro é ilimitado
   | 'team_members'         // Free tem limite de 1 usuário (admin); Pro ilimitado
   | 'custom_domain'        // Domínio próprio na vitrine
   | 'integrations'         // Integrações com e-commerce e gateways
@@ -96,7 +96,7 @@ export function canUseFeature(context: StoreAccessContext | null | undefined, fe
 export function getPlanLimits(context?: StoreAccessContext | null) {
   const isPro = hasProAccess(context)
   return {
-    maxProducts: isPro ? Infinity : 50,
+    maxProducts: isPro ? Infinity : 10,
     maxTeamMembers: isPro ? Infinity : 1,
     canUseCustomDomain: isPro,
     canUseIntegrations: isPro,
