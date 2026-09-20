@@ -323,6 +323,9 @@ export default function SuperAdminPage() {
             new Date(p.paid_at || p.created_at).getTime() >= new Date(periodEnd!).getTime() - 24 * 60 * 60 * 1000
           )
 
+          const trialEnd = sub?.trial_ends_at || s.trial_ends_at
+          const isTrialExpired = trialEnd ? new Date(trialEnd).getTime() < Date.now() : false
+
           if (rawStatus === 'ACTIVE') {
             if (isPeriodExpired && !hasRecentPayment) {
               const daysOverdue = (Date.now() - new Date(periodEnd!).getTime()) / (1000 * 60 * 60 * 24)
@@ -331,7 +334,13 @@ export default function SuperAdminPage() {
               subscriptionStatus = 'ACTIVE'
             }
           }
-          else if (rawStatus === 'TRIAL' || rawStatus === 'TRIAL_CUSTOM') subscriptionStatus = 'TRIAL'
+          else if (rawStatus === 'TRIAL' || rawStatus === 'TRIAL_CUSTOM') {
+            if (isTrialExpired) {
+              subscriptionStatus = 'EXPIRED'
+            } else {
+              subscriptionStatus = 'TRIAL'
+            }
+          }
           else if (rawStatus === 'COURTESY') subscriptionStatus = 'COURTESY'
           else if (rawStatus === 'PAST_DUE' || rawStatus === 'OVERDUE') subscriptionStatus = 'PAST_DUE'
           else if (rawStatus === 'CANCELED') subscriptionStatus = 'CANCELED'
@@ -342,6 +351,10 @@ export default function SuperAdminPage() {
 
           const subAmount = sub ? Number(sub.amount) : (s.plan === 'pro' && s.plan_status === 'active' && environment === 'PRODUCTION' ? 49.00 : 0.00)
 
+          // Regra de Ouro: Pro SOMENTE com pagamento ATIVO, CORTESIA expressa ou TRIAL válido vigente.
+          const hasProPlan = subscriptionStatus === 'ACTIVE' || subscriptionStatus === 'COURTESY' || (subscriptionStatus === 'TRIAL' && !isTrialExpired)
+          const computedPlan = hasProPlan ? (sub?.plan_id || s.plan || 'pro') : 'free'
+
           return {
             id: s.id,
             name: s.name,
@@ -351,7 +364,7 @@ export default function SuperAdminPage() {
             createdAt: s.created_at,
             lastActivity: storeSales.length > 0 ? storeSales[0].created_at : s.created_at,
             environment,
-            plan: (subscriptionStatus === 'PAST_DUE' || subscriptionStatus === 'EXPIRED' || subscriptionStatus === 'CANCELED') ? 'free' : (sub?.plan_id || s.plan || 'free'),
+            plan: computedPlan,
             subscriptionStatus,
             trialEndsAt: sub?.trial_ends_at || s.trial_ends_at || null,
             subscriptionAmount: subAmount,

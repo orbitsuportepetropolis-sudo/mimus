@@ -20,6 +20,7 @@ import {
   Boxes
 } from 'lucide-react'
 import StockInventoryTab from '@/components/stock-inventory-tab'
+import { hasProAccess } from '@/lib/permissions'
 
 interface Product {
   id: string
@@ -328,13 +329,7 @@ export default function ProductsPage() {
         throw new Error('Preencha o Nome de pelo menos um produto.')
       }
 
-      const getTrialDaysLeft = () => {
-        if (!trialEndsAt) return 0
-        const diff = new Date(trialEndsAt).getTime() - Date.now()
-        return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
-      }
-      const isTrialActive = planStatus === 'trial' && getTrialDaysLeft() > 0
-      const isPro = storePlan === 'pro' || isTrialActive
+      const isPro = hasProAccess({ plan: storePlan, status: planStatus, trial_ends_at: trialEndsAt })
 
       if (!isPro && products.length + validRows.length > 50) {
         throw new Error(`A importação excede o limite de 50 produtos do Plano Free. Total atual: ${products.length}. Você está tentando importar ${validRows.length}. Faça o upgrade para o Plano Pro!`)
@@ -1005,14 +1000,7 @@ export default function ProductsPage() {
     setNewVarName('')
     setNewVarOptions('')
 
-    // Enforce 50 products limit for Free Plan users when registering a NEW product
-    const getTrialDaysLeft = () => {
-      if (!trialEndsAt) return 0
-      const diff = new Date(trialEndsAt).getTime() - Date.now()
-      return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
-    }
-    const isTrialActive = planStatus === 'trial' && getTrialDaysLeft() > 0
-    const isPro = storePlan === 'pro' || isTrialActive
+    const isPro = hasProAccess({ plan: storePlan, status: planStatus, trial_ends_at: trialEndsAt })
 
     if (!prod && !isPro && products.length >= 50) {
       alert('Limite de 50 produtos atingido no Plano Free. Faça o upgrade para o Plano Pro por apenas R$ 49/mês para liberar cadastros ilimitados!')
@@ -1078,13 +1066,7 @@ export default function ProductsPage() {
   
   // Quick register from goods entry flow
   function openProductQuickRegister(searchTerm: string) {
-    const getTrialDaysLeft = () => {
-      if (!trialEndsAt) return 0
-      const diff = new Date(trialEndsAt).getTime() - Date.now()
-      return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
-    }
-    const isTrialActive = planStatus === 'trial' && getTrialDaysLeft() > 0
-    const isPro = storePlan === 'pro' || isTrialActive
+    const isPro = hasProAccess({ plan: storePlan, status: planStatus, trial_ends_at: trialEndsAt })
 
     if (!isPro && products.length >= 50) {
       alert('Limite de 50 produtos atingido no Plano Free. Faça o upgrade para o Plano Pro por apenas R$ 49/mês para liberar cadastros ilimitados!')

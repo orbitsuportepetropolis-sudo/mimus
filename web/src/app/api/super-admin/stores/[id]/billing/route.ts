@@ -99,7 +99,7 @@ export async function POST(
         }
         storeUpdate = {
           plan: 'pro',
-          plan_status: 'active'
+          plan_status: 'courtesy'
         }
         actionDescription = 'Cortesia Pro concedida (MRR = R$ 0)'
         break
@@ -114,7 +114,7 @@ export async function POST(
         }
         storeUpdate = {
           plan: 'free',
-          plan_status: 'trial'
+          plan_status: 'free'
         }
         actionDescription = 'Cortesia revogada (Retorno ao plano Free)'
         break
