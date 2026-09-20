@@ -944,6 +944,40 @@ interface BannerConfig {
 
         </div>
 
+      {/* Próximos Canais (SaaS) */}
+      <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-100 dark:border-zinc-800 shadow-sm space-y-4">
+        <h2 className="text-sm font-bold text-slate-700 dark:text-zinc-200 border-b border-slate-50 dark:border-zinc-800/60 pb-2 flex items-center gap-2">
+          <Globe className="w-4 h-4 text-rose-500" /> Próximos Canais de Venda (SaaS)
+        </h2>
+        <p className="text-xs text-slate-400 dark:text-zinc-500">
+          Integre o Mimus às plataformas abaixo para sincronizar produtos e pedidos automaticamente.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 opacity-60">
+          {/* Nuvemshop */}
+          <div className="p-3 rounded-xl bg-slate-50/50 dark:bg-zinc-950/40 border border-slate-100 dark:border-zinc-800 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-7 h-7 rounded bg-indigo-500 text-white font-bold flex items-center justify-center text-[10px]">N</span>
+              <span className="font-semibold text-slate-700 dark:text-zinc-300">Nuvemshop</span>
+            </div>
+            <span className="text-[9px] bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 px-2 py-0.5 rounded-full font-bold">Em Breve</span>
+          </div>
+          {/* Shopify */}
+          <div className="p-3 rounded-xl bg-slate-50/50 dark:bg-zinc-950/40 border border-slate-100 dark:border-zinc-800 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-7 h-7 rounded bg-emerald-600 text-white font-bold flex items-center justify-center text-[10px]">S</span>
+              <span className="font-semibold text-slate-700 dark:text-zinc-300">Shopify</span>
+            </div>
+            <span className="text-[9px] bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 px-2 py-0.5 rounded-full font-bold">Em Breve</span>
+          </div>
+          {/* Mercado Livre */}
+          <div className="p-3 rounded-xl bg-slate-50/50 dark:bg-zinc-950/40 border border-slate-100 dark:border-zinc-800 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-7 h-7 rounded bg-yellow-400 text-slate-800 font-bold flex items-center justify-center text-[10px]">ML</span>
+              <span className="font-semibold text-slate-700 dark:text-zinc-300">Mercado Livre</span>
+            </div>
+            <span className="text-[9px] bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 px-2 py-0.5 rounded-full font-bold">Em Breve</span>
+          </div>
+        </div>
       </div>
 
     </div>

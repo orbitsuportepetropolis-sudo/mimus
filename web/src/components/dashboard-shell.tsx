@@ -495,7 +495,6 @@ export default function DashboardShell({ children, profile, store, lowStockCount
     { name: 'Clientes', href: '/dashboard/customers', icon: Users },
     { name: 'Financeiro', href: '/dashboard/finance', icon: DollarSign },
     { name: 'Personalizar', href: '/dashboard/settings', icon: Settings },
-    { name: 'Integrações', href: '/dashboard/integrations', icon: Globe },
     { name: 'Equipe', href: '/dashboard/team', icon: Users },
     { name: 'Mensalidade', href: '/dashboard/billing', icon: CreditCard },
   ]
