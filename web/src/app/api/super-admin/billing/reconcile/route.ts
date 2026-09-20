@@ -203,18 +203,18 @@ export async function GET(request: Request) {
               pendingValue: pendingAsaasPayment?.value || sub.amount
             })
 
-            // Atualiza status no Supabase se ainda estava gravado como ACTIVE
-            if (sub.status !== targetStatus) {
+            // Atualiza status no Supabase se ainda estava gravado como ACTIVE ou plano diferente de free
+            if (sub.status !== targetStatus || sub.plan_id !== 'free' || (matchedStore && matchedStore.plan !== 'free')) {
               try {
                 await supabaseAdmin
                   .from('subscriptions')
-                  .update({ status: targetStatus, updated_at: new Date().toISOString() })
+                  .update({ plan_id: 'free', status: targetStatus, updated_at: new Date().toISOString() })
                   .eq('id', sub.id)
 
-                if (matchedStore && matchedStore.plan_status !== targetPlanStatus) {
+                if (matchedStore) {
                   await supabaseAdmin
                     .from('stores')
-                    .update({ plan_status: targetPlanStatus })
+                    .update({ plan: 'free', plan_status: targetPlanStatus })
                     .eq('id', matchedStore.id)
                 }
               } catch (syncErr: any) {

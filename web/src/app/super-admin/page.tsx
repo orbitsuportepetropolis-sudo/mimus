@@ -346,7 +346,7 @@ export default function SuperAdminPage() {
             createdAt: s.created_at,
             lastActivity: storeSales.length > 0 ? storeSales[0].created_at : s.created_at,
             environment,
-            plan: subscriptionStatus === 'EXPIRED' ? 'free' : (sub?.plan_id || s.plan || 'free'),
+            plan: (subscriptionStatus === 'PAST_DUE' || subscriptionStatus === 'EXPIRED' || subscriptionStatus === 'CANCELED') ? 'free' : (sub?.plan_id || s.plan || 'free'),
             subscriptionStatus,
             trialEndsAt: sub?.trial_ends_at || s.trial_ends_at || null,
             subscriptionAmount: subAmount,

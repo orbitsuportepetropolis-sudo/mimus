@@ -62,13 +62,8 @@ export function hasProAccess(context?: StoreAccessContext | null): boolean {
     return ends > Date.now()
   }
 
-  // 4. Período de tolerância para pagamento atrasado (grace period de navegação com aviso)
-  if (status === 'PAST_DUE') {
-    // Concede acesso temporário de visualização/operação básica por até 5 dias após vencimento
-    if (context.subscription_ends_at) {
-      const graceEnd = new Date(context.subscription_ends_at).getTime() + (5 * 24 * 60 * 60 * 1000)
-      return Date.now() <= graceEnd
-    }
+  // 4. Se estiver vencido (PAST_DUE), expirado ou cancelado, cai imediatamente para o modo grátis
+  if (status === 'PAST_DUE' || status === 'EXPIRED' || status === 'CANCELED') {
     return false
   }
 

@@ -164,6 +164,7 @@ async function processPaymentOverdue(
     await supabaseAdmin
       .from('subscriptions')
       .update({
+        plan_id: 'free',
         status: 'PAST_DUE',
         updated_at: new Date().toISOString()
       })
@@ -175,6 +176,7 @@ async function processPaymentOverdue(
   await supabaseAdmin
     .from('stores')
     .update({
+      plan: 'free',
       plan_status: 'overdue'
     })
     .eq('id', storeId)
