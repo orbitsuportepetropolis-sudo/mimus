@@ -162,6 +162,11 @@ export default function SuperAdminPage() {
   // Real SaaS and Store Economy Metrics
   const [saasMetrics, setSaasMetrics] = useState<SaaSMetrics>({
     mrr: 0,
+    contractedMrr: 0,
+    pastDueMrr: 0,
+    pastDueStoresCount: 0,
+    totalRevenueCollected: 0,
+    confirmedPaymentsCount: 0,
     payingStoresCount: 0,
     activeTrialsCount: 0,
     newStoresCount: 0,
@@ -377,27 +382,59 @@ export default function SuperAdminPage() {
         const matchingStoreIds = new Set(filteredByEnv.map(s => s.id))
 
         // 3. CÁLCULO ESTRITO DE MÉTRICAS SAAS (Receita do Mimus)
-        // Regra de Ouro: MRR somente assinaturas PAGAS e ATIVAS
+        // Regra: MRR Em Dia = assinaturas estritamente PAGAS e ATIVAS
         const payingStores = filteredByEnv.filter(s => s.subscriptionStatus === 'ACTIVE' && s.subscriptionAmount > 0)
         const mrr = payingStores.reduce((sum, s) => sum + s.subscriptionAmount, 0)
         const payingStoresCount = payingStores.length
+
+        // Lojas com mensalidade em atraso (PAST_DUE com valor contratado)
+        const pastDueStores = filteredByEnv.filter(s => s.subscriptionStatus === 'PAST_DUE' && s.subscriptionAmount > 0)
+        const pastDueMrr = pastDueStores.reduce((sum, s) => sum + s.subscriptionAmount, 0)
+        const pastDueStoresCount = pastDueStores.length
+
+        // MRR Contratado total (ativos + em atraso aguardando renovação)
+        const contractedMrr = mrr + pastDueMrr
+
+        // Caixa Real: Receita de Assinaturas Confirmadas recebida no período
+        const periodPayments = allPayments.filter(p => 
+          matchingStoreIds.has(p.store_id) && 
+          p.status === 'confirmed' &&
+          (periodFilter === 'all' || new Date(p.paid_at || p.created_at) >= periodDate)
+        )
+        const totalRevenueCollected = periodPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
+        const confirmedPaymentsCount = periodPayments.length
 
         const activeTrials = filteredByEnv.filter(s => s.subscriptionStatus === 'TRIAL')
         const activeTrialsCount = activeTrials.length
 
         const newStoresCount = filteredByEnv.filter(s => new Date(s.createdAt) >= periodDate).length
-        const arpu = payingStoresCount > 0 ? mrr / payingStoresCount : 0
+        
+        // ARPU: Se houver pagantes ativos calcula mrr / pagantes, senão se houver clientes Pro calcula pelo contratado
+        const totalProClients = payingStoresCount + pastDueStoresCount
+        const arpu = payingStoresCount > 0 
+          ? mrr / payingStoresCount 
+          : (totalProClients > 0 ? contractedMrr / totalProClients : 0)
 
         // Churn & Conversão
         const canceledStores = filteredByEnv.filter(s => s.subscriptionStatus === 'CANCELED')
         const churnRate = payingStoresCount > 0 ? (canceledStores.length / (payingStoresCount + canceledStores.length)) * 100 : null
 
+        // Conversão de Trial: lojas que já pagaram ou que contrataram o Pro
         const eligibleEndedTrials = filteredByEnv.filter(s => s.subscriptionStatus !== 'TRIAL')
-        const convertedTrials = filteredByEnv.filter(s => s.subscriptionStatus === 'ACTIVE')
+        const convertedTrials = filteredByEnv.filter(s => 
+          s.subscriptionStatus === 'ACTIVE' || 
+          s.subscriptionStatus === 'PAST_DUE' || 
+          (s.lastPayment && s.lastPayment.amount > 0)
+        )
         const conversionTrialRate = eligibleEndedTrials.length > 0 ? (convertedTrials.length / eligibleEndedTrials.length) * 100 : null
 
         setSaasMetrics({
           mrr,
+          contractedMrr,
+          pastDueMrr,
+          pastDueStoresCount,
+          totalRevenueCollected,
+          confirmedPaymentsCount,
           payingStoresCount,
           activeTrialsCount,
           newStoresCount,
