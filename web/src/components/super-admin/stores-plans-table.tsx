@@ -120,6 +120,19 @@ export function StoresPlansTable({ stores, onSelectStore, onQuickChangeEnvironme
     }
   }
 
+  const formatRelativeTime = (dateStr: string) => {
+    if (!dateStr) return ''
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+    if (diffDays <= 0) return 'Hoje'
+    if (diffDays === 1) return 'Ontem'
+    if (diffDays < 30) return `há ${diffDays} dias`
+    if (diffDays < 60) return 'há 1 mês'
+    const diffMonths = Math.floor(diffDays / 30)
+    return `há ${diffMonths} meses`
+  }
+
   return (
     <div className="space-y-4 animate-in fade-in duration-200">
       
@@ -210,6 +223,7 @@ export function StoresPlansTable({ stores, onSelectStore, onQuickChangeEnvironme
             <thead>
               <tr className="border-b border-slate-800 bg-slate-900/50 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 <th className="py-3 px-4">Loja / Responsável</th>
+                <th className="py-3 px-4">Data Inscrição</th>
                 <th className="py-3 px-4">Contato (WhatsApp / Email)</th>
                 <th className="py-3 px-4">Ambiente</th>
                 <th className="py-3 px-4">Plano</th>
@@ -242,8 +256,16 @@ export function StoresPlansTable({ stores, onSelectStore, onQuickChangeEnvironme
                         <div className="text-[11px] font-normal text-slate-400 mt-0.5">
                           {store.responsibleName}
                         </div>
-                        <div className="text-[9px] text-slate-500 font-mono mt-0.5">
-                          Cadastrada em {new Date(store.createdAt).toLocaleDateString('pt-BR')}
+                      </td>
+
+                      {/* Data Inscrição */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="font-mono text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" />
+                          {new Date(store.createdAt).toLocaleDateString('pt-BR')}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-medium pl-5 mt-0.5">
+                          {formatRelativeTime(store.createdAt)}
                         </div>
                       </td>
 

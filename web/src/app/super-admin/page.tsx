@@ -634,6 +634,19 @@ export default function SuperAdminPage() {
   }
 
   // Handle impersonation
+  const formatRelativeTime = (dateStr: string) => {
+    if (!dateStr) return ''
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+    if (diffDays <= 0) return 'Hoje'
+    if (diffDays === 1) return 'Ontem'
+    if (diffDays < 30) return `há ${diffDays} dias`
+    if (diffDays < 60) return 'há 1 mês'
+    const diffMonths = Math.floor(diffDays / 30)
+    return `há ${diffMonths} meses`
+  }
+
   const handleImpersonate = (userId: string) => {
     if (confirm('Deseja personificar esta conta? Você será redirecionado ao dashboard com as permissões deste usuário.')) {
       window.location.href = `/api/super-admin/impersonate?userId=${userId}`
@@ -1318,6 +1331,7 @@ export default function SuperAdminPage() {
                     <th className="px-5 py-3.5">Nível de Acesso (Role)</th>
                     <th className="px-5 py-3.5">Status</th>
                     <th className="px-5 py-3.5">Loja Associada</th>
+                    <th className="px-5 py-3.5">Inscrição</th>
                     <th className="px-5 py-3.5 text-right">Ações</th>
                   </tr>
                 </thead>
@@ -1394,6 +1408,16 @@ export default function SuperAdminPage() {
                       </td>
                       <td className="px-5 py-4 text-slate-300">
                         {u.store_name || <span className="text-slate-550 italic">Nenhuma (Global)</span>}
+                      </td>
+                      <td className="px-5 py-4 font-mono text-slate-300 whitespace-nowrap">
+                        <div className="text-xs font-semibold text-slate-200">
+                          {u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '-'}
+                        </div>
+                        {u.created_at && (
+                          <div className="text-[10px] text-slate-500">
+                            {formatRelativeTime(u.created_at)}
+                          </div>
+                        )}
                       </td>
                       <td className="px-5 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
