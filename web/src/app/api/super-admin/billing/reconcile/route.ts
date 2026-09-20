@@ -161,6 +161,71 @@ export async function GET(request: Request) {
         }
       })
 
+    // 5. Detectar assinaturas vencidas (current_period_end < now() sem confirmação de pagamento do novo ciclo)
+    const overdueAlerts: any[] = []
+    const now = Date.now()
+
+    for (const sub of localSubs) {
+      if (sub.status === 'ACTIVE' || sub.status === 'PAST_DUE') {
+        const periodEnd = sub.current_period_end || sub.next_billing_at
+        if (periodEnd && new Date(periodEnd).getTime() < now) {
+          const hasRecentPayment = localPayments.some((p: any) => 
+            p.store_id === sub.store_id && 
+            p.status === 'confirmed' && 
+            new Date(p.paid_at || p.created_at).getTime() >= new Date(periodEnd).getTime() - 24 * 60 * 60 * 1000
+          ) || asaasPayments.some((p: any) => 
+            (p.subscription === sub.external_subscription_id || p.customer === sub.external_customer_id) &&
+            (p.status === 'RECEIVED' || p.status === 'CONFIRMED') &&
+            new Date(p.paymentDate || p.confirmedDate).getTime() >= new Date(periodEnd).getTime() - 24 * 60 * 60 * 1000
+          )
+
+          if (!hasRecentPayment) {
+            const matchedStore = stores.find((s: any) => s.id === sub.store_id)
+            const pendingAsaasPayment = asaasPayments.find((p: any) => 
+              (p.subscription === sub.external_subscription_id || p.customer === sub.external_customer_id) &&
+              p.status === 'PENDING'
+            )
+
+            const daysOverdue = (now - new Date(periodEnd).getTime()) / (1000 * 60 * 60 * 24)
+            const targetStatus = daysOverdue > 5 ? 'EXPIRED' : 'PAST_DUE'
+            const targetPlanStatus = daysOverdue > 5 ? 'expired' : 'past_due'
+
+            overdueAlerts.push({
+              storeId: sub.store_id,
+              storeName: matchedStore?.name || 'Loja',
+              subscriptionId: sub.id,
+              externalSubscriptionId: sub.external_subscription_id,
+              periodEnd,
+              daysOverdue: Math.floor(daysOverdue),
+              status: targetStatus,
+              pendingInvoiceUrl: pendingAsaasPayment?.invoiceUrl || null,
+              pendingPaymentId: pendingAsaasPayment?.id || null,
+              pendingValue: pendingAsaasPayment?.value || sub.amount
+            })
+
+            // Atualiza status no Supabase se ainda estava gravado como ACTIVE
+            if (sub.status !== targetStatus) {
+              try {
+                await supabaseAdmin
+                  .from('subscriptions')
+                  .update({ status: targetStatus, updated_at: new Date().toISOString() })
+                  .eq('id', sub.id)
+
+                if (matchedStore && matchedStore.plan_status !== targetPlanStatus) {
+                  await supabaseAdmin
+                    .from('stores')
+                    .update({ plan_status: targetPlanStatus })
+                    .eq('id', matchedStore.id)
+                }
+              } catch (syncErr: any) {
+                console.warn('[Reconciliation Overdue Sync Error]:', syncErr.message)
+              }
+            }
+          }
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       summary: {
@@ -168,10 +233,12 @@ export async function GET(request: Request) {
         totalAsaasSubscriptions: asaasSubscriptions.length,
         totalAsaasPayments: asaasPayments.length,
         duplicateSubscriptionsCount: duplicateAlerts.length,
-        unimportedPaymentsCount: unimportedPayments.length
+        unimportedPaymentsCount: unimportedPayments.length,
+        overdueSubscriptionsCount: overdueAlerts.length
       },
       duplicateAlerts,
       unimportedPayments,
+      overdueAlerts,
       asaasSubscriptions,
       localSubscriptions: localSubs
     })

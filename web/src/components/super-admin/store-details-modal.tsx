@@ -241,6 +241,40 @@ export function StoreDetailsModal({ store, isOpen, onClose, onActionSuccess }: S
           {/* TAB 3: ASSINATURA */}
           {activeTab === 'subscription' && (
             <div className="space-y-4">
+              {store.subscriptionStatus === 'PAST_DUE' && (
+                <div className="bg-amber-950/30 border border-amber-500/40 rounded-2xl p-4 flex items-start gap-3 text-amber-200 animate-in fade-in duration-200">
+                  <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="text-xs space-y-2 flex-1">
+                    <p className="font-bold text-amber-300 text-sm">Assinatura Vencida (Aguardando Pagamento)</p>
+                    <p className="text-amber-200/90 leading-relaxed">
+                      O período anterior venceu em {store.nextBillingAt ? new Date(store.nextBillingAt).toLocaleDateString('pt-BR') : 'data recente'}. A cobrança deste mês ainda não foi confirmada pelo gateway (Asaas).
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {store.pendingInvoiceUrl && (
+                        <a
+                          href={store.pendingInvoiceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-sm transition-all"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" /> Ver Fatura no Asaas (PIX)
+                        </a>
+                      )}
+                      {cleanPhone && (
+                        <a
+                          href={`https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`}?text=${encodeURIComponent(`Olá, ${store.responsibleName}! Tudo bem? Notamos que a assinatura do plano Mimus Pro da sua loja (${store.name}) venceu recentemente. Caso precise da segunda via da fatura PIX ou queira renovar, estamos à disposição!${store.pendingInvoiceUrl ? ` Segue o link direto: ${store.pendingInvoiceUrl}` : ''}`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm transition-all"
+                        >
+                          <Phone className="w-3.5 h-3.5" /> Cobrar no WhatsApp
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
                   <h4 className="font-bold text-slate-300">Status Atual</h4>
@@ -251,7 +285,15 @@ export function StoreDetailsModal({ store, isOpen, onClose, onActionSuccess }: S
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Status da Assinatura:</span>
-                      <strong className="text-rose-400">{store.subscriptionStatus}</strong>
+                      <strong className={
+                        store.subscriptionStatus === 'PAST_DUE' 
+                          ? 'text-amber-400' 
+                          : store.subscriptionStatus === 'ACTIVE' 
+                          ? 'text-emerald-400' 
+                          : 'text-rose-400'
+                      }>
+                        {store.subscriptionStatus === 'PAST_DUE' ? 'PAST_DUE (Vencida)' : store.subscriptionStatus}
+                      </strong>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Valor Recorrente:</span>
@@ -270,8 +312,11 @@ export function StoreDetailsModal({ store, isOpen, onClose, onActionSuccess }: S
                       <span>{store.trialEndsAt ? new Date(store.trialEndsAt).toLocaleDateString('pt-BR') : 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-500">Próxima Cobrança:</span>
-                      <span>{store.nextBillingAt ? new Date(store.nextBillingAt).toLocaleDateString('pt-BR') : 'N/A'}</span>
+                      <span className="text-slate-500">Vencimento / Próxima Cobrança:</span>
+                      <span className={store.subscriptionStatus === 'PAST_DUE' ? 'text-amber-400 font-bold' : ''}>
+                        {store.nextBillingAt ? new Date(store.nextBillingAt).toLocaleDateString('pt-BR') : 'N/A'}
+                        {store.subscriptionStatus === 'PAST_DUE' ? ' (Venceu)' : ''}
+                      </span>
                     </div>
                   </div>
                 </div>

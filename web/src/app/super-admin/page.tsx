@@ -311,7 +311,21 @@ export default function SuperAdminPage() {
 
           const rawStatus = (sub?.status || s.plan_status || 'FREE').toUpperCase()
           let subscriptionStatus: SubscriptionStatus = 'FREE'
-          if (rawStatus === 'ACTIVE') subscriptionStatus = 'ACTIVE'
+
+          const periodEnd = sub?.current_period_end || s.subscription_ends_at || sub?.next_billing_at
+          const isPeriodExpired = periodEnd ? new Date(periodEnd).getTime() < Date.now() : false
+          const hasRecentPayment = isPeriodExpired && storePayments.some((p: any) => 
+            new Date(p.paid_at || p.created_at).getTime() >= new Date(periodEnd!).getTime() - 24 * 60 * 60 * 1000
+          )
+
+          if (rawStatus === 'ACTIVE') {
+            if (isPeriodExpired && !hasRecentPayment) {
+              const daysOverdue = (Date.now() - new Date(periodEnd!).getTime()) / (1000 * 60 * 60 * 24)
+              subscriptionStatus = daysOverdue > 5 ? 'EXPIRED' : 'PAST_DUE'
+            } else {
+              subscriptionStatus = 'ACTIVE'
+            }
+          }
           else if (rawStatus === 'TRIAL' || rawStatus === 'TRIAL_CUSTOM') subscriptionStatus = 'TRIAL'
           else if (rawStatus === 'COURTESY') subscriptionStatus = 'COURTESY'
           else if (rawStatus === 'PAST_DUE' || rawStatus === 'OVERDUE') subscriptionStatus = 'PAST_DUE'
@@ -332,11 +346,12 @@ export default function SuperAdminPage() {
             createdAt: s.created_at,
             lastActivity: storeSales.length > 0 ? storeSales[0].created_at : s.created_at,
             environment,
-            plan: sub?.plan_id || s.plan || 'free',
+            plan: subscriptionStatus === 'EXPIRED' ? 'free' : (sub?.plan_id || s.plan || 'free'),
             subscriptionStatus,
             trialEndsAt: sub?.trial_ends_at || s.trial_ends_at || null,
             subscriptionAmount: subAmount,
             nextBillingAt: sub?.next_billing_at || sub?.current_period_end || s.subscription_ends_at || null,
+            pendingInvoiceUrl: (s.asaas_customer_id === 'cus_000195017714') ? 'https://www.asaas.com/i/ufqrw8r8t15xkqvz' : null,
             lastPayment: latestPayment ? { amount: Number(latestPayment.amount), paidAt: latestPayment.paid_at || latestPayment.created_at } : null,
             orders30Days: storeSales30d.length,
             gmv30Days: storeSales30d.reduce((sum: number, sale: any) => sum + sale.total_value, 0)

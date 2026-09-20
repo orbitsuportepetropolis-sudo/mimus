@@ -39,6 +39,7 @@ export interface StoreRowData {
   } | null
   orders30Days: number
   gmv30Days: number
+  pendingInvoiceUrl?: string | null
 }
 
 interface StoresPlansTableProps {
@@ -92,7 +93,7 @@ export function StoresPlansTable({ stores, onSelectStore, onQuickChangeEnvironme
       case 'COURTESY':
         return <span className="bg-pink-500/10 text-pink-400 border border-pink-500/30 px-2 py-0.5 rounded-full text-[9px] font-extrabold">COURTESY</span>
       case 'PAST_DUE':
-        return <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full text-[9px] font-extrabold">PAST_DUE</span>
+        return <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full text-[9px] font-extrabold inline-flex items-center gap-1"><AlertTriangle className="w-2.5 h-2.5" /> ATRASADA</span>
       case 'CANCELED':
         return <span className="bg-rose-500/10 text-rose-400 border border-rose-500/30 px-2 py-0.5 rounded-full text-[9px] font-extrabold">CANCELED</span>
       case 'EXPIRED':
@@ -294,6 +295,11 @@ export function StoresPlansTable({ stores, onSelectStore, onQuickChangeEnvironme
                         {store.subscriptionStatus === 'TRIAL' && store.trialEndsAt ? (
                           <span className="text-purple-400">
                             Trial até {new Date(store.trialEndsAt).toLocaleDateString('pt-BR')}
+                          </span>
+                        ) : store.subscriptionStatus === 'PAST_DUE' && store.nextBillingAt ? (
+                          <span className="text-amber-400 font-bold inline-flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                            Venceu em {new Date(store.nextBillingAt).toLocaleDateString('pt-BR')}
                           </span>
                         ) : store.nextBillingAt ? (
                           <span>{new Date(store.nextBillingAt).toLocaleDateString('pt-BR')}</span>
