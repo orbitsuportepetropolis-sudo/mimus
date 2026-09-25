@@ -33,7 +33,7 @@ Você tem acesso ao histórico das últimas mensagens desta conversa. Use-o para
 ---
 DADOS ATUAIS DA LOJA (para você correlacionar nomes a IDs):
 
-PRODUTOS CADASTRADOS (ID, Nome, SKU, Código de Barras, Preço de Venda, Estoque Atual, Visível na Vitrine):
+PRODUTOS CADASTRADOS (ID, Nome, SKU, Código de Barras, Preço de Venda, Estoque Atual, Visível na Vitrine, Possui Imagem [has_image]):
 ${JSON.stringify(currentProducts)}
 
 CLIENTES CADASTRADOS (ID, Nome):
@@ -56,6 +56,11 @@ REGRAS OBRIGATÓRIAS DE COMANDOS DE VITRINE:
   * Para CADA produto zerado encontrado, gere uma ação:
     { "type": "update_storefront_visibility", "productId": "<id_do_produto>", "visible": false }
   * No campo 'reply', liste os nomes dos produtos que foram ocultados da vitrine de maneira amigável.
+- Quando o usuário pedir para ocultar produtos sem imagem/foto (ex: "O que estiver sem imagem, oculte da vitrine", "oculte produtos sem foto da vitrine", "tire da vitrine o que não tem foto", "oculte itens sem imagem"):
+  * Analise todos os itens em PRODUTOS CADASTRADOS cujo campo 'has_image' seja false (has_image === false).
+  * Para CADA produto sem imagem encontrado, gere uma ação:
+    { "type": "update_storefront_visibility", "productId": "<id_do_produto>", "visible": false }
+  * No campo 'reply', liste os nomes dos produtos que foram ocultados por não terem foto cadastrada.
 - Quando o usuário pedir para ocultar um produto específico da vitrine (ex: "Oculte o Babyliss da vitrine"):
   * Localize o produto correspondente e gere a ação { "type": "update_storefront_visibility", "productId": "<id>", "visible": false }.
 - Quando o usuário pedir para exibir produtos na vitrine (ex: "Exiba na vitrine os itens com estoque" ou "Mostre o Babyliss na vitrine"):
@@ -67,6 +72,14 @@ EXEMPLO DE RESPOSTA PARA ITENS ZERADOS:
   "actions": [
     { "type": "update_storefront_visibility", "productId": "prod_1", "visible": false },
     { "type": "update_storefront_visibility", "productId": "prod_2", "visible": false }
+  ]
+}
+
+EXEMPLO DE RESPOSTA PARA ITENS SEM IMAGEM:
+{
+  "reply": "Entendido! Ocultei da vitrine os seguintes produtos que estão sem imagem: Base Fluída, Body Cream.",
+  "actions": [
+    { "type": "update_storefront_visibility", "productId": "id_base_fluida", "visible": false }
   ]
 }
 
@@ -165,8 +178,23 @@ Você DEVE responder ESTRITAMENTE em formato JSON com o seguinte formato de resp
     const isHideIntent = lowerText.includes('ocult') || lowerText.includes('escond') || lowerText.includes('tir') || lowerText.includes('desativ')
     const isShowIntent = lowerText.includes('exib') || lowerText.includes('mostr') || lowerText.includes('ativ') || lowerText.includes('coloc')
     const isZeroStockIntent = lowerText.includes('zerad') || lowerText.includes('sem estoque') || lowerText.includes('estoque 0') || lowerText.includes('acabou')
+    const isNoImageIntent = lowerText.includes('sem imagem') || lowerText.includes('sem foto') || lowerText.includes('nao tem foto') || lowerText.includes('não tem foto') || lowerText.includes('sem fotos') || lowerText.includes('sem imagens')
 
-    if (isVitrineIntent && isHideIntent && isZeroStockIntent) {
+    if (isVitrineIntent && isHideIntent && isNoImageIntent) {
+      // Ocultar itens sem imagem
+      const noImageProds = (currentProducts || []).filter((p: any) => p.has_image === false)
+      if (noImageProds.length > 0) {
+        parsed.actions = noImageProds.map((p: any) => ({
+          type: 'update_storefront_visibility',
+          productId: p.id,
+          visible: false
+        }))
+        const names = noImageProds.map((p: any) => p.name).join(', ')
+        parsed.reply = `Entendido! Ocultei da vitrine todos os ${noImageProds.length} produto(s) sem imagem cadastrada: ${names}.`
+      } else {
+        parsed.reply = `Todos os seus produtos já possuem imagem cadastrada!`
+      }
+    } else if (isVitrineIntent && isHideIntent && isZeroStockIntent) {
       // Ocultar itens zerados
       const zeroProds = (currentProducts || []).filter((p: any) => (Number(p.stock) || 0) <= 0)
       if (zeroProds.length > 0) {

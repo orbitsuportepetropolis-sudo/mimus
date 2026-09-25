@@ -131,7 +131,7 @@ export default function AIChatModal({ onClose, storeId, onRefresh }: AIChatModal
       // 1. Fetch latest products and customers in real-time
       const { data: prods } = await supabase
         .from('products')
-        .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock, visible_in_storefront')
+        .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock, visible_in_storefront, image_url, images')
         .eq('store_id', storeId)
         .eq('active', true)
 
@@ -162,7 +162,8 @@ export default function AIChatModal({ onClose, storeId, onRefresh }: AIChatModal
             barcode: p.barcode || '',
             price: p.sale_price,
             stock: p.quantity_in_stock,
-            visible_in_storefront: p.visible_in_storefront !== false
+            visible_in_storefront: p.visible_in_storefront !== false,
+            has_image: Boolean(p.image_url || (Array.isArray(p.images) && p.images.length > 0))
           })),
           currentCustomers: currentCustomers.map(c => ({
             id: c.id,

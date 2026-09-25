@@ -259,7 +259,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
 
       let { data: prods, error: prodsErr } = await supabase
         .from('products')
-        .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock, visible_in_storefront, active')
+        .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock, visible_in_storefront, image_url, images, active')
         .eq('store_id', store_id)
         .eq('active', true)
         .order('name', { ascending: true })
@@ -267,7 +267,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
       if (prodsErr && prodsErr.code === '42703') {
         const fallback = await supabase
           .from('products')
-          .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock, visible_in_storefront')
+          .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock, visible_in_storefront, image_url')
           .eq('store_id', store_id)
           .order('name', { ascending: true })
         prods = fallback.data as any
@@ -298,7 +298,8 @@ export default function DashboardShell({ children, profile, store, lowStockCount
             barcode: p.barcode || '', 
             price: p.sale_price, 
             stock: p.quantity_in_stock,
-            visible_in_storefront: p.visible_in_storefront !== false
+            visible_in_storefront: p.visible_in_storefront !== false,
+            has_image: Boolean(p.image_url || (Array.isArray(p.images) && p.images.length > 0))
           })),
           currentCustomers: currentCustomers.map(c => ({ id: c.id, name: c.name }))
         })
