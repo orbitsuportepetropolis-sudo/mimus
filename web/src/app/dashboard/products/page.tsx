@@ -16,6 +16,7 @@ import {
   Upload,
   Save,
   Eye,
+  EyeOff,
   History,
   Boxes
 } from 'lucide-react'
@@ -179,6 +180,7 @@ export default function ProductsPage() {
   const [imagePreviews, setImagePreviews] = useState<(string | null)[]>([null, null, null, null, null])
   const [formVariations, setFormVariations] = useState<{ name: string; options: any[] }[]>([])
   const [currentStoreId, setCurrentStoreId] = useState<string | null>(null)
+  const [togglingVisibilityId, setTogglingVisibilityId] = useState<string | null>(null)
   const [uploadingOptionImg, setUploadingOptionImg] = useState<{ varIdx: number; optIdx: number } | null>(null)
   const [newVarName, setNewVarName] = useState('')
   const [newVarOptions, setNewVarOptions] = useState('')
@@ -1260,6 +1262,47 @@ export default function ProductsPage() {
     }
   }
 
+  // Toggle storefront visibility
+  async function handleToggleStorefrontVisibility(p: Product) {
+    const newStatus = p.visible_in_storefront === false ? true : false
+    setTogglingVisibilityId(p.id)
+
+    // Optimistic update
+    setProducts(prev => prev.map(item => item.id === p.id ? { ...item, visible_in_storefront: newStatus } : item))
+
+    try {
+      let storeId = currentStoreId
+      if (!storeId) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Não autenticado')
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('store_id')
+          .eq('id', user.id)
+          .single()
+        if (!profile) throw new Error('Loja não encontrada')
+        storeId = profile.store_id
+      }
+
+      const { error } = await supabase
+        .from('products')
+        .update({ visible_in_storefront: newStatus })
+        .eq('id', p.id)
+        .eq('store_id', storeId)
+
+      if (error) throw error
+
+      window.dispatchEvent(new CustomEvent('dashboard-refresh'))
+    } catch (err: any) {
+      console.error('Erro ao alterar visibilidade na vitrine:', err)
+      // Reverter alteração otimista
+      setProducts(prev => prev.map(item => item.id === p.id ? { ...item, visible_in_storefront: p.visible_in_storefront } : item))
+      alert('Não foi possível alterar a visibilidade do produto na vitrine.')
+    } finally {
+      setTogglingVisibilityId(null)
+    }
+  }
+
   // Delete product
   async function handleDelete(id: string) {
     if (confirm('Tem certeza que deseja excluir este produto?')) {
@@ -1523,9 +1566,14 @@ export default function ProductsPage() {
                                   </span>
                                 )}
                                 {p.visible_in_storefront === false && (
-                                  <span className="text-[8px] font-black uppercase tracking-wider bg-slate-400 text-white px-1.5 py-0.5 rounded dark:bg-zinc-800 dark:text-zinc-300">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleStorefrontVisibility(p)}
+                                    title="Clique para ativar exibição na vitrine"
+                                    className="text-[8px] font-black uppercase tracking-wider bg-slate-400 hover:bg-emerald-600 text-white px-1.5 py-0.5 rounded dark:bg-zinc-800 dark:hover:bg-emerald-700 dark:text-zinc-300 transition-colors flex items-center gap-1 cursor-pointer"
+                                  >
                                     Oculto na Vitrine 👁️‍
-                                  </span>
+                                  </button>
                                 )}
                               </div>
                               {p.variations && (() => {
@@ -1571,7 +1619,30 @@ export default function ProductsPage() {
                               <span className="text-slate-400">-</span>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-right space-x-2">
+                          <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleStorefrontVisibility(p)}
+                              disabled={togglingVisibilityId === p.id}
+                              className={`p-1.5 rounded-lg transition-colors inline-flex items-center justify-center ${
+                                p.visible_in_storefront === false
+                                  ? 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:text-zinc-500 dark:hover:text-emerald-400 dark:hover:bg-emerald-950/20'
+                                  : 'text-emerald-600 hover:text-slate-400 hover:bg-slate-100 dark:text-emerald-400 dark:hover:bg-zinc-800'
+                              }`}
+                              title={
+                                p.visible_in_storefront === false
+                                  ? 'Oculto na Vitrine (clique para ativar exibição)'
+                                  : 'Exibindo na Vitrine (clique para desativar)'
+                              }
+                            >
+                              {togglingVisibilityId === p.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                              ) : p.visible_in_storefront === false ? (
+                                <EyeOff className="w-4 h-4" />
+                              ) : (
+                                <Eye className="w-4 h-4" />
+                              )}
+                            </button>
                             <button
                               onClick={() => openModal(p)}
                               className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
@@ -2263,11 +2334,11 @@ export default function ProductsPage() {
                   <label className="block text-slate-400 dark:text-zinc-500 mb-1">Quantidade em Estoque *</label>
                   <input
                     type="number"
+                    min="0"
                     required
-                    disabled={!!editingProduct} // manual stock adjustment has its own page/triggers
                     value={formStock}
                     onChange={(e) => setFormStock(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500 disabled:opacity-50"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 focus:outline-none focus:ring-2 focus:ring-rose-500"
                   />
                 </div>
 
