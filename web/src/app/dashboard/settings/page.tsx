@@ -20,7 +20,8 @@ import {
   MessageCircle,
   Copy,
   ExternalLink,
-  Check
+  Check,
+  Ticket
 } from 'lucide-react'
 
 const GOOGLE_FONTS = [
@@ -838,9 +839,17 @@ interface BannerConfig {
 
           {/* Card 4: Storefront Coupons */}
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-100 dark:border-zinc-800/80 shadow-sm space-y-4">
-            <h2 className="text-sm font-bold text-slate-700 dark:text-zinc-200 border-b border-slate-50 dark:border-zinc-800/60 pb-2 flex items-center gap-2">
-              <Percent className="w-4 h-4 text-rose-500" /> Cupom de Primeira Compra
-            </h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-50 dark:border-zinc-800/60 gap-2">
+              <h2 className="text-sm font-bold text-slate-700 dark:text-zinc-200 flex items-center gap-2">
+                <Percent className="w-4 h-4 text-rose-500" /> Cupom de Primeira Compra
+              </h2>
+              <Link
+                href="/dashboard/coupons"
+                className="text-xs font-bold text-rose-600 hover:text-rose-500 flex items-center gap-1"
+              >
+                <Ticket className="w-3.5 h-3.5" /> Abrir Gerenciador de Cupons →
+              </Link>
+            </div>
             
             <div className="space-y-4 text-xs font-semibold">
               <div className="flex items-center gap-2">

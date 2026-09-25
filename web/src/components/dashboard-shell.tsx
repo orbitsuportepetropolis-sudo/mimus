@@ -24,7 +24,8 @@ import {
   Settings,
   Send,
   MessageSquare,
-  Loader2
+  Loader2,
+  Ticket
 } from 'lucide-react'
 
 interface DashboardShellProps {
@@ -515,6 +516,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
     { name: 'Produtos', href: '/dashboard/products', icon: Package },
     { name: 'Clientes', href: '/dashboard/customers', icon: Users },
     { name: 'Financeiro', href: '/dashboard/finance', icon: DollarSign },
+    { name: 'Cupons', href: '/dashboard/coupons', icon: Ticket },
     { name: 'Personalizar', href: '/dashboard/settings', icon: Settings },
     { name: 'Equipe', href: '/dashboard/team', icon: Users },
     { name: 'Mensalidade', href: '/dashboard/billing', icon: CreditCard },

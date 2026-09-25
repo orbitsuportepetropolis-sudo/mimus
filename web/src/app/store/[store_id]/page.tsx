@@ -20,7 +20,11 @@ import {
   Percent,
   CreditCard,
   Coins,
-  DollarSign
+  DollarSign,
+  Ticket,
+  Gift,
+  Tag,
+  Check
 } from 'lucide-react'
 
 interface Product {
@@ -43,6 +47,25 @@ interface Product {
 interface CartItem extends Product {
   qty: number
   selected_variations?: { [key: string]: string }
+  is_reward?: boolean
+  reward_coupon_code?: string
+}
+
+interface Coupon {
+  id: string
+  store_id: string
+  code: string
+  description: string | null
+  type: 'percentage' | 'fixed' | 'product_reward' | 'free_shipping'
+  discount_value: number
+  min_order_value: number
+  reward_product_id: string | null
+  reward_product_price: number | null
+  max_uses: number | null
+  uses_count: number
+  active: boolean
+  valid_until: string | null
+  reward_product?: Product | null
 }
 
 interface Banner {
@@ -99,6 +122,13 @@ export default function StorefrontPage() {
   const [deliveryType, setDeliveryType] = useState<'delivery' | 'pickup'>('pickup')
   const [address, setAddress] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card' | 'debit_card' | 'money'>('pix')
+
+  // Dynamic Store Coupons System
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null)
+  const [couponInput, setCouponInput] = useState('')
+  const [couponLoading, setCouponLoading] = useState(false)
+  const [couponError, setCouponError] = useState<string | null>(null)
+  const [couponSuccess, setCouponSuccess] = useState<string | null>(null)
 
   // Verify first purchase on phone number change
   useEffect(() => {
@@ -390,6 +420,11 @@ export default function StorefrontPage() {
     const item = cart.find(i => i.id === id && JSON.stringify(i.selected_variations || {}) === varsStr)
     if (!item) return
 
+    if (item.is_reward && delta > 0) {
+      alert('Limite de 1 unidade promocional por cupom.')
+      return
+    }
+
     const newQty = item.qty + delta
     if (newQty <= 0) {
       setCart(cart.filter(i => !(i.id === id && JSON.stringify(i.selected_variations || {}) === varsStr)))
@@ -433,10 +468,169 @@ export default function StorefrontPage() {
     return matchesSearch && matchesCategory
   })
 
-  const cartTotal = cart.reduce((acc, item) => acc + (item.sale_price * item.qty), 0)
+  // Cart items & totals calculations
+  const standardCartTotal = cart.filter(i => !i.is_reward).reduce((acc, item) => acc + (item.sale_price * item.qty), 0)
+  const rewardCartTotal = cart.filter(i => i.is_reward).reduce((acc, item) => acc + (item.sale_price * item.qty), 0)
+  const cartTotal = standardCartTotal + rewardCartTotal
   const cartItemsCount = cart.reduce((acc, item) => acc + item.qty, 0)
-  const discountAmount = (isFirstPurchase && couponFirstPurchaseActive) ? Math.round(cartTotal * (couponFirstPurchasePct / 100) * 100) / 100 : 0
+
+  // Min order verification for applied coupon
+  const minOrderMet = !appliedCoupon || standardCartTotal >= (appliedCoupon.min_order_value || 0)
+
+  // Calculate coupon discount
+  let couponDiscount = 0
+  if (appliedCoupon && minOrderMet) {
+    if (appliedCoupon.type === 'percentage') {
+      couponDiscount = Math.round(standardCartTotal * (appliedCoupon.discount_value / 100) * 100) / 100
+    } else if (appliedCoupon.type === 'fixed') {
+      couponDiscount = Math.min(standardCartTotal, appliedCoupon.discount_value)
+    }
+  }
+
+  // Fallback to first purchase discount if no explicit coupon is applied
+  const firstPurchaseDiscount = (!appliedCoupon && isFirstPurchase && couponFirstPurchaseActive) 
+    ? Math.round(cartTotal * (couponFirstPurchasePct / 100) * 100) / 100 
+    : 0
+
+  const discountAmount = couponDiscount > 0 ? couponDiscount : firstPurchaseDiscount
   const finalTotal = Math.max(0, cartTotal - discountAmount)
+
+  async function handleApplyCoupon(codeToApply?: string) {
+    const rawCode = (codeToApply || couponInput).trim()
+    if (!rawCode) {
+      setCouponError('Digite um código de cupom.')
+      return
+    }
+
+    const code = rawCode.toUpperCase()
+    setCouponLoading(true)
+    setCouponError(null)
+    setCouponSuccess(null)
+
+    try {
+      const { data, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('store_id', storeId)
+        .ilike('code', code)
+        .eq('active', true)
+        .maybeSingle()
+
+      if (error) {
+        console.warn('Erro ao consultar cupom:', error)
+      }
+
+      if (!data) {
+        // Fallback: check first purchase coupon code
+        if (couponFirstPurchaseActive && code.toLowerCase() === couponFirstPurchaseCode.toLowerCase()) {
+          if (!clientPhone || clientPhone.replace(/\D/g, '').length < 10) {
+            setCouponError('Preencha seu WhatsApp abaixo para validar o cupom de primeira compra.')
+            return
+          }
+          if (isFirstPurchase) {
+            setCouponSuccess(`Cupom ${couponFirstPurchaseCode} de primeira compra ativado!`)
+            return
+          } else {
+            setCouponError(`O cupom ${couponFirstPurchaseCode} é exclusivo para a primeira compra.`)
+            return
+          }
+        }
+        setCouponError('Cupom inválido ou não encontrado.')
+        return
+      }
+
+      // Check expiry date
+      if (data.valid_until && new Date(data.valid_until) < new Date()) {
+        setCouponError('Este cupom já expirou.')
+        return
+      }
+
+      // Check max uses
+      if (data.max_uses && (data.uses_count || 0) >= data.max_uses) {
+        setCouponError('Este cupom atingiu o limite de utilizações.')
+        return
+      }
+
+      // Find reward product if product_reward
+      let rewardProd: Product | null = null
+      if (data.type === 'product_reward' && data.reward_product_id) {
+        rewardProd = products.find(p => p.id === data.reward_product_id) || null
+        if (!rewardProd) {
+          const { data: prodData } = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', data.reward_product_id)
+            .maybeSingle()
+          if (prodData) {
+            rewardProd = prodData
+          }
+        }
+      }
+
+      const fullCoupon: Coupon = {
+        ...data,
+        reward_product: rewardProd
+      }
+
+      setAppliedCoupon(fullCoupon)
+      setCouponInput('')
+      setCouponSuccess(`Cupom "${fullCoupon.code}" aplicado com sucesso!`)
+
+      // If product_reward and min order is already reached, automatically offer or add to cart
+      if (fullCoupon.type === 'product_reward' && rewardProd) {
+        const hasReward = cart.some(i => i.is_reward)
+        if (!hasReward && standardCartTotal >= (fullCoupon.min_order_value || 0)) {
+          setCart(prev => [
+            ...prev.filter(i => !i.is_reward),
+            {
+              ...rewardProd!,
+              sale_price: Number(fullCoupon.reward_product_price ?? 0),
+              qty: 1,
+              is_reward: true,
+              reward_coupon_code: fullCoupon.code
+            }
+          ])
+        }
+      }
+    } catch (err: any) {
+      console.error('Erro ao aplicar cupom:', err)
+      setCouponError('Erro ao validar cupom. Tente novamente.')
+    } finally {
+      setCouponLoading(false)
+    }
+  }
+
+  function handleRemoveCoupon() {
+    setAppliedCoupon(null)
+    setCouponSuccess(null)
+    setCouponError(null)
+    setCart(prev => prev.filter(i => !i.is_reward))
+  }
+
+  function handleAddRewardToCart() {
+    if (!appliedCoupon || appliedCoupon.type !== 'product_reward') return
+    const rewardProd = appliedCoupon.reward_product || products.find(p => p.id === appliedCoupon.reward_product_id)
+    if (!rewardProd) {
+      alert('Produto da promoção não encontrado no estoque.')
+      return
+    }
+
+    if (standardCartTotal < (appliedCoupon.min_order_value || 0)) {
+      alert(`Adicione mais R$ ${(appliedCoupon.min_order_value - standardCartTotal).toFixed(2)} em produtos para desbloquear este benefício!`)
+      return
+    }
+
+    setCart(prev => [
+      ...prev.filter(i => !i.is_reward),
+      {
+        ...rewardProd,
+        sale_price: Number(appliedCoupon.reward_product_price ?? 0),
+        qty: 1,
+        is_reward: true,
+        reward_coupon_code: appliedCoupon.code
+      }
+    ])
+  }
 
   async function handleSendOrder() {
     if (!clientName) {
@@ -454,6 +648,11 @@ export default function StorefrontPage() {
       return
     }
 
+    if (appliedCoupon && !minOrderMet) {
+      alert(`O cupom ${appliedCoupon.code} requer um pedido mínimo de R$ ${(appliedCoupon.min_order_value || 0).toFixed(2)} em produtos regulares.`)
+      return
+    }
+
     setSendingOrder(true)
     try {
       // 1. Prepare items payload for database RPC
@@ -463,8 +662,8 @@ export default function StorefrontPage() {
         unit_price: item.sale_price
       }))
 
-      const totalValue = (isFirstPurchase && couponFirstPurchaseActive) ? finalTotal : cartTotal
-      const discount = (isFirstPurchase && couponFirstPurchaseActive) ? discountAmount : 0
+      const totalValue = finalTotal
+      const discount = discountAmount
 
       // 2. Call Supabase RPC to create storefront order (registers customer + reserves stock)
       const { data: saleId, error: orderError } = await supabase
@@ -482,7 +681,6 @@ export default function StorefrontPage() {
 
       if (orderError) {
         console.error('Error creating storefront order:', orderError)
-        // Check for specific stock error raised by PG function
         if (orderError.message && orderError.message.includes('estoque')) {
           alert('Ops! Algum item do seu carrinho acabou de ficar indisponível no estoque. Por favor, ajuste o carrinho e tente novamente.')
         } else {
@@ -492,6 +690,15 @@ export default function StorefrontPage() {
       }
 
       console.log('Order created successfully in database. Sale ID:', saleId)
+
+      // Increment coupon usage in database if applied
+      if (appliedCoupon) {
+        try {
+          await supabase.rpc('increment_coupon_uses', { p_coupon_id: appliedCoupon.id })
+        } catch {
+          await supabase.from('coupons').update({ uses_count: (appliedCoupon.uses_count || 0) + 1 }).eq('id', appliedCoupon.id)
+        }
+      }
 
       // 3. Format WhatsApp message
       let message = `🌸 *NOVO PEDIDO - ${storeName.toUpperCase()}* 🌸\n\n`
@@ -513,11 +720,27 @@ export default function StorefrontPage() {
         const varsText = item.selected_variations && Object.keys(item.selected_variations).length > 0
           ? ' (' + Object.entries(item.selected_variations).map(([k, v]) => `${k}: ${v}`).join(', ') + ')'
           : '';
-        message += `- *${item.qty}x* ${item.name}${varsText} (${item.brand || 'Geral'}) — R$ ${(item.sale_price * item.qty).toFixed(2)}\n`
+        const promoTag = item.is_reward ? ` 🎁 [COMPRE E LEVE - Cupom ${item.reward_coupon_code || ''}]` : '';
+        message += `- *${item.qty}x* ${item.name}${varsText}${promoTag} (${item.brand || 'Geral'}) — R$ ${(item.sale_price * item.qty).toFixed(2)}\n`
       })
 
-      if (isFirstPurchase && couponFirstPurchaseActive) {
-        message += `\n🎟️ *Cupom Primeira Compra (${couponFirstPurchaseCode} - ${couponFirstPurchasePct}%):* - R$ ${discountAmount.toFixed(2)}\n`
+      if (appliedCoupon && minOrderMet) {
+        if (appliedCoupon.type === 'product_reward') {
+          const rewardProdName = appliedCoupon.reward_product?.name || 'Item Especial'
+          message += `\n🎟️ *Cupom Compre e Leve:* ${appliedCoupon.code}\n`
+          message += `🎁 *Produto Promocional:* ${rewardProdName} por R$ ${Number(appliedCoupon.reward_product_price ?? 0).toFixed(2)}\n`
+        } else if (appliedCoupon.type === 'percentage') {
+          message += `\n🎟️ *Cupom de Desconto:* ${appliedCoupon.code} (-${appliedCoupon.discount_value}%)\n`
+          message += `💸 *Desconto Aplicado:* - R$ ${couponDiscount.toFixed(2)}\n`
+        } else if (appliedCoupon.type === 'fixed') {
+          message += `\n🎟️ *Cupom de Desconto:* ${appliedCoupon.code} (-R$ ${Number(appliedCoupon.discount_value).toFixed(2)})\n`
+          message += `💸 *Desconto Aplicado:* - R$ ${couponDiscount.toFixed(2)}\n`
+        } else if (appliedCoupon.type === 'free_shipping') {
+          message += `\n🎟️ *Cupom Aplicado:* ${appliedCoupon.code} (Frete Grátis 🚚)\n`
+        }
+        message += `💰 *VALOR TOTAL DO PEDIDO:* R$ ${finalTotal.toFixed(2)}\n\n`
+      } else if (isFirstPurchase && couponFirstPurchaseActive && discountAmount > 0) {
+        message += `\n🎟️ *Cupom Primeira Compra (${couponFirstPurchaseCode} - ${couponFirstPurchasePct}%):* - R$ ${firstPurchaseDiscount.toFixed(2)}\n`
         message += `💰 *VALOR TOTAL DO PEDIDO:* R$ ${finalTotal.toFixed(2)}\n\n`
       } else {
         message += `\n💰 *VALOR TOTAL DO PEDIDO:* R$ ${cartTotal.toFixed(2)}\n\n`
@@ -530,6 +753,7 @@ export default function StorefrontPage() {
 
       // Clear cart on success
       setCart([])
+      setAppliedCoupon(null)
       setCartOpen(false)
 
       window.open(whatsappUrl, '_blank')
@@ -1275,6 +1499,11 @@ export default function StorefrontPage() {
                         <div className="flex-1 pr-3">
                           <h4 className="font-bold text-slate-700 dark:text-zinc-200 line-clamp-1">{item.name}</h4>
                           <span className="text-[10px] text-slate-400">{item.brand || 'Geral'}</span>
+                          {item.is_reward && (
+                            <div className="inline-flex items-center gap-1 mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md bg-pink-100 text-pink-700 dark:bg-pink-950/40 dark:text-pink-300 border border-pink-200 dark:border-pink-900/30">
+                              <Gift className="w-2.5 h-2.5" /> Compre e Leve (Cupom {item.reward_coupon_code})
+                            </div>
+                          )}
                           {item.selected_variations && Object.keys(item.selected_variations).length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
                               {Object.entries(item.selected_variations).map(([key, val]) => (
@@ -1304,6 +1533,166 @@ export default function StorefrontPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+
+                  {/* Coupon Input & Promotion Card */}
+                  <div className="p-3.5 rounded-2xl border border-slate-200/80 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/40 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-zinc-200">
+                        <Ticket className="w-4 h-4 text-[var(--primary-color)]" />
+                        <span>Cupom ou Oferta Especial</span>
+                      </div>
+                      {appliedCoupon && (
+                        <button 
+                          type="button" 
+                          onClick={handleRemoveCoupon} 
+                          className="text-[10px] text-rose-500 hover:text-rose-600 font-bold flex items-center gap-0.5 transition-colors"
+                        >
+                          <X className="w-3 h-3" /> Remover
+                        </button>
+                      )}
+                    </div>
+
+                    {!appliedCoupon ? (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <Tag className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                            <input 
+                              type="text"
+                              value={couponInput}
+                              onChange={(e) => {
+                                setCouponInput(e.target.value.toUpperCase())
+                                setCouponError(null)
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  handleApplyCoupon()
+                                }
+                              }}
+                              placeholder="Digite o cupom (ex: PROMO200)"
+                              className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-bold tracking-wider uppercase placeholder:normal-case placeholder:font-normal placeholder:tracking-normal focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleApplyCoupon()}
+                            disabled={couponLoading || !couponInput.trim()}
+                            className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-black dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1"
+                          >
+                            {couponLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Aplicar'}
+                          </button>
+                        </div>
+
+                        {couponError && (
+                          <p className="text-[10px] font-semibold text-rose-500 animate-in fade-in duration-150">
+                            {couponError}
+                          </p>
+                        )}
+                        {couponSuccess && (
+                          <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 animate-in fade-in duration-150">
+                            {couponSuccess}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5 animate-in fade-in duration-150">
+                        <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-300">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-600 text-white font-black text-[10px] tracking-wider">
+                              {appliedCoupon.code}
+                            </span>
+                            <span className="text-xs font-bold">
+                              {appliedCoupon.type === 'product_reward' && 'Compre e Leve'}
+                              {appliedCoupon.type === 'percentage' && `${appliedCoupon.discount_value}% OFF`}
+                              {appliedCoupon.type === 'fixed' && `R$ ${Number(appliedCoupon.discount_value).toFixed(2)} OFF`}
+                              {appliedCoupon.type === 'free_shipping' && 'Frete Grátis'}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-medium opacity-80">Ativado</span>
+                        </div>
+
+                        {appliedCoupon.description && (
+                          <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                            {appliedCoupon.description}
+                          </p>
+                        )}
+
+                        {/* Special "Compre e Leve" Card */}
+                        {appliedCoupon.type === 'product_reward' && (
+                          <div className="p-3 rounded-xl bg-gradient-to-br from-pink-500/5 via-purple-500/5 to-pink-500/10 border border-pink-200/70 dark:border-pink-900/40 space-y-2.5">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--primary-color)]">
+                              <Gift className="w-4 h-4" />
+                              <span>Oferta Compre e Leve Desbloqueável</span>
+                            </div>
+
+                            {appliedCoupon.reward_product ? (
+                              <div className="flex items-center gap-3">
+                                {appliedCoupon.reward_product.image_url ? (
+                                  <img 
+                                    src={appliedCoupon.reward_product.image_url} 
+                                    alt={appliedCoupon.reward_product.name} 
+                                    className="w-12 h-12 rounded-lg object-cover border border-pink-100 dark:border-zinc-800"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 rounded-lg bg-pink-100/50 dark:bg-zinc-800 flex items-center justify-center text-[var(--primary-color)]">
+                                    <Gift className="w-6 h-6" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <h5 className="text-xs font-bold text-slate-800 dark:text-zinc-100 truncate">
+                                    {appliedCoupon.reward_product.name}
+                                  </h5>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-[10px] text-slate-400 line-through">
+                                      R$ {appliedCoupon.reward_product.sale_price.toFixed(2)}
+                                    </span>
+                                    <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">
+                                      por R$ {Number(appliedCoupon.reward_product_price ?? 0).toFixed(2)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-slate-600 dark:text-zinc-400">
+                                Produto especial liberado por R$ {Number(appliedCoupon.reward_product_price ?? 0).toFixed(2)}!
+                              </p>
+                            )}
+
+                            {minOrderMet ? (
+                              <div>
+                                {cart.some(i => i.is_reward) ? (
+                                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 p-2 rounded-lg">
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>Produto promocional incluído na sua sacola!</span>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={handleAddRewardToCart}
+                                    className="w-full py-2 px-3 rounded-lg bg-[var(--primary-color)] hover:opacity-90 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                                  >
+                                    <Gift className="w-3.5 h-3.5" />
+                                    <span>Adicionar à Sacola por R$ {Number(appliedCoupon.reward_product_price ?? 0).toFixed(2)}</span>
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 text-[10px] text-amber-700 dark:text-amber-300 font-medium">
+                                ⚠️ Compre mais <strong>R$ {(appliedCoupon.min_order_value - standardCartTotal).toFixed(2)}</strong> em produtos normais para liberar este item por R$ {Number(appliedCoupon.reward_product_price ?? 0).toFixed(2)}!
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {appliedCoupon.type !== 'product_reward' && !minOrderMet && (
+                          <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 text-[10px] text-amber-700 dark:text-amber-300 font-medium">
+                            ⚠️ Pedido mínimo de <strong>R$ {appliedCoupon.min_order_value.toFixed(2)}</strong> para ativar este benefício. Faltam R$ {(appliedCoupon.min_order_value - standardCartTotal).toFixed(2)}.
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Customer information Form */}
@@ -1435,21 +1824,39 @@ export default function StorefrontPage() {
             {/* Drawer Footer (Total and WhatsApp send) */}
             {cart.length > 0 && (
               <div className="p-5 border-t border-slate-100 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 space-y-3">
-                {isFirstPurchase && couponFirstPurchaseActive && (
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-400 font-medium">Subtotal:</span>
-                    <span className="font-bold text-slate-700 dark:text-zinc-300">R$ {cartTotal.toFixed(2)}</span>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400 font-medium">Subtotal dos produtos:</span>
+                  <span className="font-bold text-slate-700 dark:text-zinc-300">R$ {cartTotal.toFixed(2)}</span>
+                </div>
+
+                {appliedCoupon && couponDiscount > 0 && (
+                  <div className="flex justify-between items-center text-xs text-emerald-600 dark:text-emerald-400 font-bold animate-in fade-in duration-150">
+                    <span className="flex items-center gap-1">
+                      <Ticket className="w-3.5 h-3.5" /> Cupom {appliedCoupon.code}:
+                    </span>
+                    <span>- R$ {couponDiscount.toFixed(2)}</span>
                   </div>
                 )}
-                {isFirstPurchase && couponFirstPurchaseActive && (
-                  <div className="flex justify-between items-center text-xs text-emerald-600 dark:text-emerald-400 font-bold">
+
+                {appliedCoupon && appliedCoupon.type === 'free_shipping' && minOrderMet && (
+                  <div className="flex justify-between items-center text-xs text-emerald-600 dark:text-emerald-400 font-bold animate-in fade-in duration-150">
+                    <span className="flex items-center gap-1">
+                      <Truck className="w-3.5 h-3.5" /> Frete:
+                    </span>
+                    <span>GRÁTIS ({appliedCoupon.code})</span>
+                  </div>
+                )}
+
+                {!appliedCoupon && isFirstPurchase && couponFirstPurchaseActive && firstPurchaseDiscount > 0 && (
+                  <div className="flex justify-between items-center text-xs text-emerald-600 dark:text-emerald-400 font-bold animate-in fade-in duration-150">
                     <span>Desconto Primeira Compra ({couponFirstPurchaseCode} - {couponFirstPurchasePct}%):</span>
-                    <span>- R$ {discountAmount.toFixed(2)}</span>
+                    <span>- R$ {firstPurchaseDiscount.toFixed(2)}</span>
                   </div>
                 )}
+
                 <div className="flex justify-between items-center text-slate-800 dark:text-white">
                   <span className="text-xs font-semibold text-slate-400">Total do pedido:</span>
-                  <span className="text-lg font-black">R$ {(isFirstPurchase && couponFirstPurchaseActive) ? finalTotal.toFixed(2) : cartTotal.toFixed(2)}</span>
+                  <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">R$ {finalTotal.toFixed(2)}</span>
                 </div>
                 
                 <button 
