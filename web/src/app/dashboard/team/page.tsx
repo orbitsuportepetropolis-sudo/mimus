@@ -13,6 +13,7 @@ import {
   Loader2, 
   Clock 
 } from 'lucide-react'
+import { hasProAccess } from '@/lib/permissions'
 
 interface TeamMember {
   id: string
@@ -51,12 +52,32 @@ export default function TeamPage() {
         setStoreId(profile.store_id)
         
         const store = profile.stores as any
-        const plan = store?.plan || 'free'
-        const status = store?.plan_status || 'trial'
-        const trialEnds = store?.trial_ends_at ? new Date(store.trial_ends_at).getTime() : 0
-        const isTrialValid = (status === 'trial' && trialEnds > Date.now()) || status === 'trial_custom'
-        const isProValid = plan === 'pro' && (status === 'active' || status === 'pending' || status === 'pro')
-        const isPro = isTrialValid || isProValid
+        
+        let subPlan: string | null = null
+        let subStatus: string | null = null
+        let subTrialEnds: string | null = null
+
+        try {
+          const { data: sub } = await supabase
+            .from('subscriptions')
+            .select('plan_id, status, trial_ends_at')
+            .eq('store_id', profile.store_id)
+            .maybeSingle()
+
+          if (sub) {
+            subPlan = sub.plan_id
+            subStatus = sub.status
+            subTrialEnds = sub.trial_ends_at
+          }
+        } catch (subErr) {
+          console.warn('Subscriptions query error in team:', subErr)
+        }
+
+        const isPro = hasProAccess({
+          plan: subPlan || store?.plan,
+          status: subStatus || store?.plan_status,
+          trial_ends_at: subTrialEnds || store?.trial_ends_at
+        })
         setIsProUser(isPro)
         
         // Fetch all profiles belonging to the same store

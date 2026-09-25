@@ -23,6 +23,7 @@ import {
   Check,
   Ticket
 } from 'lucide-react'
+import { hasProAccess } from '@/lib/permissions'
 
 const GOOGLE_FONTS = [
   { name: 'Inter', value: 'Inter', type: 'sans-serif' },
@@ -158,12 +159,32 @@ interface BannerConfig {
           setCouponFirstPurchaseCode(store.coupon_first_purchase_code || 'BEMVINDA')
           setCouponFirstPurchasePct(String(store.coupon_first_purchase_pct ?? '10'))
 
-          const plan = store.plan || 'free'
-          const status = store.plan_status || 'trial'
-          const trialEnds = store.trial_ends_at ? new Date(store.trial_ends_at).getTime() : 0
-          const isTrialValid = (status === 'trial' && trialEnds > Date.now()) || status === 'trial_custom'
-          const isProValid = plan === 'pro' && (status === 'active' || status === 'pending' || status === 'pro')
-          const isPro = isTrialValid || isProValid
+          // Check subscriptions table (source of truth for billing & courtesy)
+          let subPlan: string | null = null
+          let subStatus: string | null = null
+          let subTrialEnds: string | null = null
+
+          try {
+            const { data: sub } = await supabase
+              .from('subscriptions')
+              .select('plan_id, status, trial_ends_at')
+              .eq('store_id', profile.store_id)
+              .maybeSingle()
+
+            if (sub) {
+              subPlan = sub.plan_id
+              subStatus = sub.status
+              subTrialEnds = sub.trial_ends_at
+            }
+          } catch (subErr) {
+            console.warn('Subscriptions query error in settings:', subErr)
+          }
+
+          const isPro = hasProAccess({
+            plan: subPlan || store.plan,
+            status: subStatus || store.plan_status,
+            trial_ends_at: subTrialEnds || store.trial_ends_at
+          })
           setIsProUser(isPro)
 
           // Load banners

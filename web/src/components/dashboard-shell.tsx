@@ -27,6 +27,7 @@ import {
   Loader2,
   Ticket
 } from 'lucide-react'
+import { hasProAccess } from '@/lib/permissions'
 
 interface DashboardShellProps {
   children: React.ReactNode
@@ -116,12 +117,11 @@ export default function DashboardShell({ children, profile, store, lowStockCount
     logPageView()
   }, [pathname, profile, supabase])
 
-  const plan = store?.plan || 'free'
-  const status = store?.plan_status || 'trial'
-  const trialEnds = store?.trial_ends_at ? new Date(store.trial_ends_at).getTime() : 0
-  const isTrialValid = (status === 'trial' && trialEnds > Date.now()) || status === 'trial_custom'
-  const isProValid = plan === 'pro' && (status === 'active' || status === 'pending' || status === 'pro')
-  const isPro = isTrialValid || isProValid
+  const isPro = hasProAccess({
+    plan: store?.plan,
+    status: store?.plan_status,
+    trial_ends_at: store?.trial_ends_at
+  })
   const hasAccess = true
   const showBlocker = false
 

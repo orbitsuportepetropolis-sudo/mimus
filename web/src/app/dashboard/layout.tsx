@@ -70,7 +70,7 @@ export default async function DashboardLayout({
   // --- END ONBOARDING GUARD ---
 
   // Fetch store details (if store_id exists)
-  let store = null
+  let store: any = null
   if (activeProfile.store_id) {
     const { data: storeData } = await supabase
       .from('stores')
@@ -78,6 +78,25 @@ export default async function DashboardLayout({
       .eq('id', activeProfile.store_id)
       .single()
     store = storeData
+
+    // Check subscriptions table (source of truth for billing & admin courtesy)
+    if (store) {
+      try {
+        const { data: sub } = await supabase
+          .from('subscriptions')
+          .select('plan_id, status, trial_ends_at')
+          .eq('store_id', activeProfile.store_id)
+          .maybeSingle()
+
+        if (sub && (sub.status === 'COURTESY' || sub.status === 'ACTIVE' || sub.plan_id === 'pro')) {
+          store.plan = sub.plan_id || 'pro'
+          store.plan_status = sub.status || 'courtesy'
+          if (sub.trial_ends_at) store.trial_ends_at = sub.trial_ends_at
+        }
+      } catch (err) {
+        console.warn('Erro ao consultar subscriptions no layout:', err)
+      }
+    }
   }
 
   // Fetch low stock count for notifications

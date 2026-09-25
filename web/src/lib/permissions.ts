@@ -42,27 +42,32 @@ export interface StoreAccessContext {
 export function hasProAccess(context?: StoreAccessContext | null): boolean {
   if (!context) return false
 
-  const status = (context.status || 'FREE').toUpperCase() as SubscriptionStatus
+  const status = (context.status || 'FREE').toUpperCase()
   const plan = (context.plan || 'free').toLowerCase()
 
-  // 1. Assinatura ativa paga no plano Pro/Enterprise
-  if (status === 'ACTIVE' && (plan === 'pro' || plan === 'enterprise')) {
-    return true
-  }
-
-  // 2. Conta com cortesia administrativa concedida pelo Super Admin (MRR = R$ 0 mas Pro liberado)
+  // 1. Conta com cortesia administrativa concedida pelo Super Admin
   if (status === 'COURTESY') {
     return true
   }
 
-  // 3. Período de avaliação (Trial) ativo e não expirado
-  if (status === 'TRIAL') {
-    if (!context.trial_ends_at) return true // Trial customizado sem expiração estrita
+  // 2. Assinatura ativa paga no plano Pro/Enterprise
+  if ((status === 'ACTIVE' || status === 'PRO' || status === 'PENDING') && (plan === 'pro' || plan === 'enterprise')) {
+    return true
+  }
+
+  // 3. Qualquer plano Pro que não esteja explicitamente cancelado, expirado ou inadimplente
+  if (plan === 'pro' && status !== 'CANCELED' && status !== 'EXPIRED' && status !== 'PAST_DUE') {
+    return true
+  }
+
+  // 4. Período de avaliação (Trial) ativo e não expirado
+  if (status === 'TRIAL' || status === 'TRIAL_CUSTOM') {
+    if (!context.trial_ends_at || status === 'TRIAL_CUSTOM') return true // Trial customizado sem expiração estrita
     const ends = new Date(context.trial_ends_at).getTime()
     return ends > Date.now()
   }
 
-  // 4. Se estiver vencido (PAST_DUE), expirado ou cancelado, cai imediatamente para o modo grátis
+  // 5. Se estiver vencido (PAST_DUE), expirado ou cancelado, bloqueia
   if (status === 'PAST_DUE' || status === 'EXPIRED' || status === 'CANCELED') {
     return false
   }
