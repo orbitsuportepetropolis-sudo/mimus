@@ -259,7 +259,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
 
       let { data: prods, error: prodsErr } = await supabase
         .from('products')
-        .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock, active')
+        .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock, visible_in_storefront, active')
         .eq('store_id', store_id)
         .eq('active', true)
         .order('name', { ascending: true })
@@ -267,7 +267,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
       if (prodsErr && prodsErr.code === '42703') {
         const fallback = await supabase
           .from('products')
-          .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock')
+          .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock, visible_in_storefront')
           .eq('store_id', store_id)
           .order('name', { ascending: true })
         prods = fallback.data as any
@@ -287,7 +287,15 @@ export default function DashboardShell({ children, profile, store, lowStockCount
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text,
-          currentProducts: currentProducts.map(p => ({ id: p.id, name: p.name, sku: p.sku || '', barcode: p.barcode || '', price: p.sale_price, stock: p.quantity_in_stock })),
+          currentProducts: currentProducts.map(p => ({ 
+            id: p.id, 
+            name: p.name, 
+            sku: p.sku || '', 
+            barcode: p.barcode || '', 
+            price: p.sale_price, 
+            stock: p.quantity_in_stock,
+            visible_in_storefront: p.visible_in_storefront !== false
+          })),
           currentCustomers: currentCustomers.map(c => ({ id: c.id, name: c.name }))
         })
       })
@@ -420,6 +428,14 @@ export default function DashboardShell({ children, profile, store, lowStockCount
             .eq('store_id', store_id)
 
           if (delErr) throw delErr
+        } else if (action.type === 'update_storefront_visibility') {
+          const { error: visErr } = await supabase
+            .from('products')
+            .update({ visible_in_storefront: action.visible })
+            .eq('id', action.productId)
+            .eq('store_id', store_id)
+
+          if (visErr) throw visErr
         }
       }
 

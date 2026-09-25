@@ -131,7 +131,7 @@ export default function AIChatModal({ onClose, storeId, onRefresh }: AIChatModal
       // 1. Fetch latest products and customers in real-time
       const { data: prods } = await supabase
         .from('products')
-        .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock')
+        .select('id, name, sku, barcode, sale_price, cost_price, quantity_in_stock, visible_in_storefront')
         .eq('store_id', storeId)
         .eq('active', true)
 
@@ -157,7 +157,8 @@ export default function AIChatModal({ onClose, storeId, onRefresh }: AIChatModal
             sku: p.sku || '',
             barcode: p.barcode || '',
             price: p.sale_price,
-            stock: p.quantity_in_stock
+            stock: p.quantity_in_stock,
+            visible_in_storefront: p.visible_in_storefront !== false
           })),
           currentCustomers: currentCustomers.map(c => ({
             id: c.id,
@@ -300,6 +301,15 @@ export default function AIChatModal({ onClose, storeId, onRefresh }: AIChatModal
             .eq('store_id', storeId)
 
           if (delErr) throw delErr
+          actionsExecuted = true
+        } else if (action.type === 'update_storefront_visibility') {
+          const { error: visErr } = await supabase
+            .from('products')
+            .update({ visible_in_storefront: action.visible })
+            .eq('id', action.productId)
+            .eq('store_id', storeId)
+
+          if (visErr) throw visErr
           actionsExecuted = true
         }
       }

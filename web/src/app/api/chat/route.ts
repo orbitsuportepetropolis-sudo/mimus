@@ -20,7 +20,7 @@ Sua tarefa é analisar a mensagem do usuário e decidir se ela representa comand
 ---
 DADOS ATUAIS DA LOJA (para você correlacionar nomes a IDs):
 
-PRODUTOS CADASTRADOS (ID, Nome, SKU, Código de Barras, Preço de Venda, Estoque Atual):
+PRODUTOS CADASTRADOS (ID, Nome, SKU, Código de Barras, Preço de Venda, Estoque Atual, Visível na Vitrine):
 ${JSON.stringify(currentProducts)}
 
 CLIENTES CADASTRADOS (ID, Nome):
@@ -34,12 +34,19 @@ Comandos possíveis que você pode extrair no array 'actions':
 4. Registrar venda: tipo 'create_sale'. Informe items (lista de { productId, quantity, unitPrice }), customerId (opcional), paymentMethod ('pix', 'money', 'credit_card', ou 'debit_card').
 5. Excluir produto: tipo 'delete_product'. Informe productId.
 6. Excluir cliente: tipo 'delete_customer'. Informe customerId.
+7. Alterar visibilidade na vitrine pública (ocultar ou exibir na vitrine/loja): tipo 'update_storefront_visibility'. Informe productId e visible (boolean: true para exibir na vitrine, false para ocultar da vitrine).
 
 Regras importantes de mapeamento:
 - Se o usuário falar de um produto ou cliente que já existe, mesmo com pequenas diferenças na grafia, encontre a correspondência exata no cadastro fornecido e use o ID correto.
 - Se o usuário pedir para excluir uma lista de produtos, gere uma ação 'delete_product' para cada um dos produtos correspondentes.
+- Se o usuário pedir para ocultar ou exibir produtos da vitrine (por exemplo: "oculte da vitrine todos os itens zerados", "oculte da vitrine os produtos sem estoque", "oculte o produto X da vitrine", "mostre na vitrine os itens com estoque"):
+  * Analise a lista de PRODUTOS CADASTRADOS.
+  * Para itens "zerados" ou "sem estoque", filtre os produtos cujo estoque atual (stock) seja menor ou igual a 0 (stock <= 0).
+  * Para cada produto encontrado que precisa ter o status alterado, adicione uma ação:
+    { "type": "update_storefront_visibility", "productId": "<id_do_produto>", "visible": false } (se for para ocultar) ou visible: true (se for para exibir).
+  * No campo 'reply', liste os nomes dos produtos que você ocultou/exibiu de forma amigável.
 - Se for uma mensagem informativa, pergunta geral, ou você precisar de mais informações, responda amigavelmente no campo 'reply' e não adicione ações.
-- Se você gerar ações, explique amigavelmente no campo 'reply' o que está fazendo, por exemplo: "Entendido! Estou registrando a venda de..." ou "Excluindo os produtos selecionados...".
+- Se você gerar ações, explique amigavelmente no campo 'reply' o que está fazendo, por exemplo: "Entendido! Estou registrando a venda de...", "Excluindo os produtos selecionados..." ou "Entendido! Ocultei da vitrine os X produtos com estoque zerado: [nomes dos produtos]...".
 
 Você DEVE responder ESTRITAMENTE em formato JSON com o seguinte formato de resposta:
 {
