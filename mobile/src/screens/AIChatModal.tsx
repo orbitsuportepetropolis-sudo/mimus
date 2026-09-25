@@ -151,6 +151,10 @@ export default function AIChatModal({ onClose, storeId, onRefresh }: AIChatModal
         },
         body: JSON.stringify({
           text: userText,
+          history: messages.slice(-10).map((m: any) => ({
+            role: m.sender === 'user' ? 'user' : 'model',
+            text: m.text
+          })),
           currentProducts: currentProducts.map(p => ({
             id: p.id,
             name: p.name,

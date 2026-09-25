@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
   try {
-    const { text, currentProducts, currentCustomers } = await request.json()
+    const { text, history, currentProducts, currentCustomers } = await request.json()
 
     if (!text) {
       return NextResponse.json({ error: 'Mensagem vazia.' }, { status: 400 })
@@ -21,6 +21,14 @@ Você tem poderes administrativos para ler dados e executar comandos operacionai
 - Movimentar estoque
 - Excluir produtos e clientes
 - GERENCIAR A VISIBILIDADE DOS PRODUTOS NA VITRINE PÚBLICA (loja online) através da ação 'update_storefront_visibility'
+
+MEMÓRIA DE CONVERSA:
+Você tem acesso ao histórico das últimas mensagens desta conversa. Use-o para entender referências anteriores como:
+- "e aquele outro produto?"
+- "mude o preço dele para 30"
+- "oculte ele da vitrine também"
+- "adicione 5 unidades do batom que acabamos de cadastrar"
+- "registre a venda desse último item para a Maria"
 
 ---
 DADOS ATUAIS DA LOJA (para você correlacionar nomes a IDs):
@@ -71,11 +79,43 @@ Você DEVE responder ESTRITAMENTE em formato JSON com o seguinte formato de resp
 }
 `
 
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    // Format conversation history for Gemini multi-turn format
+    const formattedContents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = []
+
+    if (Array.isArray(history) && history.length > 0) {
+      for (const h of history) {
+        if (!h.text || typeof h.text !== 'string') continue
+        const role = (h.role === 'model' || h.role === 'agent') ? 'model' : 'user'
+        
+        // Gemini API requirement: the very first message in contents MUST have role: 'user'
+        if (formattedContents.length === 0 && role !== 'user') {
+          continue
+        }
+
+        // Avoid consecutive messages of same role by combining text
+        if (formattedContents.length > 0 && formattedContents[formattedContents.length - 1].role === role) {
+          formattedContents[formattedContents.length - 1].parts[0].text += `\n${h.text}`
+        } else {
+          formattedContents.push({ role, parts: [{ text: h.text }] })
+        }
+      }
+    }
+
+    // Append current user message
+    if (formattedContents.length > 0 && formattedContents[formattedContents.length - 1].role === 'user') {
+      formattedContents[formattedContents.length - 1].parts[0].text += `\n${text}`
+    } else {
+      formattedContents.push({ role: 'user', parts: [{ text }] })
+    }
+
+    let geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: `${promptText}\n\nMENSAGEM DO USUÁRIO:\n"${text}"` }] }],
+        systemInstruction: {
+          parts: [{ text: promptText }]
+        },
+        contents: formattedContents,
         generationConfig: {
           responseMimeType: "application/json",
           temperature: 0.1
@@ -83,10 +123,31 @@ Você DEVE responder ESTRITAMENTE em formato JSON com o seguinte formato de resp
       })
     })
 
+    // If systemInstruction or multi-turn fails, fallback to combined single-turn prompt
     if (!geminiResponse.ok) {
-      const errText = await geminiResponse.text()
-      console.error('Gemini API error response:', errText)
-      return NextResponse.json({ error: 'Erro na comunicação com a API do Google Gemini' }, { status: 502 })
+      const historyContext = formattedContents.length > 1
+        ? `\nHISTÓRICO RECENTE DA CONVERSA:\n${formattedContents.map(c => `${c.role.toUpperCase()}: ${c.parts[0].text}`).join('\n')}\n`
+        : ''
+
+      const fallbackResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: `${promptText}${historyContext}\n\nMENSAGEM ATUAL DO USUÁRIO:\n"${text}"` }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.1
+          }
+        })
+      })
+
+      if (fallbackResponse.ok) {
+        geminiResponse = fallbackResponse
+      } else {
+        const errText = await geminiResponse.text()
+        console.error('Gemini API error response:', errText)
+        return NextResponse.json({ error: 'Erro na comunicação com a API do Google Gemini' }, { status: 502 })
+      }
     }
 
     const resData = await geminiResponse.json()

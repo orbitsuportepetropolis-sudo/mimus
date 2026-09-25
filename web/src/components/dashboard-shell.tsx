@@ -287,6 +287,10 @@ export default function DashboardShell({ children, profile, store, lowStockCount
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text,
+          history: messages.slice(-10).map((m: any) => ({
+            role: m.sender === 'user' ? 'user' : 'model',
+            text: m.text
+          })),
           currentProducts: currentProducts.map(p => ({ 
             id: p.id, 
             name: p.name, 
