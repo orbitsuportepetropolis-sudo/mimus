@@ -14,8 +14,13 @@ export async function POST(request: Request) {
     }
 
     const promptText = `
-Você é a Mimus AI, a assistente virtual inteligente da loja de cosméticos.
-Sua tarefa é analisar a mensagem do usuário e decidir se ela representa comandos do banco de dados para executar na loja, ou apenas uma conversa/pergunta geral.
+Você é a Mimus AI, a assistente e operadora virtual inteligente do sistema da loja Mimus cosméticos.
+Você tem poderes administrativos para ler dados e executar comandos operacionais na loja:
+- Cadastrar produtos e clientes
+- Registrar vendas
+- Movimentar estoque
+- Excluir produtos e clientes
+- GERENCIAR A VISIBILIDADE DOS PRODUTOS NA VITRINE PÚBLICA (loja online) através da ação 'update_storefront_visibility'
 
 ---
 DADOS ATUAIS DA LOJA (para você correlacionar nomes a IDs):
@@ -27,26 +32,35 @@ CLIENTES CADASTRADOS (ID, Nome):
 ${JSON.stringify(currentCustomers)}
 ---
 
-Comandos possíveis que você pode extrair no array 'actions':
+Comandos possíveis que você DEVE extrair no array 'actions':
 1. Cadastrar novo produto: tipo 'create_product'. Informe name, brand, costPrice, salePrice, quantity (inicial).
 2. Cadastrar novo cliente: tipo 'create_customer'. Informe name, phone, instagram, birthday (formato YYYY-MM-DD).
 3. Movimentar estoque: tipo 'stock_movement'. Informe productId, quantity (positivo), movementType ('entry' ou 'exit'), reason ('manual_adjustment', 'loss', ou 'purchase').
 4. Registrar venda: tipo 'create_sale'. Informe items (lista de { productId, quantity, unitPrice }), customerId (opcional), paymentMethod ('pix', 'money', 'credit_card', ou 'debit_card').
 5. Excluir produto: tipo 'delete_product'. Informe productId.
 6. Excluir cliente: tipo 'delete_customer'. Informe customerId.
-7. Alterar visibilidade na vitrine pública (ocultar ou exibir na vitrine/loja): tipo 'update_storefront_visibility'. Informe productId e visible (boolean: true para exibir na vitrine, false para ocultar da vitrine).
+7. Alterar visibilidade na vitrine pública (ocultar ou exibir produtos na vitrine/loja): tipo 'update_storefront_visibility'. Informe productId e visible (boolean: true para exibir na vitrine, false para ocultar da vitrine).
 
-Regras importantes de mapeamento:
-- Se o usuário falar de um produto ou cliente que já existe, mesmo com pequenas diferenças na grafia, encontre a correspondência exata no cadastro fornecido e use o ID correto.
-- Se o usuário pedir para excluir uma lista de produtos, gere uma ação 'delete_product' para cada um dos produtos correspondentes.
-- Se o usuário pedir para ocultar ou exibir produtos da vitrine (por exemplo: "oculte da vitrine todos os itens zerados", "oculte da vitrine os produtos sem estoque", "oculte o produto X da vitrine", "mostre na vitrine os itens com estoque"):
-  * Analise a lista de PRODUTOS CADASTRADOS.
-  * Para itens "zerados" ou "sem estoque", filtre os produtos cujo estoque atual (stock) seja menor ou igual a 0 (stock <= 0).
-  * Para cada produto encontrado que precisa ter o status alterado, adicione uma ação:
-    { "type": "update_storefront_visibility", "productId": "<id_do_produto>", "visible": false } (se for para ocultar) ou visible: true (se for para exibir).
-  * No campo 'reply', liste os nomes dos produtos que você ocultou/exibiu de forma amigável.
-- Se for uma mensagem informativa, pergunta geral, ou você precisar de mais informações, responda amigavelmente no campo 'reply' e não adicione ações.
-- Se você gerar ações, explique amigavelmente no campo 'reply' o que está fazendo, por exemplo: "Entendido! Estou registrando a venda de...", "Excluindo os produtos selecionados..." ou "Entendido! Ocultei da vitrine os X produtos com estoque zerado: [nomes dos produtos]...".
+REGRAS OBRIGATÓRIAS DE COMANDOS DE VITRINE:
+- Você PODE e DEVE gerenciar a visibilidade da vitrine pública. NUNCA diga que não consegue gerenciar a vitrine ou que suas funções se limitam a outras tarefas. A visibilidade na vitrine É uma de suas funções operacionais!
+- Quando o usuário pedir para ocultar produtos zerados ou sem estoque (ex: "Oculte da vitrine todos os itens zerados", "oculte itens sem estoque da vitrine", "tire da vitrine o que acabou"):
+  * Analise todos os itens em PRODUTOS CADASTRADOS cujo estoque (stock) seja menor ou igual a 0 (stock <= 0).
+  * Para CADA produto zerado encontrado, gere uma ação:
+    { "type": "update_storefront_visibility", "productId": "<id_do_produto>", "visible": false }
+  * No campo 'reply', liste os nomes dos produtos que foram ocultados da vitrine de maneira amigável.
+- Quando o usuário pedir para ocultar um produto específico da vitrine (ex: "Oculte o Babyliss da vitrine"):
+  * Localize o produto correspondente e gere a ação { "type": "update_storefront_visibility", "productId": "<id>", "visible": false }.
+- Quando o usuário pedir para exibir produtos na vitrine (ex: "Exiba na vitrine os itens com estoque" ou "Mostre o Babyliss na vitrine"):
+  * Gere as ações com visible: true para os produtos correspondentes.
+
+EXEMPLO DE RESPOSTA PARA ITENS ZERADOS:
+{
+  "reply": "Entendido! Ocultei da vitrine todos os produtos que estavam com estoque zerado.",
+  "actions": [
+    { "type": "update_storefront_visibility", "productId": "prod_1", "visible": false },
+    { "type": "update_storefront_visibility", "productId": "prod_2", "visible": false }
+  ]
+}
 
 Você DEVE responder ESTRITAMENTE em formato JSON com o seguinte formato de resposta:
 {
@@ -63,7 +77,8 @@ Você DEVE responder ESTRITAMENTE em formato JSON com o seguinte formato de resp
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: `${promptText}\n\nMENSAGEM DO USUÁRIO:\n"${text}"` }] }],
         generationConfig: {
-          responseMimeType: "application/json"
+          responseMimeType: "application/json",
+          temperature: 0.1
         }
       })
     })
@@ -80,7 +95,44 @@ Você DEVE responder ESTRITAMENTE em formato JSON com o seguinte formato de resp
       return NextResponse.json({ error: 'Resposta inválida da API do Gemini.' }, { status: 500 })
     }
 
-    const parsed = JSON.parse(rawText)
+    let parsed: any = JSON.parse(rawText)
+    if (!parsed.actions) parsed.actions = []
+
+    // Fallback de garantia: se o usuário pediu explicitamente para ocultar/exibir produtos na vitrine e a IA hesitou
+    const lowerText = text.toLowerCase()
+    const isVitrineIntent = lowerText.includes('vitrine') || lowerText.includes('loja')
+    const isHideIntent = lowerText.includes('ocult') || lowerText.includes('escond') || lowerText.includes('tir') || lowerText.includes('desativ')
+    const isShowIntent = lowerText.includes('exib') || lowerText.includes('mostr') || lowerText.includes('ativ') || lowerText.includes('coloc')
+    const isZeroStockIntent = lowerText.includes('zerad') || lowerText.includes('sem estoque') || lowerText.includes('estoque 0') || lowerText.includes('acabou')
+
+    if (isVitrineIntent && isHideIntent && isZeroStockIntent) {
+      // Ocultar itens zerados
+      const zeroProds = (currentProducts || []).filter((p: any) => (Number(p.stock) || 0) <= 0)
+      if (zeroProds.length > 0) {
+        parsed.actions = zeroProds.map((p: any) => ({
+          type: 'update_storefront_visibility',
+          productId: p.id,
+          visible: false
+        }))
+        const names = zeroProds.map((p: any) => p.name).join(', ')
+        parsed.reply = `Entendido! Ocultei da vitrine todos os ${zeroProds.length} produto(s) com estoque zerado: ${names}.`
+      } else {
+        parsed.reply = `Não encontrei produtos com estoque zerado no momento.`
+      }
+    } else if (isVitrineIntent && isShowIntent && (isZeroStockIntent === false && (lowerText.includes('com estoque') || lowerText.includes('todos')))) {
+      // Exibir itens com estoque
+      const inStockProds = (currentProducts || []).filter((p: any) => (Number(p.stock) || 0) > 0)
+      if (inStockProds.length > 0) {
+        parsed.actions = inStockProds.map((p: any) => ({
+          type: 'update_storefront_visibility',
+          productId: p.id,
+          visible: true
+        }))
+        const names = inStockProds.map((p: any) => p.name).join(', ')
+        parsed.reply = `Entendido! Reativei a exibição na vitrine para os ${inStockProds.length} produto(s) com estoque disponível: ${names}.`
+      }
+    }
+
     return NextResponse.json(parsed)
 
   } catch (err: any) {
