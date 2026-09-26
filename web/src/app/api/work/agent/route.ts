@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: Request) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Endpoint não disponível em produção.' }, { status: 404 })
+  }
+
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()

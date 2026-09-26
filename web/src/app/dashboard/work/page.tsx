@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { 
   Sparkles, 
@@ -46,7 +47,14 @@ const DEFAULT_THEME: StorefrontTheme = {
 }
 
 export default function MimusWorkPage() {
+  const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') {
+      router.replace('/dashboard')
+    }
+  }, [router])
 
   const [loading, setLoading] = useState(true)
   const [store, setStore] = useState<any>(null)
@@ -74,7 +82,9 @@ export default function MimusWorkPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    loadInitialData()
+    if (process.env.NODE_ENV !== 'production') {
+      loadInitialData()
+    }
   }, [])
 
   useEffect(() => {
