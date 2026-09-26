@@ -1,7 +1,36 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+
+// Rate limiter em memória (janela deslizante de 1 minuto)
+const chatRateLimits = new Map<string, { count: number; resetAt: number }>()
+
+function isRateLimited(key: string, limit = 25, windowMs = 60_000): boolean {
+  const now = Date.now()
+  const record = chatRateLimits.get(key)
+  if (!record || now > record.resetAt) {
+    chatRateLimits.set(key, { count: 1, resetAt: now + windowMs })
+    return false
+  }
+  if (record.count >= limit) {
+    return true
+  }
+  record.count++
+  return false
+}
 
 export async function POST(request: Request) {
   try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Não autenticado. Faça login para conversar com a Mimus AI.' }, { status: 401 })
+    }
+
+    if (isRateLimited(user.id)) {
+      return NextResponse.json({ error: 'Limite de mensagens atingido. Aguarde um momento para continuar.' }, { status: 429 })
+    }
+
     const { text, history, currentProducts, currentCustomers } = await request.json()
 
     if (!text) {

@@ -228,12 +228,14 @@ export async function POST(request: Request) {
     if (body.event && (body.payment || body.subscription || body.event.startsWith('SUBSCRIPTION_') || body.event.startsWith('PAYMENT_'))) {
       console.log('[Webhook Asaas] Identificado evento Asaas:', body.event)
 
-      // Validação de token se configurado
+      // Validação estrita de token de autenticação Asaas
       const ASAAS_WEBHOOK_TOKEN = process.env.ASAAS_WEBHOOK_TOKEN
       const requestToken = request.headers.get('asaas-access-token')
-      if (ASAAS_WEBHOOK_TOKEN && requestToken !== ASAAS_WEBHOOK_TOKEN) {
-        console.error('[Webhook Asaas] Token de acesso Asaas incorreto!')
-        return NextResponse.json({ error: 'Token de autenticação inválido' }, { status: 401 })
+      if (ASAAS_WEBHOOK_TOKEN) {
+        if (!requestToken || requestToken !== ASAAS_WEBHOOK_TOKEN) {
+          console.error('[Webhook Asaas] Token de acesso Asaas incorreto ou ausente!')
+          return NextResponse.json({ error: 'Token de autenticação inválido' }, { status: 401 })
+        }
       }
 
       const externalSubId = body.payment?.subscription || body.subscription || null
@@ -313,7 +315,12 @@ export async function POST(request: Request) {
     const xRequestId = request.headers.get('x-request-id') || ''
     const MERCADO_PAGO_WEBHOOK_SECRET = process.env.MERCADO_PAGO_WEBHOOK_SECRET || ''
 
-    if (MERCADO_PAGO_WEBHOOK_SECRET && signatureHeader) {
+    if (MERCADO_PAGO_WEBHOOK_SECRET) {
+      if (!signatureHeader) {
+        console.error('[Webhook MP] Cabeçalho x-signature ausente!')
+        return NextResponse.json({ error: 'Assinatura ausente' }, { status: 401 })
+      }
+
       const parts = signatureHeader.split(',')
       let ts = ''
       let v1 = ''

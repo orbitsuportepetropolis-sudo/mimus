@@ -29,6 +29,12 @@ export async function GET(request: NextRequest) {
   const headersList = await headers()
   const ip = headersList.get('x-forwarded-for') || '127.0.0.1'
   const userAgent = headersList.get('user-agent') || 'Unknown'
+  const secFetchSite = headersList.get('sec-fetch-site')
+
+  // Proteção CSRF contra requisições disparadas por sites externos
+  if (secFetchSite === 'cross-site') {
+    return NextResponse.json({ error: 'Acesso negado: origem externa não permitida.' }, { status: 403 })
+  }
 
   if (!profile || profile.role !== 'super_admin') {
     // Log unauthorized attempt

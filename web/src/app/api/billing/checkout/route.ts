@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createClient as createServerClient } from '@/lib/supabase/server'
 
 let supabaseAdminInstance: any = null
 function getSupabaseAdmin() {
@@ -48,11 +49,33 @@ const activeCheckouts = new Map<string, Promise<any>>()
 
 export async function POST(request: Request) {
   try {
+    // 1. Validação de autenticação de sessão
+    const serverSupabase = await createServerClient()
+    const { data: { user } } = await serverSupabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Não autenticado. Faça login para continuar.' }, { status: 401 })
+    }
+
     const body = await request.json()
     const { storeId, email, name, paymentMethod, cpfCnpj, phone, usePromo, creditCard } = body
 
     if (!storeId || !email || !name || !paymentMethod || !cpfCnpj) {
       return NextResponse.json({ error: 'Parâmetros obrigatórios ausentes.' }, { status: 400 })
+    }
+
+    // 2. Validação de autorização multi-tenant (apenas admin da loja ou super admin)
+    const { data: profile } = await serverSupabase
+      .from('profiles')
+      .select('store_id, role')
+      .eq('id', user.id)
+      .single()
+
+    const isSuperAdmin = profile?.role === 'super_admin'
+    const isStoreAdmin = profile?.store_id === storeId && profile?.role === 'admin'
+
+    if (!isSuperAdmin && !isStoreAdmin) {
+      return NextResponse.json({ error: 'Acesso negado. Apenas administradores desta loja podem alterar faturamento.' }, { status: 403 })
     }
 
     // Se já houver um checkout em execução para este storeId, aguardar
