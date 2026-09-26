@@ -16,7 +16,7 @@ export type SubscriptionStatus =
   | 'EXPIRED' 
   | 'COURTESY'
 
-export type StorePlan = 'free' | 'pro' | 'enterprise'
+export type StorePlan = 'free' | 'pro' | 'enterprise' | 'premium'
 
 export type StoreEnvironment = 'PRODUCTION' | 'TEST' | 'INTERNAL' | 'DEMO' | 'PENDING_REVIEW'
 
@@ -27,6 +27,8 @@ export type PlanFeature =
   | 'integrations'         // Integrações com e-commerce e gateways
   | 'advanced_reports'     // Relatórios de margem e DRE
   | 'priority_support'     // Suporte prioritário
+  | 'mimus_work'           // Acesso ao workspace agêntico Co-Work
+  | 'vitrine_studio'       // Editor de vitrine com IA
 
 export interface StoreAccessContext {
   plan?: string | null
@@ -38,6 +40,7 @@ export interface StoreAccessContext {
 
 /**
  * Avalia se o status e data de trial conferem acesso Pro ativo
+ * (Plano Premium herda todas as regalias do Pro)
  */
 export function hasProAccess(context?: StoreAccessContext | null): boolean {
   if (!context) return false
@@ -50,13 +53,13 @@ export function hasProAccess(context?: StoreAccessContext | null): boolean {
     return true
   }
 
-  // 2. Assinatura ativa paga no plano Pro/Enterprise
-  if ((status === 'ACTIVE' || status === 'PRO' || status === 'PENDING') && (plan === 'pro' || plan === 'enterprise')) {
+  // 2. Assinatura ativa paga no plano Pro/Enterprise/Premium
+  if ((status === 'ACTIVE' || status === 'PRO' || status === 'PENDING') && (plan === 'pro' || plan === 'enterprise' || plan === 'premium')) {
     return true
   }
 
-  // 3. Qualquer plano Pro que não esteja explicitamente cancelado, expirado ou inadimplente
-  if (plan === 'pro' && status !== 'CANCELED' && status !== 'EXPIRED' && status !== 'PAST_DUE') {
+  // 3. Qualquer plano Pro/Premium que não esteja explicitamente cancelado, expirado ou inadimplente
+  if ((plan === 'pro' || plan === 'premium') && status !== 'CANCELED' && status !== 'EXPIRED' && status !== 'PAST_DUE') {
     return true
   }
 
@@ -76,10 +79,37 @@ export function hasProAccess(context?: StoreAccessContext | null): boolean {
 }
 
 /**
+ * Avalia se a loja tem acesso ao plano Premium (R$ 109) - Mimus Work & Vitrine Studio
+ */
+export function hasPremiumAccess(context?: StoreAccessContext | null): boolean {
+  if (!context) return false
+
+  const status = (context.status || 'FREE').toUpperCase() as SubscriptionStatus
+  const plan = (context.plan || 'free').toLowerCase()
+
+  if (status === 'ACTIVE' && (plan === 'premium' || plan === 'enterprise')) {
+    return true
+  }
+
+  if (status === 'COURTESY') {
+    return true
+  }
+
+  if (status === 'TRIAL') {
+    if (!context.trial_ends_at) return true
+    const ends = new Date(context.trial_ends_at).getTime()
+    return ends > Date.now()
+  }
+
+  return false
+}
+
+/**
  * Verifica se a loja pode utilizar uma funcionalidade específica
  */
 export function canUseFeature(context: StoreAccessContext | null | undefined, feature: PlanFeature): boolean {
   const isPro = hasProAccess(context)
+  const isPremium = hasPremiumAccess(context)
 
   switch (feature) {
     case 'unlimited_products':
@@ -89,6 +119,10 @@ export function canUseFeature(context: StoreAccessContext | null | undefined, fe
     case 'advanced_reports':
     case 'priority_support':
       return isPro
+
+    case 'mimus_work':
+    case 'vitrine_studio':
+      return isPremium
 
     default:
       return true

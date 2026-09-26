@@ -511,6 +511,7 @@ export default function DashboardShell({ children, profile, store, lowStockCount
 
   const menuItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Mimus Work ⚡', href: '/dashboard/work', icon: Sparkles },
     ...(profile?.role === 'super_admin' ? [{ name: 'Super Admin 👑', href: '/super-admin', icon: Sparkles }] : []),
     { name: 'PDV / Vendas', href: '/dashboard/sales', icon: ShoppingBag },
     { name: 'Produtos', href: '/dashboard/products', icon: Package },

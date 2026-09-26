@@ -23,6 +23,12 @@ import {
   ExternalLink,
   Info
 } from 'lucide-react'
+import {
+  formatExpiryToISO,
+  formatDateForInput,
+  formatCouponDisplayDate,
+  isCouponExpired
+} from '@/lib/coupons'
 
 interface Coupon {
   id: string
@@ -195,7 +201,7 @@ $$;`
       setFormRewardProductId(c.reward_product_id || (products[0]?.id || ''))
       setFormRewardProductPrice(String(c.reward_product_price ?? 0))
       setFormMaxUses(c.max_uses ? String(c.max_uses) : '')
-      setFormValidUntil(c.valid_until ? c.valid_until.split('T')[0] : '')
+      setFormValidUntil(formatDateForInput(c.valid_until))
       setFormActive(c.active)
     } else {
       setEditingCoupon(null)
@@ -248,7 +254,7 @@ $$;`
         reward_product_id: formType === 'product_reward' ? formRewardProductId : null,
         reward_product_price: formType === 'product_reward' ? (parseFloat(formRewardProductPrice) || 0) : null,
         max_uses: formMaxUses ? parseInt(formMaxUses) : null,
-        valid_until: formValidUntil ? new Date(formValidUntil).toISOString() : null,
+        valid_until: formatExpiryToISO(formValidUntil),
         active: formActive
       }
 
@@ -346,9 +352,9 @@ $$;`
   })
 
   // Quick stats
-  const activeCount = coupons.filter(c => c.active).length
+  const activeCount = coupons.filter(c => c.active && !isCouponExpired(c.valid_until)).length
   const totalUses = coupons.reduce((sum, c) => sum + (c.uses_count || 0), 0)
-  const productRewardCount = coupons.filter(c => c.type === 'product_reward' && c.active).length
+  const productRewardCount = coupons.filter(c => c.type === 'product_reward' && c.active && !isCouponExpired(c.valid_until)).length
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -492,7 +498,7 @@ $$;`
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredCoupons.map((c) => {
             const isProductReward = c.type === 'product_reward'
-            const isExpired = c.valid_until && new Date(c.valid_until) < new Date()
+            const isExpired = isCouponExpired(c.valid_until)
 
             return (
               <div 
@@ -610,7 +616,7 @@ $$;`
                         <span>•</span>
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          Até {new Date(c.valid_until).toLocaleDateString('pt-BR')}
+                          Até {formatCouponDisplayDate(c.valid_until)}
                         </span>
                       </>
                     )}

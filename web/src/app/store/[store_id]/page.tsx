@@ -26,6 +26,7 @@ import {
   Tag,
   Check
 } from 'lucide-react'
+import { isCouponExpired } from '@/lib/coupons'
 
 interface Product {
   id: string
@@ -540,7 +541,7 @@ export default function StorefrontPage() {
       }
 
       // Check expiry date
-      if (data.valid_until && new Date(data.valid_until) < new Date()) {
+      if (isCouponExpired(data.valid_until)) {
         setCouponError('Este cupom já expirou.')
         return
       }
